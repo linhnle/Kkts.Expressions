@@ -12,7 +12,7 @@ namespace Kkts.Expressions.Internal
 			new List<Func<Type, Parser, bool>>
 			{
 				 (t, p) => t == typeof(ArrayParser) || t == typeof(NumberParser) || t == typeof(PropertyParser) || t == typeof(StringParser),
-				 (t, p) => t == typeof(NotOperatorParser) || t == typeof(NotFunctionParser) || t == typeof(GroupParser),
+				 (t, p) => t == typeof(NotOperatorParser) || t == typeof(NotFunctionParser) || t == typeof(GroupParser) || t == typeof(ComparisonFunctionOperatorParser),
 				 (t, p) => t == typeof(ComparisonOparatorParser),
 				 (t, p) => t == typeof(LogicalOperatorParser) && GetStandardOperator(p.Result) == Interpreter.LogicalAnd,
 				 (t, p) => t == typeof(LogicalOperatorParser)
@@ -211,6 +211,8 @@ namespace Kkts.Expressions.Internal
 					return BuildNode(param, gp, arg);
 				case ComparisonOparatorParser cop:
 					return BuildNode(param, cop, list, ref currentIndex, arg);
+				case ComparisonFunctionOperatorParser cfop:
+					return BuildNode(param, cfop, list, ref currentIndex, arg);
 				case ArrayParser ap:
 					return BuildNode(ap);
 				default: return null;
@@ -253,6 +255,23 @@ namespace Kkts.Expressions.Internal
 			list[currentIndex - 1] = null;
 			list[currentIndex + 1] = null;
 			++currentIndex;
+
+			return result;
+		}
+
+		private static Node BuildNode(ParameterExpression param, ComparisonFunctionOperatorParser parser, List<Parser> list, ref int currentIndex, BuildArgument arg)
+		{
+			if (parser.BuiltNode != null) return parser.BuiltNode;
+			var result = new Comparison
+			{
+				Left = BuildNode(param, list[currentIndex - 1], list, ref currentIndex, arg),
+				Right = BuildNode(param, parser.Chain, arg),
+				Operator = GetStandardOperator(parser.Result),
+				StartIndex = parser.StartIndex,
+				StartChar = parser.StartChar
+			};
+			parser.BuiltNode = result;
+			list[currentIndex - 1] = null;
 
 			return result;
 		}

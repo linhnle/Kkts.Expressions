@@ -38,8 +38,8 @@ namespace Kkts.Expressions
 		internal const string LogicalOr = "||";
 		internal const string LogicalOr2 = "or";
 		internal const string LogicalOr3 = "|";
-		internal static string[] ComparisonOperators = 
-			{ 
+		internal static string[] ComparisonOperators =
+			{
 				ComparisonEqual,
 				ComparisonEqual2,
 				ComparisonNotEqual,
@@ -58,6 +58,15 @@ namespace Kkts.Expressions
 				ComparisonEndsWith2,
 				ComparisonEndsWith3,
 				ComparisonIn
+			};
+		internal static string[] ComparisonFunctionOperators = 
+			{
+				ComparisonContains,
+				ComparisonContains2,
+				ComparisonStartsWith,
+				ComparisonStartsWith2,
+				ComparisonEndsWith,
+				ComparisonEndsWith2
 			};
 		internal static readonly MethodInfo StringContainsMethod = typeof(string).GetMethod(nameof(string.Contains), new[] { typeof(string) });
 		internal static readonly MethodInfo StringStartsWithMethod = typeof(string).GetMethod(nameof(string.StartsWith), new[] { typeof(string) });

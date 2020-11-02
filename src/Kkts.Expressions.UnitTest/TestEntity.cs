@@ -6,6 +6,8 @@ namespace Kkts.Expressions.UnitTest
     public class TestEntity
     {
         public int Id { get; set; }
+        public bool Boolean { get; set; }
+        public bool? BooleanNullable { get; set; }
         public int Integer { get; set; }
         public int? IntegerNullable { get; set; }
         public double Double { get; set; }

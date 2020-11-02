@@ -25,6 +25,8 @@ namespace Kkts.Expressions.Internal
 
 		public bool LeftHand { get; set; } = true;
 
+		public bool EndFunction { get; set; } = false;
+
 		public int Length => _chars.Count;
 
 		public string Result => new string(_chars.ToArray());
@@ -44,5 +46,10 @@ namespace Kkts.Expressions.Internal
 		{
 			_chars.Add(@char);
 		}
+
+		protected void Append(Parser parser)
+        {
+			_chars.AddRange(parser._chars);
+        }
 	}
 }

@@ -65,6 +65,16 @@ namespace Kkts.Expressions.Internal
 
 		public override IList<Parser> GetNextParsers(char @char)
 		{
+			if (@char == '.')
+			{
+				return new List<Parser> { new ComparisonFunctionOperatorParser { Previous = this } };
+			}
+
+			if (EndFunction)
+			{
+				return new List<Parser>(0);
+			}
+
 			if (LeftHand)
 			{
 				return new List<Parser>

@@ -67,6 +67,18 @@ namespace Kkts.Expressions.UnitTest.Units
             }
         }
 
+
+        [Fact]
+        public void ParsePredicate_String_ComparisonFunction_Succeed()
+        {
+            var result = Interpreter.ParsePredicate<TestEntity>($"String='{DF.String1}' and String != null and String.startsWith(String) and String.endsWith('1') and String.contains('m') and '${DF.String1}'.contains(String) and String in ['{DF.String1}','{DF.String2}','{DF.String3}','{DF.StringN}']");
+            Assert.True(result.Succeeded);
+            using (var context = DF.GetContext())
+            {
+                var value = context.Entities.Count(result.Result);
+                Assert.Equal(1, value);
+            }
+        }
         #endregion Expresion Parser
     }
 }

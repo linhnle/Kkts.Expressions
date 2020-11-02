@@ -7,6 +7,7 @@ namespace Kkts.Expressions.Internal
 		private const string KeyWordTrue = Interpreter.True;
 		private const string KeyWordFalse = Interpreter.False;
 		private const string KeyWordNull = Interpreter.Null;
+		private PropertyParser _nestedParser;
 
 		public bool IsNull { get; private set; }
 
@@ -14,17 +15,45 @@ namespace Kkts.Expressions.Internal
 
 		public bool IsVariable { get; set; }
 
+		public bool IsNestedProperty { get; set; }
+
 		public override bool Accept(char @char, int noOfWhiteSpaceIgnored, int index, ref bool keepTrack, ref bool isStartGroup)
 		{
 			if (Done) return false;
-			if(noOfWhiteSpaceIgnored > 0 && Length > 0)
+			var prevChar = PreviousChar;
+			if (IsNestedProperty)
+            {
+				if (@char == '.')
+                {
+					_nestedParser = new PropertyParser();
+					return true;
+				}
+                else
+                {
+					var accepted = _nestedParser.Accept(@char, noOfWhiteSpaceIgnored, index, ref keepTrack, ref isStartGroup);
+					if (!accepted)
+                    {
+						if (@char != '(' && _nestedParser.Done)
+						{
+							Append('.');
+							Append(_nestedParser);
+						}
+
+						Done = _nestedParser.Done;
+						if (Done) EndIndex = index - 1;
+					}
+
+					return accepted;
+                }
+            }
+
+			if (noOfWhiteSpaceIgnored > 0 && Length > 0)
 			{
 				Done = Length > 0;
 				if (Done) EndIndex = index - noOfWhiteSpaceIgnored;
 				return false;
 			}
-
-			var prevChar = PreviousChar;
+			
 			if (prevChar == char.MinValue && char.IsDigit(@char)) return false;
 			if (char.IsLetter(@char) || @char == '_' || char.IsDigit(@char))
 			{
@@ -32,7 +61,6 @@ namespace Kkts.Expressions.Internal
 				Append(@char);
 				return true;
 			}
-
 			
 			Done = Length > 0;
 			if (Done) EndIndex = index - 1;
@@ -44,9 +72,15 @@ namespace Kkts.Expressions.Internal
 		{
 			if (@char == '.')
 			{
-				Append(@char);
-				return new List<Parser> { this };
+				IsNestedProperty = true;
+				Done = false;
+				return new List<Parser> { this, new ComparisonFunctionOperatorParser { Previous = this } };
 			}
+
+			if (EndFunction)
+            {
+				return new List<Parser>(0);
+            }
 
 			if (LeftHand)
 			{
