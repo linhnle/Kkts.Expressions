@@ -1,0 +1,9 @@
+﻿################################################################################
+# This .gitignore file was automatically created by Microsoft(R) Visual Studio.
+################################################################################
+
+/src/.vs/Kkts/v16/TestStore/0
+/src/Kkts.Expressions/bin
+/src/Kkts.Expressions.UnitTest/bin
+/src/Kkts.Expressions.UnitTest/obj
+/src/Kkts.Expressions/obj

@@ -1,0 +1,16 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netcoreapp2.0</TargetFramework>
+    <Copyright>Copyright (C) 2016-2019 KKTS Ltd.</Copyright>
+    <Version>1.0.0-beta</Version>
+    <Authors>Linh Le</Authors>
+    <Product>Dynamic Expression</Product>
+    <Company>KKTS Ltd.</Company>
+    <PackageLicenseUrl>https://github.com/linhnle/Kk/blob/master/LICENSE</PackageLicenseUrl>
+    <PackageProjectUrl>https://github.com/linhnle/Kk</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/linhnle/Kk.git</RepositoryUrl>
+    <RepositoryType>Git</RepositoryType>
+  </PropertyGroup>
+
+</Project>
