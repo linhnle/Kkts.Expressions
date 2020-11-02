@@ -167,7 +167,8 @@ namespace Kkts.Expressions.UnitTest
                     Option = TestOptions.OptionN,
                     OptionNullable = TestOptions.OptionN,
                     ParentId = ParentIdN,
-                    String = StringN
+                    String = StringN,
+                    BooleanNullable = true
                 };
 
                 var e5 = new TestEntity
@@ -185,7 +186,9 @@ namespace Kkts.Expressions.UnitTest
                     Option = TestOptions.Option2,
                     OptionNullable = null,
                     ParentId = ParentId2,
-                    String = null
+                    String = null,
+                    Boolean = true,
+                    BooleanNullable = null
                 };
 
                 context.Add(e1);

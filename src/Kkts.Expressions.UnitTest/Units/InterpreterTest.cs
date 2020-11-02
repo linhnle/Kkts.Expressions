@@ -244,6 +244,87 @@ namespace Kkts.Expressions.UnitTest.Units
                 Assert.True(value > 0);
             }
         }
+
+        [Fact]
+        public void ParsePredicate_NestedProperty_Succeed()
+        {
+            var result = Interpreter.ParsePredicate<TestEntity>($"Parent.Id = 1 and Parent.Id >= 1");
+            Assert.True(result.Succeeded);
+            using (var context = DF.GetContext())
+            {
+                var value = context.Entities.Count(result.Result);
+                Assert.Equal(1, value);
+            }
+        }
+
+        [Fact]
+        public void ParsePredicate_Enum_Succeed()
+        {
+            var query = $"Option='{TestOptions.Option1}' and Option != 1 and Option = 0  and Option in ['{TestOptions.Option1}','{TestOptions.Option2}','{TestOptions.Option3}']";
+            var and1 = Interpreter.ParsePredicate<TestEntity>(query);
+            var and2 = Interpreter.ParsePredicate<TestEntity>(query.Replace("and", "&&"));
+            var and3 = Interpreter.ParsePredicate<TestEntity>(query.Replace("and", "&"));
+            var or1 = Interpreter.ParsePredicate<TestEntity>(query.Replace("and", "or"));
+            var or2 = Interpreter.ParsePredicate<TestEntity>(query.Replace("and", "||"));
+            var or3 = Interpreter.ParsePredicate<TestEntity>(query.Replace("and", "|"));
+            Assert.True(and1.Succeeded);
+            Assert.True(and2.Succeeded);
+            Assert.True(and3.Succeeded);
+            Assert.True(or1.Succeeded);
+            Assert.True(or2.Succeeded);
+            Assert.True(or3.Succeeded);
+            using (var context = DF.GetContext())
+            {
+                var value = context.Entities.Count(and1.Result);
+                Assert.Equal(1, value);
+                value = context.Entities.Count(and2.Result);
+                Assert.Equal(1, value);
+                value = context.Entities.Count(and3.Result);
+                Assert.Equal(1, value);
+                value = context.Entities.Count(or1.Result);
+                Assert.True(value > 0);
+                value = context.Entities.Count(or2.Result);
+                Assert.True(value > 0);
+                value = context.Entities.Count(or3.Result);
+                Assert.True(value > 0);
+            }
+        }
+
+        [Fact]
+        public void ParsePredicate_EnumNullable_Succeed()
+        {
+            var result = Interpreter.ParsePredicate<TestEntity>($"Option='{TestOptions.Option2}' and OptionNullable=null");
+            var result2 = Interpreter.ParsePredicate<TestEntity>($"OptionNullable='{TestOptions.Option1}'");
+            Assert.True(result.Succeeded);
+            Assert.True(result2.Succeeded);
+            using (var context = DF.GetContext())
+            {
+                var value = context.Entities.Count(result.Result);
+                Assert.Equal(1, value);
+                value = context.Entities.Count(result2.Result);
+                Assert.True(value > 0);
+            }
+        }
+
+        [Fact]
+        public void ParsePredicate_BooleanAndBooleanNullable_Succeed()
+        {
+            var result = Interpreter.ParsePredicate<TestEntity>($"Boolean and BooleanNullable=null");
+            var result2 = Interpreter.ParsePredicate<TestEntity>($"BooleanNullable=true and Not(Boolean) and !Boolean and Boolean=false");
+            var result3 = Interpreter.ParsePredicate<TestEntity>($"Boolean in ['true','false']");
+            Assert.True(result.Succeeded);
+            Assert.True(result2.Succeeded);
+            Assert.True(result3.Succeeded);
+            using (var context = DF.GetContext())
+            {
+                var value = context.Entities.Count(result.Result);
+                Assert.Equal(1, value);
+                value = context.Entities.Count(result2.Result);
+                Assert.True(value > 0);
+                value = context.Entities.Count(result3.Result);
+                Assert.True(value > 0);
+            }
+        }
         #endregion Expresion Parser
     }
 }

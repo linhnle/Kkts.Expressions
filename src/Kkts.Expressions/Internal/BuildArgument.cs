@@ -7,7 +7,7 @@ namespace Kkts.Expressions
 {
     internal class BuildArgument
     {
-        private ILookup<string, string> _lookup;
+        private IDictionary<string, string> _lookup;
         private IEnumerable<string> _validProperties;
         private Type _evaluationType;
 
@@ -19,7 +19,7 @@ namespace Kkts.Expressions
             set
             {
                 _validProperties = value;
-                _lookup = value?.ToLookup(k => k?.ToLower());
+                _lookup = value?.ToDictionary(k => k?.ToLower());
             }
         }
 
@@ -29,7 +29,7 @@ namespace Kkts.Expressions
             set
             {
                 _evaluationType = value;
-                if (_validProperties?.Count() > 0) return;
+                if (_validProperties?.Any() == true) return;
                 ImportValidProperties();
             }
         }
@@ -44,7 +44,42 @@ namespace Kkts.Expressions
 
         public bool IsValidProperty(string value)
         {
-            var isValid = _lookup?.Contains(value?.ToLower()) == true;
+            if (value == null) return false;
+
+            var isValid = _lookup?.ContainsKey(value.ToLower()) == true;
+            if (!isValid && _validProperties?.Any() == true && value.Contains('.') && _evaluationType != null)
+            {
+                var segments = value.Split('.');
+                Type type = null;
+                var parentProp = string.Empty;
+                foreach(var segment in segments)
+                {
+                    if (type is null)
+                    {
+                        type = _evaluationType.GetProperty(segment)?.PropertyType;
+                        parentProp = segment;
+                        if (type is null) break;
+                    }
+                    else
+                    {
+                        var hasValidProp = false;
+                        var props = type.GetProperties(BindingFlags.Public | BindingFlags.Instance).Where(p => p.CanRead).Select(p => p.Name);
+                        foreach(var prop in props)
+                        {
+                            var nestedProp = $"{parentProp}.{prop}".ToLower();
+                            _lookup[nestedProp] = nestedProp;
+                            if (prop == segment) hasValidProp = true;
+                        }
+
+                        if (!hasValidProp) break;
+
+                        type = type.GetProperty(segment).PropertyType;
+                    }
+                }
+
+                isValid = _lookup?.ContainsKey(value.ToLower()) == true;
+            }
+            
             if (!isValid) InvalidProperties.Add(value);
 
             return isValid;
