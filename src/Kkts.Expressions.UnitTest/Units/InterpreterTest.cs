@@ -375,6 +375,76 @@ namespace Kkts.Expressions.UnitTest.Units
                 Assert.True(value > 0);
             }
         }
+
+        [Fact]
+        public void ParsePredicate_DateTimeNullable_Succeed()
+        {
+            var result = Interpreter.ParsePredicate<TestEntity>($"DateTimeNullable='{DF.DateTimeString1}' and DateTimeNullable!=null");
+            var result2 = Interpreter.ParsePredicate<TestEntity>($"DateTimeNullable>'{DF.DateTimeString1}'");
+            Assert.True(result.Succeeded);
+            Assert.True(result2.Succeeded);
+            using (var context = DF.GetContext())
+            {
+                var value = context.Entities.Count(result.Result);
+                Assert.Equal(1, value);
+                value = context.Entities.Count(result2.Result);
+                Assert.True(value > 0);
+            }
+        }
+
+        [Fact]
+        public void ParsePredicate_DateTimeOffsetAndVariableResolver_Succeed()
+        {
+            var query = $"DateTimeOffset='{DF.DateTimeOffsetString1}' and DateTimeOffset<'{DF.DateTimeOffsetString2}' and DateTimeOffset<='{DF.DateTimeOffsetString1}' and DateTimeOffset>='{DF.DateTimeOffsetString1}' and DateTimeOffset in ['{DF.DateTimeOffsetString1}','{DF.DateTimeOffsetString2}','{DF.DateTimeOffsetString3}']";
+            var query3 = $"DateTimeOffset.Year=now.year and DateTimeOffset.Year==utcnow.year";
+            var and1 = Interpreter.ParsePredicate<TestEntity>(query);
+            var and1_2 = Interpreter.ParsePredicate<TestEntity>(query3);
+            var and2 = Interpreter.ParsePredicate<TestEntity>(query.Replace("and", "&&"));
+            var and3 = Interpreter.ParsePredicate<TestEntity>(query.Replace("and", "&"));
+            var or1 = Interpreter.ParsePredicate<TestEntity>(query.Replace("and", "or"));
+            var or2 = Interpreter.ParsePredicate<TestEntity>(query.Replace("and", "||"));
+            var or3 = Interpreter.ParsePredicate<TestEntity>(query.Replace("and", "|"));
+            Assert.True(and1_2.Succeeded);
+            Assert.True(and1.Succeeded);
+            Assert.True(and2.Succeeded);
+            Assert.True(and3.Succeeded);
+            Assert.True(or1.Succeeded);
+            Assert.True(or2.Succeeded);
+            Assert.True(or3.Succeeded);
+            using (var context = DF.GetContext())
+            {
+                var value = context.Entities.Count(and1.Result);
+                Assert.Equal(1, value);
+                value = context.Entities.Count(and1_2.Result);
+                Assert.Equal(1, value);
+                value = context.Entities.Count(and2.Result);
+                Assert.Equal(1, value);
+                value = context.Entities.Count(and3.Result);
+                Assert.Equal(1, value);
+                value = context.Entities.Count(or1.Result);
+                Assert.True(value > 0);
+                value = context.Entities.Count(or2.Result);
+                Assert.True(value > 0);
+                value = context.Entities.Count(or3.Result);
+                Assert.True(value > 0);
+            }
+        }
+
+        [Fact]
+        public void ParsePredicate_DateTimeOffsetNullable_Succeed()
+        {
+            var result = Interpreter.ParsePredicate<TestEntity>($"DateTimeOffsetNullable='{DF.DateTimeString1}' and DateTimeOffsetNullable!=null");
+            var result2 = Interpreter.ParsePredicate<TestEntity>($"DateTimeOffsetNullable>'{DF.DateTimeString1}'");
+            Assert.True(result.Succeeded);
+            Assert.True(result2.Succeeded);
+            using (var context = DF.GetContext())
+            {
+                var value = context.Entities.Count(result.Result);
+                Assert.Equal(1, value);
+                value = context.Entities.Count(result2.Result);
+                Assert.True(value > 0);
+            }
+        }
         #endregion Expresion Parser
     }
 }

@@ -28,10 +28,10 @@ namespace Kkts.Expressions.UnitTest
         public static readonly DateTimeOffset DateTimeOffset2 = new DateTimeOffset(2017, 06, 16, 0, 0, 0, TimeSpan.FromSeconds(0));
         public static readonly DateTimeOffset DateTimeOffset3 = new DateTimeOffset(2019, 07, 16, 0, 0, 0, TimeSpan.FromSeconds(0));
         public static readonly DateTimeOffset DateTimeOffsetN = new DateTimeOffset(DateTime.Now.Year, 08, 16, 0, 0, 0, TimeSpan.FromSeconds(0));
-        public static readonly string DateTimeOffsetString1 = DateTimeOffset1.ToString();
-        public static readonly string DateTimeOffsetString2 = DateTimeOffset2.ToString();
-        public static readonly string DateTimeOffsetString3 = DateTimeOffset3.ToString();
-        public static readonly string DateTimeOffsetStringN = DateTimeOffsetN.ToString();
+        public static readonly string DateTimeOffsetString1 = DateTimeOffset1.ToString("yyyy-MM-dd");
+        public static readonly string DateTimeOffsetString2 = DateTimeOffset2.ToString("yyyy-MM-dd");
+        public static readonly string DateTimeOffsetString3 = DateTimeOffset3.ToString("yyyy-MM-dd");
+        public static readonly string DateTimeOffsetStringN = DateTimeOffsetN.ToString("yyyy-MM-dd");
         public static readonly double Double1 = 2d;
         public static readonly double Double2 = 4d;
         public static readonly double Double3 = 8.3d;
