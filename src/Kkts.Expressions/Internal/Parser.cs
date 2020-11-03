@@ -42,6 +42,8 @@ namespace Kkts.Expressions.Internal
 
 		public abstract bool Validate();
 
+		public abstract void EndExpression();
+
 		protected void Append(char @char)
 		{
 			_chars.Add(@char);

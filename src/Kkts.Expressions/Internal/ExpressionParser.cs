@@ -133,7 +133,18 @@ namespace Kkts.Expressions.Internal
 				}
 			}
 
-			if (acceptedParsers.Count != 1 || groups.Count > 0 || !acceptedParsers[0].Validate())
+			Parser lastestParser = null;
+			var acceptedCount = 0;
+			foreach(var acceptedParser in acceptedParsers)
+            {
+				if (acceptedParser.Validate())
+                {
+					++acceptedCount;
+					lastestParser = acceptedParser;
+
+				}
+            }
+			if (acceptedCount != 1 || groups.Count > 0)
 			{
 				ThrowFormatException(reader.LastChar, reader.Length - 1);
 			}
@@ -294,7 +305,7 @@ namespace Kkts.Expressions.Internal
 			}
 			else if (arg.VariableResolver.IsVariable(result))
             {
-				builtNode = new Constant { Value = null, StartIndex = parser.StartIndex, StartChar = parser.StartChar, IsVariable = true };
+				builtNode = new Constant { Value = result, StartIndex = parser.StartIndex, StartChar = parser.StartChar, IsVariable = true };
 			}
 			else
 			{

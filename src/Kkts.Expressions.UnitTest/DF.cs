@@ -19,7 +19,7 @@ namespace Kkts.Expressions.UnitTest
         public static readonly DateTime DateTime1 = new DateTime(2016, 05, 15);
         public static readonly DateTime DateTime2 = new DateTime(2017, 06, 15);
         public static readonly DateTime DateTime3 = new DateTime(2019, 07, 15);
-        public static readonly DateTime DateTimeN = new DateTime(2020, 08, 15);
+        public static readonly DateTime DateTimeN = new DateTime(DateTime.Now.Year, 08, 15);
         public static readonly string DateTimeString1 = DateTime1.ToString("yyyy-MM-dd");
         public static readonly string DateTimeString2 = DateTime2.ToString("yyyy-MM-dd");
         public static readonly string DateTimeString3 = DateTime3.ToString("yyyy-MM-dd");
@@ -27,7 +27,7 @@ namespace Kkts.Expressions.UnitTest
         public static readonly DateTimeOffset DateTimeOffset1 = new DateTimeOffset(2016, 05, 16, 0, 0, 0, TimeSpan.FromSeconds(0));
         public static readonly DateTimeOffset DateTimeOffset2 = new DateTimeOffset(2017, 06, 16, 0, 0, 0, TimeSpan.FromSeconds(0));
         public static readonly DateTimeOffset DateTimeOffset3 = new DateTimeOffset(2019, 07, 16, 0, 0, 0, TimeSpan.FromSeconds(0));
-        public static readonly DateTimeOffset DateTimeOffsetN = new DateTimeOffset(2020, 08, 16, 0, 0, 0, TimeSpan.FromSeconds(0));
+        public static readonly DateTimeOffset DateTimeOffsetN = new DateTimeOffset(DateTime.Now.Year, 08, 16, 0, 0, 0, TimeSpan.FromSeconds(0));
         public static readonly string DateTimeOffsetString1 = DateTimeOffset1.ToString();
         public static readonly string DateTimeOffsetString2 = DateTimeOffset2.ToString();
         public static readonly string DateTimeOffsetString3 = DateTimeOffset3.ToString();
