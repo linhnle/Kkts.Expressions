@@ -3,7 +3,7 @@ using System.Linq;
 
 namespace Kkts.Expressions.Internal
 {
-    internal class ComparisonOparatorParser : Parser
+	internal class ComparisonOparatorParser : Parser
 	{
 		private static readonly char[] SpecialChars = { '=', '!', '<', '>', '@', '*' };
 		private bool _isSpecialChar = true;

@@ -50,8 +50,8 @@ namespace Kkts.Expressions.Internal
 		}
 
 		protected void Append(Parser parser)
-        {
+		{
 			_chars.AddRange(parser._chars);
-        }
+		}
 	}
 }

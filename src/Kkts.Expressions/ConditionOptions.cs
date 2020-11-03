@@ -6,7 +6,7 @@ using System.Linq.Expressions;
 
 namespace Kkts.Expressions
 {
-    public class ConditionOptions
+	public class ConditionOptions
 	{
 		public virtual string OrderBy { get; set; }
 
@@ -19,12 +19,12 @@ namespace Kkts.Expressions
 		public virtual string Where { get; set; }
 
 		public virtual Condition<T> BuildConditon<T>(VariableResolver variableResolver = null, IEnumerable<string> validProperties = null)
-        {
+		{
 			return (Condition<T>)BuildConditon(typeof(T), variableResolver, validProperties);
-        }
+		}
 
 		public virtual Condition BuildConditon(Type type, VariableResolver variableResolver = null, IEnumerable<string> validProperties = null)
-        {
+		{
 			if (type == null) throw new ArgumentNullException(nameof(type));
 			var arg = new BuildArgument
 			{
@@ -40,7 +40,7 @@ namespace Kkts.Expressions
 			OrderByClause orderByClause = null;
 
 			if (Filters != null && Filters.Any())
-            {
+			{
 				var filtersResult = Filters.TryBuildPredicate(type, arg);
 				if (filtersResult.Succeeded)
 				{
@@ -49,10 +49,10 @@ namespace Kkts.Expressions
 				else
 				{
 					if (filtersResult.Exception != null)
-                    {
+					{
 						exceptions.Add(filtersResult.Exception);
-                    }
-                }
+					}
+				}
 			}
 
 			if (FilterGroups != null && FilterGroups.Any())
@@ -88,7 +88,7 @@ namespace Kkts.Expressions
 			}
 
 			if (!string.IsNullOrWhiteSpace(OrderBy))
-            {
+			{
 				var orderByResult = OrderByParser.Parse(OrderBy, arg);
 				if (orderByResult.Succeeded)
 				{
@@ -103,7 +103,7 @@ namespace Kkts.Expressions
 				}
 			}
 			else if (OrderBys != null && OrderBys.Any())
-            {
+			{
 				var orderBysResult = OrderByParser.Parse(OrderBys.ToArray(), arg);
 				if (orderBysResult.Succeeded)
 				{
@@ -131,14 +131,14 @@ namespace Kkts.Expressions
 				};
 				error.Exceptions = exceptions;
 				result.Error = error;
-            }
-            else
-            {
+			}
+			else
+			{
 				result.Predicates = predicates;
 				result.OrderByClause = orderByClause;
-            }
+			}
 
 			return result;
-        }
+		}
 	}
 }

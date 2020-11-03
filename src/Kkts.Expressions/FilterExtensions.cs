@@ -7,7 +7,7 @@ namespace Kkts.Expressions
 {
 	public static class FilterExtensions
 	{
-        #region Filter
+		#region Filter
 		public static Expression<Func<T, bool>> BuildPredicate<T>(this Filter filter, VariableResolver variableResolver = null)
 		{
 			return (Expression<Func<T, bool>>)BuildPredicate(filter, typeof(T), variableResolver);
@@ -43,7 +43,7 @@ namespace Kkts.Expressions
 		}
 
 		public static EvaluationResult<T, bool> TryBuildPredicate<T>(this Filter filter, VariableResolver variableResolver = null, IEnumerable<string> validProperties = null)
-        {
+		{
 			if (filter == null) throw new ArgumentNullException(nameof(filter));
 			var result = TryBuildPredicate(filter, typeof(T), variableResolver, validProperties);
 
@@ -148,7 +148,7 @@ namespace Kkts.Expressions
 			var allFilters = filters as Filter[] ?? filters.ToArray();
 			
 			foreach(var filter in allFilters)
-            {
+			{
 				arg.IsValidProperty(filter?.Property);
 				arg.IsValidOperator(filter?.Operator);
 			}
@@ -162,8 +162,8 @@ namespace Kkts.Expressions
 				};
 			}			
 
-            try
-            {
+			try
+			{
 				var param = type.CreateParameterExpression();
 				var body = BuildBody(allFilters, param, arg.VariableResolver);
 				return new EvaluationResult
@@ -173,24 +173,24 @@ namespace Kkts.Expressions
 				};
 			}
 			catch (Exception ex)
-            {
+			{
 				return new EvaluationResult
 				{
 					Exception = ex
 				};
-            }
+			}
 		}
 		#endregion internal
 
 		#endregion Filter
 
-        #region Validation
+		#region Validation
 		public static bool IsValid(this Filter filter)
-        {
+		{
 			return !string.IsNullOrWhiteSpace(filter?.Property)
 				&& !string.IsNullOrWhiteSpace(filter?.Operator)
 				&& Interpreter.ComparisonOperators.Contains(filter.Operator.ToLower());
-        }
+		}
 
 		public static bool IsValid(this IEnumerable<Filter> filters)
 		{
@@ -219,6 +219,6 @@ namespace Kkts.Expressions
 			var prop = param.CreatePropertyExpression(filter.Property);
 			return Interpreter.BuildBody(filter.Operator.GetComparisonOperator(), prop, filter.Value, variableResolver);
 		}
-        #endregion private
-    }
+		#endregion private
+	}
 }

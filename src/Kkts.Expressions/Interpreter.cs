@@ -124,17 +124,17 @@ namespace Kkts.Expressions
 		internal static Expression BuildBody(ComparisonOperator @operator, MemberExpression prop, object value, VariableResolver variableResolver)
 		{
 			if (value is string && prop.Type != typeof(string) && @operator != ComparisonOperator.In)
-            {
+			{
 				var varName = (string)value;
 				if (variableResolver.IsVariable(varName) && variableResolver.TryResolve(varName, out var result))
-                {
+				{
 					value = Convert.ChangeType(result, prop.Type);
-                }
-                else
-                {
+				}
+				else
+				{
 					value = varName.Cast(prop.Type);
-                }
-            }
+				}
+			}
 
 			@operator = CorrectOperator(prop.Type, @operator);
 			switch (@operator)

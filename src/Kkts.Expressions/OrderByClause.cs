@@ -4,11 +4,11 @@ using System.Linq.Expressions;
 
 namespace Kkts.Expressions
 {
-    public sealed class OrderByClause
-    {
+	public sealed class OrderByClause
+	{
 		private readonly OrderByParser _parser;
 		internal OrderByClause(OrderByParser parser)
-        {
+		{
 			_parser = parser;
 		}
 

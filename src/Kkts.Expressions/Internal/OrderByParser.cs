@@ -4,7 +4,7 @@ using System.Linq;
 
 namespace Kkts.Expressions
 {
-    internal class OrderByParser
+	internal class OrderByParser
 	{
 		private const string Desc1 = "desc";
 		private const string Desc2 = "descending";
@@ -28,7 +28,7 @@ namespace Kkts.Expressions
 		public bool IsValid { get; set; } = true;
 
 		public static EvaluationResult<OrderByClause> Parse(OrderByInfo[] orderBys, BuildArgument arg)
-        {
+		{
 			var parser = new OrderByParser();
 			foreach (var orderBy in orderBys)
 			{
@@ -69,25 +69,25 @@ namespace Kkts.Expressions
 		}
 
 		public static EvaluationResult<OrderByClause> Parse(string expression, BuildArgument arg)
-        {
+		{
 			var parser = new OrderByParser();
 			foreach (var segment in expression.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries))
 			{
 				var parts = segment.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
 				if (!parser.IsValid)
-                {
+				{
 					arg.IsValidProperty(parts[0]);
 					var isValid = parts.Length == 2 && !arg.IsValidOrderByDirection(parts[1]);
 					continue;
-                }
+				}
 
 				if (parts.Length > 2
 					|| !arg.IsValidProperty(parts[0])
 					|| (parts.Length == 2 && !arg.IsValidOrderByDirection(parts[1])))
-                {
+				{
 					parser.IsValid = false;
 					continue;
-                }
+				}
 
 				if (parser.PropertyName == null)
 				{

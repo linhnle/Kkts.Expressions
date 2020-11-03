@@ -3,7 +3,7 @@ using System.Linq;
 
 namespace Kkts.Expressions.Internal
 {
-    internal class ComparisonFunctionOperatorParser : Parser
+	internal class ComparisonFunctionOperatorParser : Parser
 	{
 		private const char Beginning = '(';
 		private const char Ending = ')';
@@ -15,9 +15,9 @@ namespace Kkts.Expressions.Internal
 		public override bool Accept(char @char, int noOfWhiteSpaceIgnored, int index, ref bool keepTrack, ref bool isStartGroup)
 		{
 			if (!_isStarted && @char == '.')
-            {
+			{
 				return true;
-            }
+			}
 
 			if (!_startBoby && (char.IsLetter(@char) || @char == Beginning))
 			{
@@ -32,12 +32,12 @@ namespace Kkts.Expressions.Internal
 					var funcName = Result.ToLower();
 					_startBoby = Interpreter.ComparisonFunctionOperators.Contains(funcName);
 					if (!_startBoby)
-                    {
+					{
 						return false;
-                    }
+					}
 				}
-                else
-                {
+				else
+				{
 					Append(@char);
 				}
 

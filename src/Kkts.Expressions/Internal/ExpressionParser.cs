@@ -20,8 +20,8 @@ namespace Kkts.Expressions.Internal
 
 		public static EvaluationResult Parse(string expression, Type type, BuildArgument arg)
 		{
-            try
-            {
+			try
+			{
 				var param = type.CreateParameterExpression();
 				var rootNode = Parse(new ExpressionReader(expression), param, arg);
 				if (arg.InvalidProperties.Count > 0 || arg.InvalidVariables.Count > 0)
@@ -42,14 +42,14 @@ namespace Kkts.Expressions.Internal
 				};
 			}
 			catch (Exception ex)
-            {
+			{
 				return new EvaluationResult
 				{
 					Exception = ex,
 					InvalidProperties = new List<string>(0),
 					InvalidVariables = new List<string>(0)
 				};
-            }
+			}
 		}
 
 		private static Node Parse(ExpressionReader reader, ParameterExpression parameter, BuildArgument arg)
@@ -136,14 +136,14 @@ namespace Kkts.Expressions.Internal
 			Parser lastestParser = null;
 			var acceptedCount = 0;
 			foreach(var acceptedParser in acceptedParsers)
-            {
+			{
 				acceptedParser.EndExpression();
 				if (acceptedParser.Validate())
-                {
+				{
 					++acceptedCount;
 					lastestParser = acceptedParser;
 				}
-            }
+			}
 			if (acceptedCount != 1 || groups.Count > 0)
 			{
 				ThrowFormatException(reader.LastChar, reader.Length - 1);
@@ -304,17 +304,17 @@ namespace Kkts.Expressions.Internal
 				builtNode = new Constant { Value = result.ToLower(), Type = typeof(bool), StartIndex = parser.StartIndex, StartChar = parser.StartChar };
 			}
 			else if (arg.VariableResolver.IsVariable(result))
-            {
+			{
 				builtNode = new Constant { Value = result, StartIndex = parser.StartIndex, StartChar = parser.StartChar, IsVariable = true };
 			}
 			else
 			{
 				if (parser.IsVariable)
-                {
+				{
 					arg.InvalidVariables.Add(result);
-                }
-                else
-                {
+				}
+				else
+				{
 					arg.IsValidProperty(result);
 				}
 				

@@ -2,7 +2,7 @@
 
 namespace Kkts.Expressions.Internal
 {
-    internal static class Utils
+	internal static class Utils
 	{
 		private static readonly char[] WhiteSpaces = { ' ', '\t', '\n', '\r' };
 

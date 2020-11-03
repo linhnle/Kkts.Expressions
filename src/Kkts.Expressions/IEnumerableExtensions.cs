@@ -4,10 +4,10 @@ using System.Linq;
 
 namespace Kkts.Expressions
 {
-    public static class IEnumerableExtensions
-    {
-        
-        public static IEnumerable<T> Take<T>(this IEnumerable<T> source, Condition<T> condition, Pagination pagination)
+	public static class IEnumerableExtensions
+	{
+		
+		public static IEnumerable<T> Take<T>(this IEnumerable<T> source, Condition<T> condition, Pagination pagination)
 		{
 			if (source == null) throw new ArgumentNullException(nameof(source));
 			if (condition == null) throw new ArgumentNullException(nameof(condition));
@@ -72,9 +72,9 @@ namespace Kkts.Expressions
 			return source;
 		}
 
-        #region OrderBy
-        #region Generic
-        public static IOrderedEnumerable<T> OrderBy<T>(this IEnumerable<T> source, string expression, IEnumerable<string> validProperties = null) where T : class
+		#region OrderBy
+		#region Generic
+		public static IOrderedEnumerable<T> OrderBy<T>(this IEnumerable<T> source, string expression, IEnumerable<string> validProperties = null) where T : class
 		{
 			if (source == null) throw new ArgumentNullException(nameof(source));
 			if (string.IsNullOrWhiteSpace(expression)) throw new ArgumentException($"{expression} is required", nameof(expression));

@@ -5,8 +5,8 @@ using System.Linq.Expressions;
 
 namespace Kkts.Expressions
 {
-    public static class FilterGroupExtensions
-    {
+	public static class FilterGroupExtensions
+	{
 		#region FilterGroup
 		public static Expression<Func<T, bool>> BuildPredicate<T>(this FilterGroup filterGroup, VariableResolver variableResolver = null)
 		{

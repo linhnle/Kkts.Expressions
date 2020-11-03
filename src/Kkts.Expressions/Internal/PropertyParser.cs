@@ -22,17 +22,17 @@ namespace Kkts.Expressions.Internal
 			if (Done) return false;
 			var prevChar = PreviousChar;
 			if (IsNestedProperty)
-            {
+			{
 				if (@char == '.')
-                {
+				{
 					_nestedParser = new PropertyParser();
 					return true;
 				}
-                else
-                {
+				else
+				{
 					var accepted = _nestedParser.Accept(@char, noOfWhiteSpaceIgnored, index, ref keepTrack, ref isStartGroup);
 					if (!accepted)
-                    {
+					{
 						if (@char != '(' && _nestedParser.Done)
 						{
 							Append('.');
@@ -44,8 +44,8 @@ namespace Kkts.Expressions.Internal
 					}
 
 					return accepted;
-                }
-            }
+				}
+			}
 
 			if (noOfWhiteSpaceIgnored > 0 && Length > 0)
 			{
@@ -78,9 +78,9 @@ namespace Kkts.Expressions.Internal
 			}
 
 			if (EndFunction)
-            {
+			{
 				return new List<Parser>(0);
-            }
+			}
 
 			if (LeftHand)
 			{
@@ -107,13 +107,13 @@ namespace Kkts.Expressions.Internal
 			return true;
 		}
 
-        public override void EndExpression()
-        {
-            if (IsNestedProperty && !Done && _nestedParser.Validate())
-            {
+		public override void EndExpression()
+		{
+			if (IsNestedProperty && !Done && _nestedParser.Validate())
+			{
 				Append('.');
 				Append(_nestedParser);
-            }
-        }
-    }
+			}
+		}
+	}
 }

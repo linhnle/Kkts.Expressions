@@ -5,7 +5,7 @@ using System.Linq.Expressions;
 
 namespace Kkts.Expressions
 {
-    public static class IQueryableExtensions
+	public static class IQueryableExtensions
 	{
 		public static IQueryable<T> Take<T>(this IQueryable<T> source, Condition<T> condition, Pagination pagination)
 		{
@@ -60,14 +60,14 @@ namespace Kkts.Expressions
 			if (!condition.IsValid) throw new InvalidOperationException("Condition is not valid");
 
 			foreach (var predicate in condition.Predicates)
-            {
+			{
 				source = source.Where(predicate);
-            }
+			}
 
 			if (condition.OrderByClause != null)
-            {
+			{
 				source = condition.OrderByClause.Sort(source);
-            }
+			}
 
 			return source;
 		}

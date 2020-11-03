@@ -77,9 +77,9 @@ namespace Kkts.Expressions
 		}
 
 		public static LambdaExpression Convert(this LambdaExpression expression, Type targetType)
-        {
+		{
 			return (LambdaExpression)Convert((Expression)expression, targetType);
-        }
+		}
 
 		internal static MemberExpression CreatePropertyExpression(this ParameterExpression param, string propertyName)
 		{

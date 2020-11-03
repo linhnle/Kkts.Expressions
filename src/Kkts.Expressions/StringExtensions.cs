@@ -98,7 +98,7 @@ namespace Kkts.Expressions
 				(DateTimeOffset)Convert.ChangeType(value, typeof(DateTimeOffset));
 		}
 
-		public static bool TryParseDateTime(this string value, out DateTimeOffset dateTimeOffset, IFormatProvider provider = null)
+		public static bool TryParseDateTimeOffset(this string value, out DateTimeOffset dateTimeOffset, IFormatProvider provider = null)
 		{
 			try
 			{
