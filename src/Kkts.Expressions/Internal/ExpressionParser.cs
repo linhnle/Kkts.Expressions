@@ -137,11 +137,11 @@ namespace Kkts.Expressions.Internal
 			var acceptedCount = 0;
 			foreach(var acceptedParser in acceptedParsers)
             {
+				acceptedParser.EndExpression();
 				if (acceptedParser.Validate())
                 {
 					++acceptedCount;
 					lastestParser = acceptedParser;
-
 				}
             }
 			if (acceptedCount != 1 || groups.Count > 0)
@@ -149,7 +149,7 @@ namespace Kkts.Expressions.Internal
 				ThrowFormatException(reader.LastChar, reader.Length - 1);
 			}
 
-			var chain = BuildChain(null, acceptedParsers[0]);
+			var chain = BuildChain(null, lastestParser);
 
 			return BuildNode(parameter, chain, arg);
 

@@ -11,11 +11,11 @@ namespace Kkts.Expressions.Internal.Nodes
 
 		public bool IsVariable { get; set; }
 
-		public override Expression Build(BuildArgument options)
+		public override Expression Build(BuildArgument arg)
 		{
 			try
 			{
-				if (IsVariable && options.VariableResolver.TryResolve(Value, out var value))
+				if (IsVariable && arg.VariableResolver.TryResolve(Value, out var value))
 				{
 					return Expression.Constant(Convert.ChangeType(value, Type));
 				}

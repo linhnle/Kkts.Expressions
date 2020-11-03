@@ -17,7 +17,7 @@ namespace Kkts.Expressions.Internal
 
 		public int StartIndex { get; protected set; } = -1;
 
-		public char StartChar => _chars[0];
+		public char StartChar => _chars.Count == 0 ? char.MinValue : _chars[0];
 
 		public int EndIndex { get; protected set; } = -1;
 
@@ -42,7 +42,7 @@ namespace Kkts.Expressions.Internal
 
 		public abstract bool Validate();
 
-		public abstract void EndExpression();
+		public virtual void EndExpression() { }
 
 		protected void Append(char @char)
 		{

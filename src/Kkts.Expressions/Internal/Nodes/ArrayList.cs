@@ -13,7 +13,7 @@ namespace Kkts.Expressions.Internal.Nodes
 
 		public Type Type { get; set; }
 
-		public override Expression Build(BuildArgument options)
+		public override Expression Build(BuildArgument arg)
 		{
 			ParseValues();
 			var arr = Array.CreateInstance(Type, StringValues.Count);

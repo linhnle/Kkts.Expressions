@@ -6,7 +6,7 @@ namespace Kkts.Expressions.Internal.Nodes
 	{
 		public int StartIndex { get; set; }
 		public char StartChar { get; set; }
-		public abstract Expression Build(BuildArgument options);
+		public abstract Expression Build(BuildArgument arg);
 
 		public string GetErrorMessage()
 		{

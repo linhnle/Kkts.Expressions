@@ -7,12 +7,12 @@ namespace Kkts.Expressions.Internal.Nodes
 	{
 		public Node Node { get; set; }
 
-		public override Expression Build(BuildArgument options)
+		public override Expression Build(BuildArgument arg)
 		{
 			if(Node == null) throw new FormatException(GetErrorMessage());
 			try
 			{
-				return Expression.Not(Node.Build(options));
+				return Expression.Not(Node.Build(arg));
 			}
 			catch (Exception ex)
 			{

@@ -6,9 +6,9 @@ namespace Kkts.Expressions.Internal.Nodes
 	{
 		public Node Node { get; set; }
 
-		public override Expression Build(BuildArgument options)
+		public override Expression Build(BuildArgument arg)
 		{
-			return Node.Build(options);
+			return Node.Build(arg);
 		}
 	}
 }

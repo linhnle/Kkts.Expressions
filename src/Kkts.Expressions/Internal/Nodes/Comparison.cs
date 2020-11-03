@@ -12,7 +12,7 @@ namespace Kkts.Expressions.Internal.Nodes
 
 		public Node Right { get; set; }
 
-		public override Expression Build(BuildArgument options)
+		public override Expression Build(BuildArgument arg)
 		{
 			try
 			{
@@ -23,30 +23,30 @@ namespace Kkts.Expressions.Internal.Nodes
 				{
 					if (c.Type == null)
 					{
-						var propEx = (MemberExpression)p.Build(options);
+						var propEx = (MemberExpression)p.Build(arg);
 						c.Type = propEx.Type;
-						left = c.Build(options);
+						left = c.Build(arg);
 						right = propEx;
 					}
 					else
 					{
-						left = c.Build(options);
-						right = p.Build(options);
+						left = c.Build(arg);
+						right = p.Build(arg);
 					}
 				}
 				else if (Left is Property p2 && Right is Constant c2)
 				{
-					var propEx = (MemberExpression)p2.Build(options);
+					var propEx = (MemberExpression)p2.Build(arg);
 					c2.Type = propEx.Type;
 					left = propEx;
-					right = c2.Build(options);
+					right = c2.Build(arg);
 				}
 				else if (Left is Property p3 && Right is ArrayList al)
 				{
-					var propEx = (MemberExpression)p3.Build(options);
+					var propEx = (MemberExpression)p3.Build(arg);
 					al.Type = propEx.Type;
 					left = propEx;
-					right = al.Build(options);
+					right = al.Build(arg);
 					inOperatorDataType = al.Type;
 				}
 				else if (Left is Constant c3 && Right is ArrayList al2)
@@ -59,13 +59,13 @@ namespace Kkts.Expressions.Internal.Nodes
 					}
 
 					inOperatorDataType = c3.Type;
-					left = c3.Build(options);
-					right = al2.Build(options);
+					left = c3.Build(arg);
+					right = al2.Build(arg);
 				}
 				else
 				{
-					left = Left.Build(options);
-					right = Right?.Build(options);
+					left = Left.Build(arg);
+					right = Right?.Build(arg);
 				}
 
 				if (left == null) throw new FormatException(GetErrorMessage());

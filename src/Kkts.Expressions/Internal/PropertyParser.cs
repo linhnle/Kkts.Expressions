@@ -106,5 +106,14 @@ namespace Kkts.Expressions.Internal
 
 			return true;
 		}
-	}
+
+        public override void EndExpression()
+        {
+            if (IsNestedProperty && !Done && _nestedParser.Validate())
+            {
+				Append('.');
+				Append(_nestedParser);
+            }
+        }
+    }
 }

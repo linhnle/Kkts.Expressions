@@ -10,17 +10,17 @@ namespace Kkts.Expressions.Internal.Nodes
 
 		public Node Right { get; set; }
 
-		public override Expression Build(BuildArgument options)
+		public override Expression Build(BuildArgument arg)
 		{
 			Operator = Operator.ToLower();
 			switch (Operator) 
 			{
 				case Interpreter.LogicalAnd:
 				case Interpreter.LogicalAnd2:
-					return Expression.AndAlso(Left.Build(options), Right.Build(options));
+					return Expression.AndAlso(Left.Build(arg), Right.Build(arg));
 				case Interpreter.LogicalOr:
 				case Interpreter.LogicalOr2:
-					return Expression.OrElse(Left.Build(options), Right.Build(options));
+					return Expression.OrElse(Left.Build(arg), Right.Build(arg));
 				default:
 					return null;
 			}
