@@ -64,7 +64,7 @@ namespace Kkts.Expressions
             return false;
         }
 
-        public virtual Task InitializeVariablesAsync()
+        public virtual Task InitializeVariablesAsync(object state)
         {
             return Task.CompletedTask;
         }
