@@ -233,7 +233,10 @@ namespace Kkts.Expressions.Internal
 		private static Node BuildNode(ParameterExpression param, NotOperatorParser parser, List<Parser> list, ref int currentIndex, BuildArgument arg)
 		{
 			if (parser.BuiltNode != null) return parser.BuiltNode;
-			var result = new Not { Node = BuildNode(param, parser.Body, arg), StartIndex = parser.StartIndex, StartChar = '!' };
+			var index = currentIndex;
+			var nextParser = list[++currentIndex];
+			var result = new Not { Node = BuildNode(param, nextParser, list, ref currentIndex, arg), StartIndex = parser.StartIndex, StartChar = '!' };
+			list[index + 1] = null;
 			parser.BuiltNode = result;
 
 			return result;

@@ -461,33 +461,63 @@ namespace Kkts.Expressions.UnitTest.Units
         [Fact]
         public void ParsePredicate_NotOperatorAndNotFunction_Success()
         {
-            //var result = Interpreter.ParsePredicate<TestEntity>($"!Boolean");
+            var result = Interpreter.ParsePredicate<TestEntity>($"!Boolean");
             var result2 = Interpreter.ParsePredicate<TestEntity>($"!(Boolean=true)");
-            //var result3 = Interpreter.ParsePredicate<TestEntity>($"not(Boolean)");
-            //var result4 = Interpreter.ParsePredicate<TestEntity>($"not(Boolean=true)");
-            //var result5 = Interpreter.ParsePredicate<TestEntity>($"not(Integer={DF.Integer1})");
-            //var result6 = Interpreter.ParsePredicate<TestEntity>($"not(Integer in [{DF.Integer1}])");
-            //Assert.True(result.Succeeded);
-            //Assert.True(result2.Succeeded);
-            //Assert.True(result3.Succeeded);
-            //Assert.True(result4.Succeeded);
-            //Assert.True(result5.Succeeded);
-            //Assert.True(result6.Succeeded);
-            //using (var context = DF.GetContext())
-            //{
-            //    var value = context.Entities.Count(result.Result);
-            //    Assert.Equal(4, value);
-            //    value = context.Entities.Count(result2.Result);
-            //    Assert.Equal(4, value);
-            //    value = context.Entities.Count(result3.Result);
-            //    Assert.Equal(4, value);
-            //    value = context.Entities.Count(result4.Result);
-            //    Assert.Equal(4, value);
-            //    value = context.Entities.Count(result5.Result);
-            //    Assert.Equal(4, value);
-            //    value = context.Entities.Count(result6.Result);
-            //    Assert.Equal(4, value);
-            //}
+            var result3 = Interpreter.ParsePredicate<TestEntity>($"not(Boolean)");
+            var result4 = Interpreter.ParsePredicate<TestEntity>($"not(Boolean=true)");
+            var result5 = Interpreter.ParsePredicate<TestEntity>($"!(Integer={DF.Integer1})");
+            var result6 = Interpreter.ParsePredicate<TestEntity>($"!(Integer in [{DF.Integer1}])");
+            var result7 = Interpreter.ParsePredicate<TestEntity>($"not(Integer={DF.Integer1})");
+            var result8 = Interpreter.ParsePredicate<TestEntity>($"not(Integer in [{DF.Integer1}])");
+            var result9 = Interpreter.ParsePredicate<TestEntity>($"!Boolean = true");
+            var result10 = Interpreter.ParsePredicate<TestEntity>($"!(Boolean=true) == true");
+            var result11 = Interpreter.ParsePredicate<TestEntity>($"not(Boolean) == true");
+            var result12 = Interpreter.ParsePredicate<TestEntity>($"not(Boolean=true)==true");
+            var result13 = Interpreter.ParsePredicate<TestEntity>($"!Boolean and !(Integer={DF.Integer1})");
+            var result14 = Interpreter.ParsePredicate<TestEntity>($"not(Boolean) and not(Integer={DF.Integer1})");
+            Assert.True(result.Succeeded);
+            Assert.True(result2.Succeeded);
+            Assert.True(result3.Succeeded);
+            Assert.True(result4.Succeeded);
+            Assert.True(result5.Succeeded);
+            Assert.True(result6.Succeeded);
+            Assert.True(result7.Succeeded);
+            Assert.True(result8.Succeeded);
+            Assert.True(result9.Succeeded);
+            Assert.True(result10.Succeeded);
+            Assert.True(result11.Succeeded);
+            Assert.True(result12.Succeeded);
+            using (var context = DF.GetContext())
+            {
+                var value = context.Entities.Count(result.Result);
+                Assert.Equal(4, value);
+                value = context.Entities.Count(result2.Result);
+                Assert.Equal(4, value);
+                value = context.Entities.Count(result3.Result);
+                Assert.Equal(4, value);
+                value = context.Entities.Count(result4.Result);
+                Assert.Equal(4, value);
+                value = context.Entities.Count(result5.Result);
+                Assert.Equal(4, value);
+                value = context.Entities.Count(result6.Result);
+                Assert.Equal(4, value);
+                value = context.Entities.Count(result7.Result);
+                Assert.Equal(4, value);
+                value = context.Entities.Count(result8.Result);
+                Assert.Equal(4, value);
+                value = context.Entities.Count(result9.Result);
+                Assert.Equal(4, value);
+                value = context.Entities.Count(result10.Result);
+                Assert.Equal(4, value);
+                value = context.Entities.Count(result11.Result);
+                Assert.Equal(4, value);
+                value = context.Entities.Count(result12.Result);
+                Assert.Equal(4, value);
+                value = context.Entities.Count(result13.Result);
+                Assert.Equal(3, value);
+                value = context.Entities.Count(result14.Result);
+                Assert.Equal(3, value);
+            }
         }
         #endregion Expresion Parser
     }
