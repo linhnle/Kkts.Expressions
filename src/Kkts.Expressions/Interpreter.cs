@@ -90,6 +90,7 @@ namespace Kkts.Expressions
 				Exception = result.Exception,
 				InvalidProperties = result.InvalidProperties,
 				InvalidVariables = result.InvalidVariables,
+				InvalidOperators = result.InvalidOperators,
 				Succeeded = result.Succeeded
 			};
 		}

@@ -13,7 +13,7 @@ namespace Kkts.Expressions.Internal
 
 		public Parser LastSuccess { get; set; }
 
-		public List<Parser> Chain { get; set; }
+		public List<Parser> Body { get; set; }
 
 		public int StartIndex { get; protected set; } = -1;
 

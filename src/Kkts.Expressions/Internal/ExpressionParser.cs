@@ -124,7 +124,7 @@ namespace Kkts.Expressions.Internal
 							acceptedParsers.Add(group);
 						}
 
-						group.Chain = BuildChain(group, group.LastSuccess);
+						group.Body = BuildChain(group, group.LastSuccess);
 					}
 					else
 					{
@@ -233,10 +233,7 @@ namespace Kkts.Expressions.Internal
 		private static Node BuildNode(ParameterExpression param, NotOperatorParser parser, List<Parser> list, ref int currentIndex, BuildArgument arg)
 		{
 			if (parser.BuiltNode != null) return parser.BuiltNode;
-			var index = currentIndex;
-			var nextParser = list[++currentIndex];
-			var result = new Not { Node = BuildNode(param, nextParser, list, ref currentIndex, arg), StartIndex = parser.StartIndex, StartChar = '!' };
-			list[index + 1] = null;
+			var result = new Not { Node = BuildNode(param, parser.Body, arg), StartIndex = parser.StartIndex, StartChar = '!' };
 			parser.BuiltNode = result;
 
 			return result;
@@ -245,7 +242,7 @@ namespace Kkts.Expressions.Internal
 		private static Node BuildNode(ParameterExpression param, NotFunctionParser parser, BuildArgument arg)
 		{
 			if (parser.BuiltNode != null) return parser.BuiltNode;
-			var result = new Not { Node = BuildNode(param, parser.Chain, arg), StartIndex = parser.StartIndex, StartChar = parser.StartChar };
+			var result = new Not { Node = BuildNode(param, parser.Body, arg), StartIndex = parser.StartIndex, StartChar = parser.StartChar };
 			parser.BuiltNode = result;
 
 			return result;
@@ -276,7 +273,7 @@ namespace Kkts.Expressions.Internal
 			var result = new Comparison
 			{
 				Left = BuildNode(param, list[currentIndex - 1], list, ref currentIndex, arg),
-				Right = BuildNode(param, parser.Chain, arg),
+				Right = BuildNode(param, parser.Body, arg),
 				Operator = GetStandardOperator(parser.Result),
 				StartIndex = parser.StartIndex,
 				StartChar = parser.StartChar
@@ -359,7 +356,7 @@ namespace Kkts.Expressions.Internal
 		private static Node BuildNode(ParameterExpression param, GroupParser parser, BuildArgument arg)
 		{
 			if (parser.BuiltNode != null) return parser.BuiltNode;
-			var result = new Group { Node = BuildNode(param, parser.Chain, arg), StartIndex = parser.StartIndex, StartChar = parser.StartChar };
+			var result = new Group { Node = BuildNode(param, parser.Body, arg), StartIndex = parser.StartIndex, StartChar = parser.StartChar };
 			parser.BuiltNode = result;
 
 			return result;

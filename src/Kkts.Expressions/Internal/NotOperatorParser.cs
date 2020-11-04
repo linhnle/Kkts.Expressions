@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.Linq;
 
 namespace Kkts.Expressions.Internal
 {
@@ -7,7 +8,7 @@ namespace Kkts.Expressions.Internal
 		private const char Operator = '!';
 
 		private bool _started = false;
-		private IList<Parser> _parsers;
+		private List<Parser> _parsers;
 
 		public override bool Accept(char @char, int noOfWhiteSpaceIgnored, int index, ref bool keepTrack, ref bool isStartGroup)
 		{
@@ -52,10 +53,26 @@ namespace Kkts.Expressions.Internal
 
 		public override bool Validate()
 		{
-			return _started;
+			if (_started)
+            {
+				_parsers = _parsers.Where(p => p.Validate()).ToList();
+
+				if (_parsers.Count != 1) return false;
+
+				Body = _parsers;
+
+				return true;
+            }
+
+			return false;
 		}
 
-		public override IList<Parser> GetNextParsers(char @char)
+        public override void EndExpression()
+        {
+			_parsers.ForEach(p => p.EndExpression());
+        }
+
+        public override IList<Parser> GetNextParsers(char @char)
 		{
 			return _parsers.Count == 0 ? base.GetNextParsers(@char) : _parsers[0].GetNextParsers(@char);
 		}

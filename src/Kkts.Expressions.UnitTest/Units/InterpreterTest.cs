@@ -433,8 +433,8 @@ namespace Kkts.Expressions.UnitTest.Units
         [Fact]
         public void ParsePredicate_DateTimeOffsetNullable_Succeed()
         {
-            var result = Interpreter.ParsePredicate<TestEntity>($"DateTimeOffsetNullable='{DF.DateTimeString1}' and DateTimeOffsetNullable!=null");
-            var result2 = Interpreter.ParsePredicate<TestEntity>($"DateTimeOffsetNullable>'{DF.DateTimeString1}'");
+            var result = Interpreter.ParsePredicate<TestEntity>($"DateTimeOffsetNullable='{DF.DateTimeOffsetString1}' and DateTimeOffsetNullable!=null");
+            var result2 = Interpreter.ParsePredicate<TestEntity>($"DateTimeOffsetNullable>'{DF.DateTimeOffsetString1}'");
             Assert.True(result.Succeeded);
             Assert.True(result2.Succeeded);
             using (var context = DF.GetContext())
@@ -444,6 +444,50 @@ namespace Kkts.Expressions.UnitTest.Units
                 value = context.Entities.Count(result2.Result);
                 Assert.True(value > 0);
             }
+        }
+
+        [Fact]
+        public void ParsePredicate_ComplicatedGroup_Success()
+        {
+            var result = Interpreter.ParsePredicate<TestEntity>($"(Integer={DF.Integer1} or Double={DF.Double3}) and (Guid=='{DF.Guid1}' or DateTime='{DF.DateTime3}')");
+            Assert.True(result.Succeeded);
+            using (var context = DF.GetContext())
+            {
+                var value = context.Entities.Count(result.Result);
+                Assert.Equal(2, value);
+            }
+        }
+
+        [Fact]
+        public void ParsePredicate_NotOperatorAndNotFunction_Success()
+        {
+            //var result = Interpreter.ParsePredicate<TestEntity>($"!Boolean");
+            var result2 = Interpreter.ParsePredicate<TestEntity>($"!(Boolean=true)");
+            //var result3 = Interpreter.ParsePredicate<TestEntity>($"not(Boolean)");
+            //var result4 = Interpreter.ParsePredicate<TestEntity>($"not(Boolean=true)");
+            //var result5 = Interpreter.ParsePredicate<TestEntity>($"not(Integer={DF.Integer1})");
+            //var result6 = Interpreter.ParsePredicate<TestEntity>($"not(Integer in [{DF.Integer1}])");
+            //Assert.True(result.Succeeded);
+            //Assert.True(result2.Succeeded);
+            //Assert.True(result3.Succeeded);
+            //Assert.True(result4.Succeeded);
+            //Assert.True(result5.Succeeded);
+            //Assert.True(result6.Succeeded);
+            //using (var context = DF.GetContext())
+            //{
+            //    var value = context.Entities.Count(result.Result);
+            //    Assert.Equal(4, value);
+            //    value = context.Entities.Count(result2.Result);
+            //    Assert.Equal(4, value);
+            //    value = context.Entities.Count(result3.Result);
+            //    Assert.Equal(4, value);
+            //    value = context.Entities.Count(result4.Result);
+            //    Assert.Equal(4, value);
+            //    value = context.Entities.Count(result5.Result);
+            //    Assert.Equal(4, value);
+            //    value = context.Entities.Count(result6.Result);
+            //    Assert.Equal(4, value);
+            //}
         }
         #endregion Expresion Parser
     }
