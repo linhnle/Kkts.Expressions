@@ -27,7 +27,7 @@ namespace Kkts.Expressions
 
 			source = Where(source, condition);
 
-			var result = new PagedResult<TResult>(pagination)
+			var result = new PagedResult<TResult>()
 			{
 				TotalRecords = source.Count(),
 				Records = source.Skip(pagination.Offset).Take(pagination.Limit).Select(@select).ToArray()
@@ -44,7 +44,7 @@ namespace Kkts.Expressions
 
 			source = Where(source, condition);
 
-			var result = new PagedResult<T>(pagination)
+			var result = new PagedResult<T>()
 			{
 				TotalRecords = source.Count(),
 				Records = source.Skip(pagination.Offset).Take(pagination.Limit).ToArray()

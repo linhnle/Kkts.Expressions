@@ -1,20 +1,16 @@
 ﻿using System.Collections.Generic;
-using System.Linq;
 
 namespace Kkts.Expressions.Internal
 {
-	internal class NotOperatorParser : Parser
+    internal class NotOperatorParser : Parser
 	{
 		private const char Operator = '!';
-
-		private bool _started = false;
 
 		public override bool Accept(char @char, int noOfWhiteSpaceIgnored, int index, ref bool keepTrack, ref bool isStartGroup)
 		{
 			if (@char == Operator)
 			{
 				Append(@char);
-				_started = true;
 				StartIndex = index;
 				EndIndex = index;
 				Done = true;
