@@ -162,17 +162,19 @@ namespace Kkts.Expressions
 		#endregion FilterGroup
 
 		#region Validation
-		public static bool IsValid(FilterGroup filterGroup)
+
+		internal static bool IsValid(FilterGroup filterGroup)
 		{
 			return filterGroup != null
 				&& filterGroup.Filters != null
 				&& filterGroup.Filters.All(p => p.IsValid());
 		}
 
-		public static bool IsValid(this IEnumerable<FilterGroup> filterGroups)
+		internal static bool IsValid(this IEnumerable<FilterGroup> filterGroups)
 		{
 			return filterGroups != null && filterGroups.All(p => IsValid(p));
 		}
+
 		#endregion Validation
 	}
 }

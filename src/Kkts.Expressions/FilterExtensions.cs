@@ -8,6 +8,7 @@ namespace Kkts.Expressions
 	public static class FilterExtensions
 	{
 		#region Filter
+
 		public static Expression<Func<T, bool>> BuildPredicate<T>(this Filter filter, VariableResolver variableResolver = null)
 		{
 			return (Expression<Func<T, bool>>)BuildPredicate(filter, typeof(T), variableResolver);
@@ -180,19 +181,21 @@ namespace Kkts.Expressions
 				};
 			}
 		}
+
 		#endregion internal
 
 		#endregion Filter
 
 		#region Validation
-		public static bool IsValid(this Filter filter)
+
+		internal static bool IsValid(this Filter filter)
 		{
 			return !string.IsNullOrWhiteSpace(filter?.Property)
 				&& !string.IsNullOrWhiteSpace(filter?.Operator)
 				&& Interpreter.ComparisonOperators.Contains(filter.Operator.ToLower());
 		}
 
-		public static bool IsValid(this IEnumerable<Filter> filters)
+		internal static bool IsValid(this IEnumerable<Filter> filters)
 		{
 			return filters != null && filters.All(p => IsValid(p));
 		}
@@ -200,6 +203,7 @@ namespace Kkts.Expressions
 		#endregion Validation
 
 		#region shared
+
 		internal static LambdaExpression AlwaysTruePredicate(this Type type)
 		{
 			var param = type.CreateParameterExpression();
@@ -219,6 +223,7 @@ namespace Kkts.Expressions
 			var prop = param.CreatePropertyExpression(filter.Property);
 			return Interpreter.BuildBody(filter.Operator.GetComparisonOperator(), prop, filter.Value, variableResolver);
 		}
+
 		#endregion private
 	}
 }

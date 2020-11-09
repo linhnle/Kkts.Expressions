@@ -525,7 +525,7 @@ namespace Kkts.Expressions.UnitTest.Units
         #region BuildPredicate
 
         [Fact]
-        public void BuildPredicate_AllOperators_Success()
+        public void BuildPredicate_AllOperators_Success_WithoutExceptions()
         {
             // integer
             var exp = Interpreter.BuildPredicate<TestEntity>("Integer", ComparisonOperator.Equal, "1");
@@ -537,6 +537,8 @@ namespace Kkts.Expressions.UnitTest.Units
             exp = Interpreter.BuildPredicate<TestEntity>("Integer", ComparisonOperator.In, "1, 2, 4");
             // integer nullable
             exp = Interpreter.BuildPredicate<TestEntity>("IntegerNullable", ComparisonOperator.Equal, "1");
+            exp = Interpreter.BuildPredicate<TestEntity>("IntegerNullable", ComparisonOperator.Equal, "");
+            exp = Interpreter.BuildPredicate<TestEntity>("IntegerNullable", ComparisonOperator.Equal, null);
             exp = Interpreter.BuildPredicate<TestEntity>("IntegerNullable", ComparisonOperator.NotEqual, "1");
             exp = Interpreter.BuildPredicate<TestEntity>("IntegerNullable", ComparisonOperator.LessThan, "1");
             exp = Interpreter.BuildPredicate<TestEntity>("IntegerNullable", ComparisonOperator.LessThanOrEqual, "1");
@@ -554,6 +556,8 @@ namespace Kkts.Expressions.UnitTest.Units
             exp = Interpreter.BuildPredicate<TestEntity>("Double", ComparisonOperator.In, "1.2, 2, 4");
             // double nullable
             exp = Interpreter.BuildPredicate<TestEntity>("DoubleNullable", ComparisonOperator.Equal, "1.0");
+            exp = Interpreter.BuildPredicate<TestEntity>("DoubleNullable", ComparisonOperator.Equal, "");
+            exp = Interpreter.BuildPredicate<TestEntity>("DoubleNullable", ComparisonOperator.Equal, null);
             exp = Interpreter.BuildPredicate<TestEntity>("DoubleNullable", ComparisonOperator.NotEqual, "1");
             exp = Interpreter.BuildPredicate<TestEntity>("DoubleNullable", ComparisonOperator.LessThan, "1");
             exp = Interpreter.BuildPredicate<TestEntity>("DoubleNullable", ComparisonOperator.LessThanOrEqual, "1");
