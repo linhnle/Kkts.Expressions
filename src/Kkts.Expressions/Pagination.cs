@@ -1,4 +1,6 @@
-﻿namespace Kkts.Expressions
+﻿using System;
+
+namespace Kkts.Expressions
 {
 	public class Pagination
 	{
@@ -37,6 +39,11 @@
 		{
 			get => _limit;
 			set => Limit = value;
+		}
+
+		public int CalculateTotalPages(int totalRecords)
+		{
+			return (int)Math.Ceiling(totalRecords / (double)PageSize);
 		}
 	}
 }
