@@ -519,6 +519,19 @@ namespace Kkts.Expressions.UnitTest.Units
                 Assert.Equal(3, value);
             }
         }
+
+        [Fact]
+        public void ParsePredicate_CustomVarableResolver_Success()
+        {
+            var result = Interpreter.ParsePredicate<TestEntity>("Integer=user.Id", new CustomVariableResolver());
+            Assert.True(result.Succeeded);
+            using (var context = DF.GetContext())
+            {
+                var value = context.Entities.Count(result.Result);
+                Assert.Equal(1, value);
+            }
+        }
+
         #endregion Expression Parser
 
 

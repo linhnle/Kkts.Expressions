@@ -1,6 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
+﻿using System.Linq;
 using Xunit;
 
 namespace Kkts.Expressions.UnitTest.Units
@@ -160,6 +158,63 @@ namespace Kkts.Expressions.UnitTest.Units
 
             // actually just test without exceptions
             Assert.NotNull(exp);
+        }
+
+        [Fact]
+        public void BuildPredicate_Filters_Succeed()
+        {
+            var query = new Filter[]
+            {
+                new Filter{ Property = "Integer", Operator = "=", Value = DF.Integer1.ToString() },
+                new Filter{ Property = "String", Operator = "=", Value = DF.String1 }
+            }.BuildPredicate<TestEntity>();
+            using (var context = DF.GetContext())
+            {
+                var value = context.Entities.Count(query);
+                Assert.Equal(1, value);
+            }
+        }
+
+        [Fact]
+        public void TryBuildPredicate_Filters_Succeed()
+        {
+            var query = new Filter[]
+            {
+                new Filter{ Property = "Integer", Operator = "=", Value = DF.Integer1.ToString() },
+                new Filter{ Property = "String", Operator = "=", Value = DF.String1 }
+            }.TryBuildPredicate<TestEntity>(validProperties: new string[] { "Integer", "String" });
+            Assert.True(query.Succeeded);
+            using (var context = DF.GetContext())
+            {
+                var value = context.Entities.Count(query.Result);
+                Assert.Equal(1, value);
+            }
+        }
+
+        [Fact]
+        public void TryBuildPredicate_Filters_HasInvalidProperty_Failed()
+        {
+            var query = new Filter[]
+            {
+                new Filter{ Property = "Integer", Operator = "=", Value = DF.Integer1.ToString() },
+                new Filter{ Property = "String", Operator = "=", Value = DF.String1 }
+            }.TryBuildPredicate<TestEntity>(validProperties: new string[] { "Integer" });
+            Assert.False(query.Succeeded);
+        }
+
+        [Fact]
+        public void ParsePredicate_CustomVarableResolver_Success()
+        {
+            var query = new Filter[]
+            {
+                new Filter{ Property = "Integer", Operator = "=", Value = "user.Id" }
+            }.TryBuildPredicate<TestEntity>(new CustomVariableResolver(), validProperties: new string[] { "Integer" });
+            Assert.True(query.Succeeded);
+            using (var context = DF.GetContext())
+            {
+                var value = context.Entities.Count(query.Result);
+                Assert.Equal(1, value);
+            }
         }
     }
 }

@@ -60,6 +60,22 @@ namespace Kkts.Expressions
 			return TryBuildPredicate<T>(filterGroup, arg);
 		}
 
+		public static EvaluationResult<T, bool> TryBuildPredicate<T>(this IEnumerable<FilterGroup> filterGroups, VariableResolver variableResolver = null, IEnumerable<string> validProperties = null)
+		{
+			if (filterGroups == null) throw new ArgumentNullException(nameof(filterGroups));
+			var result = TryBuildPredicate(filterGroups, typeof(T), variableResolver, validProperties);
+
+			return new EvaluationResult<T, bool>
+			{
+				Exception = result.Exception,
+				InvalidOperators = result.InvalidOperators,
+				InvalidProperties = result.InvalidProperties,
+				InvalidVariables = result.InvalidVariables,
+				Result = (Expression<Func<T, bool>>)result.Result,
+				Succeeded = result.Succeeded
+			};
+		}
+
 		public static EvaluationResult TryBuildPredicate(this IEnumerable<FilterGroup> filterGroups, Type type, VariableResolver variableResolver = null, IEnumerable<string> validProperties = null)
 		{
 			if (filterGroups == null) throw new ArgumentNullException(nameof(filterGroups));
