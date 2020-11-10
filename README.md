@@ -114,6 +114,25 @@ Expression<Func<Data, bool>> predicate = Interpreter.ParsePredicate("name = user
 // Only accept Id in predicate, if other properties occurs in predicate, an exception will be thrown
 Expression<Func<Data, bool>> predicate = Interpreter.ParsePredicate("id = 1 and name='Test'", validProperties: new[] { "Id" }); // throw an exception
 ```
+### Usage 6 (Condition)
+``` csharp
+// The options can be deserialized from JSON
+var options = new ConditionOptions 
+{ 
+  OrderBy = "...",
+  OrderBys = new[] { new OrderByInfo { ... } },
+  Filters = new[] { new Filter { ... } },
+  FilterGroups = new[] { new FilterGroup { Filters = new[] { ... } } },
+  Where = "..."
+}
+var condition = options.BuildCondition<Data>();
+var context = new TestDbContext();
+var result = context.Entities.Where(condition).ToList();
+// or paging
+var result = context.Take(condition, new Pagination { Offset = 10, Limit = 50 });
+// or paging with total records count
+var result = context.TakePage(condition, new Pagination { Offset = 10, Limit = 50 });
+```
 ### Support opetors
 | Branch             | Usage|Support data types|
 |--------------------|--------------------------------------------|-------------------------------------------------------------------|
