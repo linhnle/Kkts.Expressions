@@ -20,7 +20,7 @@ public class TestDbContext : DbContext
     // ...
 }
 ```
-#### Usage 1
+### Usage 1
 ``` csharp
 // The property name is case insensitive for example id and Id are the same
 Expression<Func<Data, bool>> predicate = Interpreter.ParsePredicate("id = 1 and name='Test'"); 
@@ -112,9 +112,9 @@ Expression<Func<Data, bool>> predicate = Interpreter.ParsePredicate("name = user
 ### Usage 5 (Valid Properties)
 ``` csharp
 // Only accept Id in predicate, if other properties occurs in predicate, an exception will be thrown
-Expression<Func<Data, bool>> predicate = Interpreter.ParsePredicate("id = 1 and name='Test'", validProperties: new[] { "Id" }); // throw an exception because it only accept 
+Expression<Func<Data, bool>> predicate = Interpreter.ParsePredicate("id = 1 and name='Test'", validProperties: new[] { "Id" }); // throw an exception
 ```
-### Support opeartors
+### Support opetors
 | Branch             | Usage|Support data types|
 |--------------------|--------------------------------------------|-------------------------------------------------------------------|
 |Equals| Id = 1 or Id == 1 | Number, String, Guid, Boolean, DateTime, DateTimeOffset, Enum, Nullable |
