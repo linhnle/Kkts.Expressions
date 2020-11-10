@@ -149,3 +149,8 @@ var result = context.TakePage(condition, new Pagination { Offset = 10, Limit = 5
 |Not | !IsEnabled or not(IsEnabled) or not(Id = 1) or !(Id = 1) | Boolean |
 |Logical and (and or &&) | Id = 1 and Name = "Text" |----|
 |Logical or (or or \|\|) | Id = 1 and Name = "Text" |----|
+
+
+## Contacts
+**[LinkedIn](https://www.linkedin.com/in/linh-le-258417105/)**
+** Skype: linh.nhat.le
