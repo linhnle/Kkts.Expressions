@@ -521,7 +521,7 @@ namespace Kkts.Expressions.UnitTest.Units
         }
 
         [Fact]
-        public void ParsePredicate_CustomVarableResolver_Success()
+        public void ParsePredicate_CustomVariableResolver_Success()
         {
             var result = Interpreter.ParsePredicate<TestEntity>("Integer=user.Id", new CustomVariableResolver());
             Assert.True(result.Succeeded);

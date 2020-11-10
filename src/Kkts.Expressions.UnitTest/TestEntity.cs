@@ -25,6 +25,9 @@ namespace Kkts.Expressions.UnitTest
         [InverseProperty(nameof(Parent))]
         public int ParentId { get; set; }
         public ParentEntity Parent { get; set; }
+
+        public int OrderBy1 { get; set; }
+        public string  OrderBy2 { get; set; }
     }
 
     public class ParentEntity

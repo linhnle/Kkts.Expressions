@@ -29,7 +29,7 @@ namespace Kkts.Expressions
 			var arg = new BuildArgument
 			{
 				ValidProperties = validProperties,
-				VariableResolver = variableResolver,
+				VariableResolver = variableResolver ?? new VariableResolver(),
 				EvaluationType = type
 			};
 

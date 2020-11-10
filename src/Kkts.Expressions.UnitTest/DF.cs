@@ -113,7 +113,9 @@ namespace Kkts.Expressions.UnitTest
                     Option = TestOptions.Option1,
                     OptionNullable = TestOptions.Option1,
                     ParentId = ParentId1,
-                    String = String1
+                    String = String1,
+                    OrderBy1 = 10,
+                    OrderBy2 = "ABC"
                 };
 
                 var e2 = new TestEntity
@@ -131,7 +133,9 @@ namespace Kkts.Expressions.UnitTest
                     Option = TestOptions.Option2,
                     OptionNullable = TestOptions.Option2,
                     ParentId = ParentId2,
-                    String = String2
+                    String = String2,
+                    OrderBy1 = 20,
+                    OrderBy2 = "BBC"
                 };
 
                 var e3 = new TestEntity
@@ -149,7 +153,9 @@ namespace Kkts.Expressions.UnitTest
                     Option = TestOptions.Option3,
                     OptionNullable = TestOptions.Option3,
                     ParentId = ParentId3,
-                    String = String3
+                    String = String3,
+                    OrderBy1 = 30,
+                    OrderBy2 = "CBC"
                 };
 
                 var eN = new TestEntity
@@ -168,7 +174,9 @@ namespace Kkts.Expressions.UnitTest
                     OptionNullable = TestOptions.OptionN,
                     ParentId = ParentIdN,
                     String = StringN,
-                    BooleanNullable = true
+                    BooleanNullable = true,
+                    OrderBy1 = 50,
+                    OrderBy2 = "DBC"
                 };
 
                 var e5 = new TestEntity
@@ -188,7 +196,9 @@ namespace Kkts.Expressions.UnitTest
                     ParentId = ParentId2,
                     String = null,
                     Boolean = true,
-                    BooleanNullable = null
+                    BooleanNullable = null,
+                    OrderBy1 = 30,
+                    OrderBy2 = "EBC"
                 };
 
                 context.Add(e1);
