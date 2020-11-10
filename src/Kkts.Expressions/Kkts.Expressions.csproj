@@ -7,10 +7,11 @@
     <Authors>Linh Le</Authors>
     <Product>Dynamic Expression</Product>
     <Company>KKTS Ltd.</Company>
-    <PackageLicenseUrl>https://github.com/linhnle/Kk/blob/master/LICENSE</PackageLicenseUrl>
+    <PackageLicenseUrl></PackageLicenseUrl>
     <PackageProjectUrl>https://github.com/linhnle/Kkts.Expressions</PackageProjectUrl>
     <RepositoryUrl>https://github.com/linhnle/Kkts.Expressions.git</RepositoryUrl>
     <RepositoryType>Git</RepositoryType>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
   </PropertyGroup>
 
 </Project>
