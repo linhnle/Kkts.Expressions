@@ -72,5 +72,25 @@ namespace Kkts.Expressions.UnitTest.Units
                 Assert.Equal("EBC", e.OrderBy2);
             }
         }
+
+        [Fact]
+        public void TakeAndTakePage_Success()
+        {
+            var c = new ConditionOptions().BuildCondition<TestEntity>();
+            var p = new Pagination { Offset = 1, Limit = 2 };
+            using (var context = DF.GetContext())
+            {
+                var e = context.Entities.Take(c, p);
+                Assert.Equal(2, e.Count());
+                var r = e.First();
+                Assert.Equal(DF.Integer2, r.Integer);
+
+                var page = context.Entities.TakePage(c, p);
+                Assert.Equal(2, page.Records.Count());
+                Assert.Equal(5, page.TotalRecords);
+                r = page.Records.First();
+                Assert.Equal(DF.Integer2, r.Integer);
+            }
+        }
     }
 }
