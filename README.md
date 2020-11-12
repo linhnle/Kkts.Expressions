@@ -23,22 +23,26 @@ public class TestDbContext : DbContext
 ### Usage 1
 ``` csharp
 // The property name is case insensitive for example id and Id are the same
-Expression<Func<Data, bool>> predicate = Interpreter.ParsePredicate("id = 1 and name='Test'"); 
+EvaluationResult<Data, bool> evaluationResult = Interpreter.ParsePredicate("id = 1 and name='Test'");
+// Use EvaluationResult to get validation result
+Expression<Func<Data, bool>> predicate = evaluationResult.Result;
 
 // Equivalent
 var filters = new Filter[]
             {
                 new Filter{ Property = "id", Operator = "=", Value = "1" },
-                // 
+                // and
                 new Filter{ Property = "name", Operator = "=", Value = "Test" }
             };
 
 Expression<Func<Data, bool>> predicate = filters.BuildPredicate<Data>();
+
+// Or use filters.TryBuildPredicate<Data>() to get validation result
 ```
 ### Usage 2
 ``` csharp
 // The property name is case insensitive for example id and Id are the same
-Expression<Func<Data, bool>> predicate = Interpreter.ParsePredicate("(id = 1 and name='Test1') or (id = 2 and name='Test2')"); 
+Expression<Func<Data, bool>> predicate = Interpreter.ParsePredicate("(id = 1 and name='Test1') or (id = 2 and name='Test2')").Result; 
 
 // Equivalent
 var filters = new FilterGroup[]
@@ -57,7 +61,7 @@ var filters = new FilterGroup[]
                 {
                     Filters = new List<Filter>
                     {
-                        new Filter{ Property = "id", Operator = "=", Value = "1" },
+                        new Filter{ Property = "id", Operator = "=", Value = "2" },
                         // and
                         new Filter{ Property = "name", Operator = "=", Value = "Test2" }
                     }
@@ -65,6 +69,7 @@ var filters = new FilterGroup[]
             }
 
 Expression<Func<Data, bool>> predicate = filters.BuildPredicate<Data>();
+// Or use filters.TryBuildPredicate<Data>() to get validation result
 ```
 
 ### Usage 3 (Order By)
@@ -82,16 +87,17 @@ var ordered = context.Entities.OrderBy(new[]
             }
 
 Expression<Func<Data, bool>> predicate = filters.BuildPredicate<Data>();
+// Or use filters.TryBuildPredicate<Data>() to get validation result
 ```
 ### Usage 4 (Variables)
 ``` csharp
 // It has 2 default variables: now, utcnow (they are case insensitive)
-Expression<Func<Data, bool>> predicate = Interpreter.ParsePredicate("CreationDate = now or CreationDate = utcnow"); 
+Expression<Func<Data, bool>> predicate = Interpreter.ParsePredicate("CreationDate = now or CreationDate = utcnow").Result; 
 // Equivalent in c#
 Expression<Func<Data, bool>> predicate = p => p.CreationDate == DateTime.Now || p.CreationDate == DateTime.UtcNow;
 
 // We can compare the year, month, day, ... like 
-Expression<Func<Data, bool>> predicate = Interpreter.ParsePredicate("CreationDate.year = now.year")
+Expression<Func<Data, bool>> predicate = Interpreter.ParsePredicate("CreationDate.year = now.year").Result
 ```
 ### Usage 5 (Custom Variables)
 ``` csharp
@@ -107,12 +113,12 @@ class CustomVariableResolver : VariableResolver
 }
 
 // Now it has new variables user.id and user.username
-Expression<Func<Data, bool>> predicate = Interpreter.ParsePredicate("name = user.username and id = user.id", variableResolver: new CustomVariableResolver()); 
+Expression<Func<Data, bool>> predicate = Interpreter.ParsePredicate("name = user.username and id = user.id", variableResolver: new CustomVariableResolver()).Result; 
 ```
 ### Usage 5 (Valid Properties)
 ``` csharp
 // Only accept Id in predicate, if other properties occurs in predicate, an exception will be thrown
-Expression<Func<Data, bool>> predicate = Interpreter.ParsePredicate("id = 1 and name='Test'", validProperties: new[] { "Id" }); // throw an exception
+Expression<Func<Data, bool>> predicate = Interpreter.ParsePredicate("id = 1 and name='Test'", validProperties: new[] { "Id" }).Result; // throw an exception
 ```
 ### Usage 6 (Condition)
 ``` csharp
@@ -127,6 +133,7 @@ var options = new ConditionOptions
 }
 var condition = options.BuildCondition<Data>();
 var context = new TestDbContext();
+// Should check if condition.IsValid before calling where
 var result = context.Entities.Where(condition).ToList();
 // or paging
 var result = context.Take(condition, new Pagination { Offset = 10, Limit = 50 });
@@ -134,7 +141,7 @@ var result = context.Take(condition, new Pagination { Offset = 10, Limit = 50 })
 var result = context.TakePage(condition, new Pagination { Offset = 10, Limit = 50 });
 ```
 ### Support opetors
-| Branch             | Usage|Support data types|
+| Operator             | Usage|Support data types|
 |--------------------|--------------------------------------------|-------------------------------------------------------------------|
 |Equals| Id = 1 or Id == 1 | Number, String, Guid, Boolean, DateTime, DateTimeOffset, Enum, Nullable |
 |Not Equals| Id != 1 or Id <> 1 | Number, String, Guid, Boolean, DateTime, DateTimeOffset, Enum, Nullable |
@@ -153,4 +160,4 @@ var result = context.TakePage(condition, new Pagination { Offset = 10, Limit = 5
 
 ## Contacts
 **[LinkedIn](https://www.linkedin.com/in/linh-le-258417105/)**
-** Skype: linh.nhat.le
+**Skype: linh.nhat.le**
