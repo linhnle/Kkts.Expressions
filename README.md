@@ -25,6 +25,7 @@ public class TestDbContext : DbContext
 // The property name is case insensitive for example id and Id are the same
 EvaluationResult<Data, bool> evaluationResult = Interpreter.ParsePredicate("id = 1 and name='Test'");
 // Use EvaluationResult to get validation result
+// Should check if evaluationResult.Succeeded
 Expression<Func<Data, bool>> predicate = evaluationResult.Result;
 
 // Equivalent
@@ -86,8 +87,9 @@ var ordered = context.Entities.OrderBy(new[]
               { new OrderByInfo { Property = "Name", Descending = true }
             }
 
-Expression<Func<Data, bool>> predicate = filters.BuildPredicate<Data>();
-// Or use filters.TryBuildPredicate<Data>() to get validation result
+// or
+var evaluationResult = context.Entities.TryOrderBy(...);
+if (evaluationResult.Succeeded) var ordered = evaluationResult.Result;
 ```
 ### Usage 4 (Variables)
 ``` csharp
@@ -97,7 +99,7 @@ Expression<Func<Data, bool>> predicate = Interpreter.ParsePredicate("CreationDat
 Expression<Func<Data, bool>> predicate = p => p.CreationDate == DateTime.Now || p.CreationDate == DateTime.UtcNow;
 
 // We can compare the year, month, day, ... like 
-Expression<Func<Data, bool>> predicate = Interpreter.ParsePredicate("CreationDate.year = now.year").Result
+Expression<Func<Data, bool>> predicate = Interpreter.ParsePredicate("CreationDate.year = now.year").Result;
 ```
 ### Usage 5 (Custom Variables)
 ``` csharp
