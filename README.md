@@ -142,7 +142,7 @@ var result = context.Entities.Take(condition, new Pagination { Offset = 10, Limi
 var result = context.Entities.Take(condition, new Pagination { Page = 2, PageSize = 10 });
 // or paging with total records count
 var result = context.Entities.TakePage(condition, new Pagination { Offset = 10, Limit = 10 });
-var result = context.Entities.TakePage(condition, new Pagination { Offset = 2, Limit = 10 });
+var result = context.Entities.TakePage(condition, new Pagination { Page = 2, PageSize = 10 });
 ```
 ### Support opetors
 | Operator             | Usage|Support data types|
