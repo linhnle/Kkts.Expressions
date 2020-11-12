@@ -147,10 +147,10 @@ var result = context.TakePage(condition, new Pagination { Offset = 10, Limit = 5
 |--------------------|--------------------------------------------|-------------------------------------------------------------------|
 |Equals| Id = 1 or Id == 1 | Number, String, Guid, Boolean, DateTime, DateTimeOffset, Enum, Nullable |
 |Not Equals| Id != 1 or Id <> 1 | Number, String, Guid, Boolean, DateTime, DateTimeOffset, Enum, Nullable |
-|Less than| Id < 1 | Number, DateTime, DateTimeOffset, Enum, Nullable |
-|Less than or Equal| Id <= 1 | Number, DateTime, DateTimeOffset, Enum, Nullable |
-|Greater than| Id > 1 | Number, DateTime, DateTimeOffset, Enum, Nullable |
-|Greater than or Equal| Id >= 1 | Number, DateTime, DateTimeOffset, Enum, Nullable |
+|Less than| Id < 1 | Number, DateTime, DateTimeOffset, Nullable|
+|Less than or Equal| Id <= 1 | Number, DateTime, DateTimeOffset, Nullable |
+|Greater than| Id > 1 | Number, DateTime, DateTimeOffset, Nullable |
+|Greater than or Equal| Id >= 1 | Number, DateTime, DateTimeOffset, Nullable |
 |In| Id in [1, 2, 3, 4] or Name in ['String1', 'String2'] | Number, String, Guid, DateTime, DateTimeOffset, Enum, Nullable |
 |Contains | Name.contains('Text') or Name @ 'Text' | String |
 |Starts with | Name.startsWith('Text') or Name @* 'Text' | String |
