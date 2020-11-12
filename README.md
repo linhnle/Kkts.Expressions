@@ -138,9 +138,11 @@ var context = new TestDbContext();
 // Should check if condition.IsValid before calling where
 var result = context.Entities.Where(condition).ToList();
 // or paging
-var result = context.Take(condition, new Pagination { Offset = 10, Limit = 50 });
+var result = context.Entities.Take(condition, new Pagination { Offset = 10, Limit = 10 });
+var result = context.Entities.Take(condition, new Pagination { Page = 2, PageSize = 10 });
 // or paging with total records count
-var result = context.TakePage(condition, new Pagination { Offset = 10, Limit = 50 });
+var result = context.Entities.TakePage(condition, new Pagination { Offset = 10, Limit = 10 });
+var result = context.Entities.TakePage(condition, new Pagination { Offset = 2, Limit = 10 });
 ```
 ### Support opetors
 | Operator             | Usage|Support data types|
