@@ -23,7 +23,7 @@ public class TestDbContext : DbContext
 ### Usage 1
 ``` csharp
 // The property name is case insensitive for example id and Id are the same
-EvaluationResult<Data, bool> evaluationResult = Interpreter.ParsePredicate("id = 1 and name='Test'");
+EvaluationResult<Data, bool> evaluationResult = Interpreter.ParsePredicate<Data>("id = 1 and name='Test'");
 // Use EvaluationResult to get validation result
 // Should check if evaluationResult.Succeeded
 Expression<Func<Data, bool>> predicate = evaluationResult.Result;
@@ -43,7 +43,7 @@ Expression<Func<Data, bool>> predicate = filters.BuildPredicate<Data>();
 ### Usage 2
 ``` csharp
 // The property name is case insensitive for example id and Id are the same
-Expression<Func<Data, bool>> predicate = Interpreter.ParsePredicate("(id = 1 and name='Test1') or (id = 2 and name='Test2')").Result; 
+Expression<Func<Data, bool>> predicate = Interpreter.ParsePredicate<Data>("(id = 1 and name='Test1') or (id = 2 and name='Test2')").Result; 
 
 // Equivalent
 var filters = new FilterGroup[]
@@ -94,12 +94,12 @@ if (evaluationResult.Succeeded) var ordered = evaluationResult.Result;
 ### Usage 4 (Variables)
 ``` csharp
 // It has 2 default variables: now, utcnow (they are case insensitive)
-Expression<Func<Data, bool>> predicate = Interpreter.ParsePredicate("CreationDate = now or CreationDate = utcnow").Result; 
+Expression<Func<Data, bool>> predicate = Interpreter.ParsePredicate<Data>("CreationDate = now or CreationDate = utcnow").Result; 
 // Equivalent in c#
 Expression<Func<Data, bool>> predicate = p => p.CreationDate == DateTime.Now || p.CreationDate == DateTime.UtcNow;
 
 // We can compare the year, month, day, ... like 
-Expression<Func<Data, bool>> predicate = Interpreter.ParsePredicate("CreationDate.year = now.year").Result;
+Expression<Func<Data, bool>> predicate = Interpreter.ParsePredicate<Data>("CreationDate.year = now.year").Result;
 ```
 ### Usage 5 (Custom Variables)
 ``` csharp
@@ -115,12 +115,12 @@ class CustomVariableResolver : VariableResolver
 }
 
 // Now it has new variables user.id and user.username
-Expression<Func<Data, bool>> predicate = Interpreter.ParsePredicate("name = user.username and id = user.id", variableResolver: new CustomVariableResolver()).Result; 
+Expression<Func<Data, bool>> predicate = Interpreter.ParsePredicate<Data>("name = user.username and id = user.id", variableResolver: new CustomVariableResolver()).Result; 
 ```
 ### Usage 5 (Valid Properties)
 ``` csharp
 // Only accept Id in predicate, if other properties occurs in predicate, an exception will be thrown
-Expression<Func<Data, bool>> predicate = Interpreter.ParsePredicate("id = 1 and name='Test'", validProperties: new[] { "Id" }).Result; // throw an exception
+Expression<Func<Data, bool>> predicate = Interpreter.ParsePredicate<Data>("id = 1 and name='Test'", validProperties: new[] { "Id" }).Result; // throw an exception
 ```
 ### Usage 6 (Condition)
 ``` csharp
