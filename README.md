@@ -158,8 +158,8 @@ var result = context.Entities.TakePage(condition, new Pagination { Page = 2, Pag
 |Starts with | Name.startsWith('Text') or Name @* 'Text' | String |
 |Ends with | Name.endsWith('Text') or Name \*@ 'Text' | String |
 |Not | !IsEnabled or not(IsEnabled) or not(Id = 1) or !(Id = 1) | Boolean |
-|Logical and (and or &&) | Id = 1 and Name = "Text" |----|
-|Logical or (or or \|\|) | Id = 1 and Name = "Text" |----|
+|Logical and (and or &&) | Id = 1 and Name = "Text" | Boolean |
+|Logical or (or or \|\|) | Id = 1 or Name = "Text" | Boolean |
 
 
 ## Contacts
