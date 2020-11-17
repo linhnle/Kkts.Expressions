@@ -46,7 +46,15 @@ namespace Kkts.Expressions
                     for (var i = 1; i < segments.Length; ++i)
                     {
                         var member = Expression.PropertyOrField(Expression.Parameter(prop.PropertyType), segments[i])?.Member;
-                        tmp = ((dynamic)member).GetValue(tmp);
+                        switch (member)
+                        {
+                            case PropertyInfo p:
+                                tmp = p.GetValue(tmp);
+                                break;
+                            case FieldInfo f:
+                                tmp = f.GetValue(tmp);
+                                break;
+                        }
                     }
                 }
                 catch (Exception)

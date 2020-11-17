@@ -125,6 +125,7 @@ namespace Kkts.Expressions
 				error.EvaluationResult = new EvaluationResultBase
 				{
 					InvalidProperties = arg.InvalidProperties,
+					InvalidValues = arg.InvalidValues,
 					InvalidOperators = arg.InvalidOperators,
 					InvalidVariables = arg.InvalidVariables,
 					InvalidOrderByDirections = arg.InvalidOrderByDirections

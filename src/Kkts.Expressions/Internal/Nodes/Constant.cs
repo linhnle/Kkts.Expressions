@@ -24,6 +24,7 @@ namespace Kkts.Expressions.Internal.Nodes
 			}
 			catch (Exception ex)
 			{
+				arg.InvalidValues.Add(Value);
 				throw new FormatException(GetErrorMessage(), ex);
 			}
 		}

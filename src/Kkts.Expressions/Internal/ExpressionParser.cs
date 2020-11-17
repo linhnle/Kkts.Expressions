@@ -47,7 +47,8 @@ namespace Kkts.Expressions.Internal
 				{
 					Exception = ex,
 					InvalidProperties = new List<string>(0),
-					InvalidVariables = new List<string>(0)
+					InvalidVariables = new List<string>(0),
+					InvalidValues = arg.InvalidValues
 				};
 			}
 		}
@@ -113,7 +114,7 @@ namespace Kkts.Expressions.Internal
 
 				if (acceptedParsers.Count == 0)
 				{
-					if (groups.TryPop(out group) && group.Accept(c, noOfWhiteSpaceIgnored, reader.CurrentIndex, ref keepTrack, ref isStartGroup))
+					if (groups.Count > 0 && (group = groups.Pop()).Accept(c, noOfWhiteSpaceIgnored, reader.CurrentIndex, ref keepTrack, ref isStartGroup))
 					{
 						if (reader.HasNext)
 						{

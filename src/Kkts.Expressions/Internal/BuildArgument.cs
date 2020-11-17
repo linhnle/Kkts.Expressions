@@ -40,6 +40,8 @@ namespace Kkts.Expressions
 
         public ICollection<string> InvalidVariables { get; private set; } = new List<string>();
 
+        public ICollection<string> InvalidValues { get; private set; } = new List<string>();
+
         public ICollection<string> InvalidOrderByDirections { get; private set; } = new List<string>();
 
         public bool IsValidProperty(string value)

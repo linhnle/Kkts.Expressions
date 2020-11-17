@@ -53,6 +53,7 @@ namespace Kkts.Expressions
 				Exception = result.Exception,
 				InvalidOperators = result.InvalidOperators,
 				InvalidProperties = result.InvalidProperties,
+				InvalidValues = result.InvalidValues,
 				InvalidVariables = result.InvalidVariables,
 				Result = (Expression<Func<T, bool>>)result.Result,
 				Succeeded = result.Succeeded
@@ -69,6 +70,7 @@ namespace Kkts.Expressions
 				Exception = result.Exception,
 				InvalidOperators = result.InvalidOperators,
 				InvalidProperties = result.InvalidProperties,
+				InvalidValues = result.InvalidValues,
 				InvalidVariables = result.InvalidVariables,
 				Result = (Expression<Func<T, bool>>)result.Result,
 				Succeeded = result.Succeeded

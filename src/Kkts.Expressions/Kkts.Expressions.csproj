@@ -1,9 +1,9 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>netcoreapp2.0</TargetFramework>
+    <TargetFramework>netstandard2.0</TargetFramework>
     <Copyright>Copyright (C) 2016-2020 KKTS Ltd.</Copyright>
-    <Version>1.0.0</Version>
+    <Version>1.0.1</Version>
     <Authors>Linh Le</Authors>
     <Product>Dynamic Expression</Product>
     <Company>KKTS Ltd.</Company>

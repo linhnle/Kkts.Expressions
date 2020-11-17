@@ -83,7 +83,7 @@ namespace Kkts.Expressions
 
 		internal static MemberExpression CreatePropertyExpression(this ParameterExpression param, string propertyName)
 		{
-			var body = propertyName.Split('.', StringSplitOptions.RemoveEmptyEntries).Aggregate<string, MemberExpression>(null, (current, p) => (current == null ? Expression.PropertyOrField(param, p) : Expression.PropertyOrField(current, p)));
+			var body = propertyName.Split('.').Aggregate<string, MemberExpression>(null, (current, p) => (current == null ? Expression.PropertyOrField(param, p.Trim()) : Expression.PropertyOrField(current, p.Trim())));
 
 			return body;
 		}

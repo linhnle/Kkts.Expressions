@@ -14,7 +14,9 @@ namespace Kkts.Expressions
 
         public IEnumerable<string> InvalidVariables { get; internal set; }
 
-        public ICollection<string> InvalidOrderByDirections { get; internal set; }
+        public IEnumerable<string> InvalidOrderByDirections { get; internal set; }
+
+        public IEnumerable<string> InvalidValues { get; internal set; }
 
         public Exception Exception { get; internal set; }
     }
