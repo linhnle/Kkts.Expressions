@@ -144,7 +144,7 @@ var result = context.Entities.Take(condition, new Pagination { Page = 2, PageSiz
 var result = context.Entities.TakePage(condition, new Pagination { Offset = 10, Limit = 10 });
 var result = context.Entities.TakePage(condition, new Pagination { Page = 2, PageSize = 10 });
 ```
-### Support opetors
+### Support operators
 | Operator             | Usage|Support data types|
 |--------------------|--------------------------------------------|-------------------------------------------------------------------|
 |Equals| Id = 1 or Id == 1 | Number, String, Guid, Boolean, DateTime, DateTimeOffset, Enum, Nullable |
