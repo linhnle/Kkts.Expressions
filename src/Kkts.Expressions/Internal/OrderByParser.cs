@@ -19,7 +19,7 @@ namespace Kkts.Expressions
 			ThenBys = new List<(string Name, bool Descending)>();
 		}
 
-		public ICollection<(string Name, bool Descending)> ThenBys { get; }
+		public readonly ICollection<(string Name, bool Descending)> ThenBys;
 
 		public string PropertyName { get; set; }
 
@@ -46,12 +46,12 @@ namespace Kkts.Expressions
 
 				if (parser.PropertyName == null)
 				{
-					parser.PropertyName = orderBy.Property;
+					parser.PropertyName = arg.MapProperty(orderBy.Property);
 					parser.Descending = orderBy.Descending;
 				}
 				else
 				{
-					parser.ThenBys.Add((orderBy.Property, orderBy.Descending));
+					parser.ThenBys.Add((arg.MapProperty(orderBy.Property), orderBy.Descending));
 				}
 			}
 
@@ -91,12 +91,12 @@ namespace Kkts.Expressions
 
 				if (parser.PropertyName == null)
 				{
-					parser.PropertyName = parts[0];
+					parser.PropertyName = arg.MapProperty(parts[0]);
 					parser.Descending = IsDescending(parts);
 				}
 				else
 				{
-					parser.ThenBys.Add((parts[0], IsDescending(parts)));
+					parser.ThenBys.Add((arg.MapProperty(parts[0]), IsDescending(parts)));
 				}
 			}
 

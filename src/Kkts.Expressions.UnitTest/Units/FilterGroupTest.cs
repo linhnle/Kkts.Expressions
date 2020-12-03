@@ -85,5 +85,36 @@ namespace Kkts.Expressions.UnitTest.Units
                 Assert.Equal(1, value);
             }
         }
+
+        [Fact]
+        public void TryBuildPredicate_FilterGroups_PropertyMapping_Success()
+        {
+            var propertyMapping = new Dictionary<string, string> { ["Number"] = "Integer", ["NumberNullable"] = "IntegerNullable" };
+            var validProperties = new[] { "Number", "NumberNullable" };
+            var query = new FilterGroup
+            {
+                Filters = new List<Filter>
+                {
+                    new Filter{ Property = "Number", Operator = "=", Value = DF.Integer1.ToString() },
+                    new Filter{ Property = "NumberNullable", Operator = "=", Value = DF.Integer2.ToString() }
+                }
+            }.TryBuildPredicate<TestEntity>(validProperties: validProperties, propertyMapping: propertyMapping);
+            Assert.True(query.Succeeded);
+        }
+
+        [Fact]
+        public void BuildPredicate_FilterGroups_PropertyMapping_Success()
+        {
+            var propertyMapping = new Dictionary<string, string> { ["Number"] = "Integer", ["NumberNullable"] = "IntegerNullable" };
+            var validProperties = new[] { "Number", "NumberNullable" };
+            var query = new FilterGroup
+            {
+                Filters = new List<Filter>
+                {
+                    new Filter{ Property = "Number", Operator = "=", Value = DF.Integer1.ToString() },
+                    new Filter{ Property = "NumberNullable", Operator = "=", Value = DF.Integer2.ToString() }
+                }
+            }.BuildPredicate<TestEntity>(validProperties: validProperties, propertyMapping: propertyMapping);
+        }
     }
 }

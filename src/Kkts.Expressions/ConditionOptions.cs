@@ -18,19 +18,20 @@ namespace Kkts.Expressions
 
 		public virtual string Where { get; set; }
 
-		public virtual Condition<T> BuildCondition<T>(VariableResolver variableResolver = null, IEnumerable<string> validProperties = null)
+		public virtual Condition<T> BuildCondition<T>(VariableResolver variableResolver = null, IEnumerable<string> validProperties = null, IDictionary<string, string> propertyMapping = null)
 		{
-			return (Condition<T>)BuildCondition(typeof(T), variableResolver, validProperties);
+			return (Condition<T>)BuildCondition(typeof(T), variableResolver, validProperties, propertyMapping);
 		}
 
-		public virtual Condition BuildCondition(Type type, VariableResolver variableResolver = null, IEnumerable<string> validProperties = null)
+		public virtual Condition BuildCondition(Type type, VariableResolver variableResolver = null, IEnumerable<string> validProperties = null, IDictionary<string, string> propertyMapping = null)
 		{
 			if (type == null) throw new ArgumentNullException(nameof(type));
 			var arg = new BuildArgument
 			{
 				ValidProperties = validProperties,
-				VariableResolver = variableResolver ?? new VariableResolver(),
-				EvaluationType = type
+				VariableResolver = variableResolver,
+				EvaluationType = type,
+				PropertyMapping = propertyMapping
 			};
 
 			var error = new ConditionBase.ErrorInfo();

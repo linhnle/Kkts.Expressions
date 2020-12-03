@@ -1,4 +1,5 @@
-﻿using System.Linq;
+﻿using System.Collections.Generic;
+using System.Linq;
 using Xunit;
 
 namespace Kkts.Expressions.UnitTest.Units
@@ -203,7 +204,7 @@ namespace Kkts.Expressions.UnitTest.Units
         }
 
         [Fact]
-        public void ParsePredicate_CustomVarableResolver_Success()
+        public void ParsePredicate_CustomVariableResolver_Success()
         {
             var query = new Filter[]
             {
@@ -215,6 +216,31 @@ namespace Kkts.Expressions.UnitTest.Units
                 var value = context.Entities.Count(query.Result);
                 Assert.Equal(1, value);
             }
+        }
+
+        [Fact]
+        public void TryBuildPredicate_Filters_PropertyMapping_Success()
+        {
+            var propertyMapping = new Dictionary<string, string> { ["Number"] = "Integer", ["NumberNullable"] = "IntegerNullable" };
+            var validProperties = new string[] { };
+            var query = new Filter[]
+            {
+                new Filter{ Property = "Number", Operator = "=", Value = DF.Integer1.ToString() },
+                new Filter{ Property = "NumberNullable", Operator = "=", Value = DF.Integer2.ToString() }
+            }.TryBuildPredicate<TestEntity>(validProperties: validProperties, propertyMapping: propertyMapping);
+            Assert.True(query.Succeeded);
+        }
+
+        [Fact]
+        public void BuildPredicate_Filters_PropertyMapping_Success()
+        {
+            var propertyMapping = new Dictionary<string, string> { ["Number"] = "Integer", ["NumberNullable"] = "IntegerNullable" };
+            var validProperties = new[] { "Number", "NumberNullable" };
+            var query = new Filter[]
+            {
+                new Filter{ Property = "Number", Operator = "=", Value = DF.Integer1.ToString() },
+                new Filter{ Property = "NumberNullable", Operator = "=", Value = DF.Integer2.ToString() }
+            }.BuildPredicate<TestEntity>(validProperties: validProperties, propertyMapping: propertyMapping);
         }
     }
 }

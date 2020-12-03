@@ -8,62 +8,76 @@ namespace Kkts.Expressions
 	public static class FilterGroupExtensions
 	{
 		#region FilterGroup
-		public static Expression<Func<T, bool>> BuildPredicate<T>(this FilterGroup filterGroup, VariableResolver variableResolver = null)
+		public static Expression<Func<T, bool>> BuildPredicate<T>(this FilterGroup filterGroup, VariableResolver variableResolver = null, IEnumerable<string> validProperties = null, IDictionary<string, string> propertyMapping = null)
 		{
 			if (filterGroup == null) throw new ArgumentNullException(nameof(filterGroup));
-			return (Expression<Func<T, bool>>)FilterExtensions.BuildPredicate(filterGroup.Filters, typeof(T), variableResolver ?? new VariableResolver());
+			return (Expression<Func<T, bool>>)FilterExtensions.BuildPredicate(filterGroup.Filters, typeof(T), variableResolver, validProperties, propertyMapping);
 		}
 
-		public static LambdaExpression BuildPredicate(this FilterGroup filterGroup, Type type, VariableResolver variableResolver = null)
+		public static LambdaExpression BuildPredicate(this FilterGroup filterGroup, Type type, VariableResolver variableResolver = null, IEnumerable<string> validProperties = null, IDictionary<string, string> propertyMapping = null)
 		{
 			if (filterGroup == null) throw new ArgumentNullException(nameof(filterGroup));
 			if (type == null) throw new ArgumentNullException(nameof(type));
-			if (!IsValid(filterGroup)) throw new InvalidOperationException("The operator or property name is not valid");
+			var arg = new BuildArgument
+			{
+				ValidProperties = validProperties,
+				EvaluationType = type,
+				VariableResolver = variableResolver,
+				PropertyMapping = propertyMapping
+			};
+			if (!IsValid(filterGroup, arg)) throw new InvalidOperationException("The operator or property name is not valid");
 
-			return FilterExtensions.BuildPredicate(filterGroup.Filters, type, variableResolver ?? new VariableResolver());
+			return FilterExtensions.BuildPredicateInternal(filterGroup.Filters, type, arg);
 		}
 
-		public static Expression<Func<T, bool>> BuildPredicate<T>(this IEnumerable<FilterGroup> filterGroups, VariableResolver variableResolver = null)
+		public static Expression<Func<T, bool>> BuildPredicate<T>(this IEnumerable<FilterGroup> filterGroups, VariableResolver variableResolver = null, IEnumerable<string> validProperties = null, IDictionary<string, string> propertyMapping = null)
 		{
-			return (Expression<Func<T, bool>>)BuildPredicate(filterGroups, typeof(T), variableResolver ?? new VariableResolver());
+			return (Expression<Func<T, bool>>)BuildPredicate(filterGroups, typeof(T), variableResolver, validProperties, propertyMapping);
 		}
 
-		public static LambdaExpression BuildPredicate(this IEnumerable<FilterGroup> filterGroups, Type type, VariableResolver variableResolver = null)
+		public static LambdaExpression BuildPredicate(this IEnumerable<FilterGroup> filterGroups, Type type, VariableResolver variableResolver = null, IEnumerable<string> validProperties = null, IDictionary<string, string> propertyMapping = null)
 		{
 			if (filterGroups == null) throw new ArgumentNullException(nameof(filterGroups));
 			if (type == null) throw new ArgumentNullException(nameof(type));
-			if (!IsValid(filterGroups)) throw new InvalidOperationException("The operator or property name is not valid");
+			var arg = new BuildArgument
+			{
+				ValidProperties = validProperties,
+				EvaluationType = type,
+				VariableResolver = variableResolver,
+				PropertyMapping = propertyMapping
+			};
+			if (!IsValid(filterGroups, arg)) throw new InvalidOperationException("The operator or property name is not valid");
 
 			var allFilterGroups = filterGroups as FilterGroup[] ?? filterGroups.ToArray();
 			allFilterGroups = allFilterGroups.Where(p => p?.Filters?.Any() == true).ToArray();
 			if (!allFilterGroups.Any()) return FilterExtensions.AlwaysTruePredicate(type);
 
-			variableResolver = variableResolver ?? new VariableResolver();
 			var param = type.CreateParameterExpression();
 			var body = allFilterGroups.Aggregate((Expression)null, (current, next) => current == null
-				? FilterExtensions.BuildBody(next.Filters.ToArray(), param, variableResolver)
-				: Expression.OrElse(current, FilterExtensions.BuildBody(next.Filters.ToArray(), param, variableResolver)));
+				? FilterExtensions.BuildBody(next.Filters.ToArray(), param, arg)
+				: Expression.OrElse(current, FilterExtensions.BuildBody(next.Filters.ToArray(), param, arg)));
 
 			return Expression.Lambda(body, param);
 		}
 
-		public static EvaluationResult<T, bool> TryBuildPredicate<T>(this FilterGroup filterGroup, VariableResolver variableResolver = null, IEnumerable<string> validProperties = null)
+		public static EvaluationResult<T, bool> TryBuildPredicate<T>(this FilterGroup filterGroup, VariableResolver variableResolver = null, IEnumerable<string> validProperties = null, IDictionary<string, string> propertyMapping = null)
 		{
 			if (filterGroup == null) throw new ArgumentNullException(nameof(filterGroup)); ;
 			var arg = new BuildArgument
 			{
 				ValidProperties = validProperties,
 				EvaluationType = typeof(T),
-				VariableResolver = variableResolver ?? new VariableResolver()
+				VariableResolver = variableResolver,
+				PropertyMapping = propertyMapping
 			};
 
 			return TryBuildPredicate<T>(filterGroup, arg);
 		}
 
-		public static EvaluationResult<T, bool> TryBuildPredicate<T>(this IEnumerable<FilterGroup> filterGroups, VariableResolver variableResolver = null, IEnumerable<string> validProperties = null)
+		public static EvaluationResult<T, bool> TryBuildPredicate<T>(this IEnumerable<FilterGroup> filterGroups, VariableResolver variableResolver = null, IEnumerable<string> validProperties = null, IDictionary<string, string> propertyMapping = null)
 		{
 			if (filterGroups == null) throw new ArgumentNullException(nameof(filterGroups));
-			var result = TryBuildPredicate(filterGroups, typeof(T), variableResolver, validProperties);
+			var result = TryBuildPredicate(filterGroups, typeof(T), variableResolver, validProperties, propertyMapping);
 
 			return new EvaluationResult<T, bool>
 			{
@@ -76,7 +90,7 @@ namespace Kkts.Expressions
 			};
 		}
 
-		public static EvaluationResult TryBuildPredicate(this IEnumerable<FilterGroup> filterGroups, Type type, VariableResolver variableResolver = null, IEnumerable<string> validProperties = null)
+		public static EvaluationResult TryBuildPredicate(this IEnumerable<FilterGroup> filterGroups, Type type, VariableResolver variableResolver = null, IEnumerable<string> validProperties = null, IDictionary<string, string> propertyMapping = null)
 		{
 			if (filterGroups == null) throw new ArgumentNullException(nameof(filterGroups));
 			if (type == null) throw new ArgumentNullException(nameof(type));
@@ -84,7 +98,8 @@ namespace Kkts.Expressions
 			{
 				ValidProperties = validProperties,
 				EvaluationType = type,
-				VariableResolver = variableResolver ?? new VariableResolver()
+				VariableResolver = variableResolver,
+				PropertyMapping = propertyMapping
 			};
 
 			return TryBuildPredicate(filterGroups, type, arg);
@@ -105,7 +120,7 @@ namespace Kkts.Expressions
 
 			try
 			{
-				var expression = (Expression<Func<T, bool>>)FilterExtensions.BuildPredicate(filterGroup.Filters, typeof(T), arg.VariableResolver);
+				var expression = (Expression<Func<T, bool>>)FilterExtensions.BuildPredicateInternal(filterGroup.Filters, typeof(T), arg);
 
 				return new EvaluationResult<T, bool>
 				{
@@ -157,8 +172,8 @@ namespace Kkts.Expressions
 			{
 				var param = type.CreateParameterExpression();
 				var body = allFilterGroups.Aggregate((Expression)null, (current, next) => current == null
-					? FilterExtensions.BuildBody(next.Filters.ToArray(), param, arg.VariableResolver)
-					: Expression.OrElse(current, FilterExtensions.BuildBody(next.Filters.ToArray(), param, arg.VariableResolver)));
+					? FilterExtensions.BuildBody(next.Filters.ToArray(), param, arg)
+					: Expression.OrElse(current, FilterExtensions.BuildBody(next.Filters.ToArray(), param, arg)));
 				return new EvaluationResult
 				{
 					Succeeded = true,
@@ -179,16 +194,16 @@ namespace Kkts.Expressions
 
 		#region Validation
 
-		internal static bool IsValid(FilterGroup filterGroup)
+		internal static bool IsValid(FilterGroup filterGroup, BuildArgument arg)
 		{
 			return filterGroup != null
 				&& filterGroup.Filters != null
-				&& filterGroup.Filters.All(p => p.IsValid());
+				&& filterGroup.Filters.All(p => p.IsValid(arg));
 		}
 
-		internal static bool IsValid(this IEnumerable<FilterGroup> filterGroups)
+		internal static bool IsValid(this IEnumerable<FilterGroup> filterGroups, BuildArgument arg)
 		{
-			return filterGroups != null && filterGroups.All(p => IsValid(p));
+			return filterGroups != null && filterGroups.All(p => IsValid(p, arg));
 		}
 
 		#endregion Validation

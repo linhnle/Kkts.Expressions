@@ -45,7 +45,7 @@ namespace Kkts.Expressions
                 {
                     for (var i = 1; i < segments.Length; ++i)
                     {
-                        var member = Expression.PropertyOrField(Expression.Parameter(prop.PropertyType), segments[i])?.Member;
+                        var member = Expression.PropertyOrField(Expression.Parameter(prop.PropertyType), segments[i]).Member;
                         switch (member)
                         {
                             case PropertyInfo p:

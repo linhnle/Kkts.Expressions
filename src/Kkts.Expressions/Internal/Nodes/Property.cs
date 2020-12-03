@@ -13,7 +13,7 @@ namespace Kkts.Expressions.Internal.Nodes
 		{
 			try
 			{
-				return Param.CreatePropertyExpression(Name);
+				return Param.CreatePropertyExpression(arg.MapProperty(Name));
 			}
 			catch (Exception ex)
 			{

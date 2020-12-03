@@ -72,7 +72,7 @@ namespace Kkts.Expressions
 		internal static readonly MethodInfo StringStartsWithMethod = typeof(string).GetMethod(nameof(string.StartsWith), new[] { typeof(string) });
 		internal static readonly MethodInfo StringEndsWithMethod = typeof(string).GetMethod(nameof(string.EndsWith), new[] { typeof(string) });
 
-		public static EvaluationResult<T, bool> ParsePredicate<T>(this string expression, VariableResolver variableResolver = null, IEnumerable<string> validProperties = null)
+		public static EvaluationResult<T, bool> ParsePredicate<T>(this string expression, VariableResolver variableResolver = null, IEnumerable<string> validProperties = null, IDictionary<string, string> propertyMapping = null)
 		{
 			if (string.IsNullOrWhiteSpace(expression)) throw new ArgumentException("Invalid expression", nameof(expression));
 
@@ -81,7 +81,8 @@ namespace Kkts.Expressions
 			{
 				ValidProperties = validProperties,
 				EvaluationType = type,
-				VariableResolver = variableResolver ?? new VariableResolver()
+				VariableResolver = variableResolver,
+				PropertyMapping = propertyMapping
 			});
 
 			return new EvaluationResult<T, bool>
@@ -95,7 +96,7 @@ namespace Kkts.Expressions
 			};
 		}
 
-		public static EvaluationResult ParsePredicate(this string expression, Type type, VariableResolver variableResolver = null, IEnumerable<string> validProperties = null)
+		public static EvaluationResult ParsePredicate(this string expression, Type type, VariableResolver variableResolver = null, IEnumerable<string> validProperties = null, IDictionary<string, string> propertyMapping = null)
 		{
 			if (string.IsNullOrWhiteSpace(expression)) throw new ArgumentException($"{nameof(expression)} is required", nameof(expression));
 			if (type == null) throw new ArgumentNullException(nameof(type));
@@ -104,7 +105,8 @@ namespace Kkts.Expressions
 			{
 				ValidProperties = validProperties,
 				EvaluationType = type,
-				VariableResolver = variableResolver ?? new VariableResolver()
+				VariableResolver = variableResolver,
+				PropertyMapping = propertyMapping
 			});
 		}
 
