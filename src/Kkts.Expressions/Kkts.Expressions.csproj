@@ -13,6 +13,7 @@
     <RepositoryType>Git</RepositoryType>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <Description>Build string expression to lambda expression to support dynamic query from UI</Description>
+    <PackageTags>Expression, LambdaExpression, DynamicExpression, StringExpression, Query, StringQuery</PackageTags>
   </PropertyGroup>
 
 </Project>
