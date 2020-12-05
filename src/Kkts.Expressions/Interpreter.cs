@@ -110,6 +110,26 @@ namespace Kkts.Expressions
 			});
 		}
 
+		public static EvaluationResult<OrderByClause> TryBuildOrderByClause(this string expression, Type type, IEnumerable<string> validProperties = null, IDictionary<string, string> propertyMapping = null)
+		{
+			if (string.IsNullOrWhiteSpace(expression)) throw new ArgumentException($"{nameof(expression)} is required", nameof(expression));
+			if (type is null) throw new ArgumentNullException(nameof(type));
+
+			var arg = new BuildArgument
+			{
+				ValidProperties = validProperties,
+				EvaluationType = type,
+				PropertyMapping = propertyMapping
+			};
+
+			return OrderByParser.Parse(expression, arg);
+		}
+
+		public static EvaluationResult<OrderByClause> TryBuildOrderByClause<T>(this string expression, IEnumerable<string> validProperties = null, IDictionary<string, string> propertyMapping = null)
+		{
+			return TryBuildOrderByClause(expression, typeof(T), validProperties, propertyMapping);
+		}
+
 		public static Expression<Func<TEntity, bool>> BuildPredicate<TEntity>(string propertyName, ComparisonOperator @operator, object value, VariableResolver variableResolver = null)
 		{
 			if (string.IsNullOrWhiteSpace(propertyName)) throw new ArgumentException($"{nameof(propertyName)} is required", nameof(propertyName));

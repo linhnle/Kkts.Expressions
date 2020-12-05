@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 
-namespace Kkts.Expressions
+namespace Kkts.Expressions.Internal
 {
 	internal class OrderByParser
 	{
@@ -13,7 +13,6 @@ namespace Kkts.Expressions
 		internal static readonly string[] DescendingOptions = { Desc1, Desc2 };
 		internal static readonly string[] Options = { Desc1, Desc2, Asc1, Asc2 };
 		
-
 		private OrderByParser()
 		{
 			ThenBys = new List<(string Name, bool Descending)>();

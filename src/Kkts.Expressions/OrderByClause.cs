@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using Kkts.Expressions.Internal;
+using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
 
@@ -28,7 +29,6 @@ namespace Kkts.Expressions
 			var result = Sort(source, _parser.PropertyName, _parser.Descending, false);
 			return _parser.ThenBys.Any() ? _parser.ThenBys.Aggregate(result, (current, thenByItem) => Sort(current, thenByItem.Name, thenByItem.Descending, true)) : result;
 		}
-
 
 		internal static IOrderedQueryable Sort(IQueryable source, string propertyName, bool descending, bool thenBy)
 		{
