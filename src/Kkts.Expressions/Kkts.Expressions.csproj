@@ -3,7 +3,7 @@
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
     <Copyright>Copyright (C) 2016-2020 KKTS Ltd.</Copyright>
-    <Version>1.0.3-rc2</Version>
+    <Version>1.0.3</Version>
     <Authors>Linh Le</Authors>
     <Product>Dynamic Expression</Product>
     <Company>KKTS Ltd.</Company>
