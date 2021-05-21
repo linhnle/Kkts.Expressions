@@ -176,6 +176,7 @@ var filters = new FilterGroup[]
                     }
                 }
             }
+Expression<Func<Data, bool>> predicate = filters.BuildPredicate<Data>(propertyMapping: mapping);
 ```
 ### Support operators
 | Operator             | Usage|Support data types|
