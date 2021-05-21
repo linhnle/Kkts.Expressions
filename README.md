@@ -144,6 +144,39 @@ var result = context.Entities.Take(condition, new Pagination { Page = 2, PageSiz
 var result = context.Entities.TakePage(condition, new Pagination { Offset = 10, Limit = 10 });
 var result = context.Entities.TakePage(condition, new Pagination { Page = 2, PageSize = 10 });
 ```
+### Usage 7 (Property Mapping)
+``` csharp
+// map entityId as Id
+var mapping = new Dictionary<string, string>
+            {
+                ["entityId"] = "Id"
+            };
+Expression<Func<Data, bool>> predicate = Interpreter.ParsePredicate<Data>("(entityId = 1 and name='Test1') or (entityId = 2 and name='Test2')", propertyMapping: mapping).Result; 
+
+// Equivalent
+var filters = new FilterGroup[]
+            {
+                new FilterGroup
+                {
+                    Filters = new List<Filter>
+                    {
+                        new Filter{ Property = "entityId", Operator = "=", Value = "1" },
+                        // and
+                        new Filter{ Property = "name", Operator = "=", Value = "Test1" }
+                    }
+                },
+                // or 
+                new FilterGroup
+                {
+                    Filters = new List<Filter>
+                    {
+                        new Filter{ Property = "entityId", Operator = "=", Value = "2" },
+                        // and
+                        new Filter{ Property = "name", Operator = "=", Value = "Test2" }
+                    }
+                }
+            }
+```
 ### Support operators
 | Operator             | Usage|Support data types|
 |--------------------|--------------------------------------------|-------------------------------------------------------------------|
