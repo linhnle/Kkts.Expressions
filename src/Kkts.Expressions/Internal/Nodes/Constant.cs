@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections;
 using System.Linq.Expressions;
 
 namespace Kkts.Expressions.Internal.Nodes
@@ -17,6 +18,21 @@ namespace Kkts.Expressions.Internal.Nodes
 			{
 				if (IsVariable && arg.VariableResolver.TryResolve(Value, out var value))
 				{
+					if (value is IEnumerable)
+					{
+						var valueType = value.GetType();
+						if (valueType.IsGenericType)
+						{
+							Type = valueType.GetGenericArguments()[0];
+						}
+						else if (valueType.IsArray)
+						{
+							Type = valueType.GetElementType();
+						}
+
+						return Expression.Constant(value);
+                    }
+
 					return Expression.Constant(Convert.ChangeType(value, Type));
 				}
 

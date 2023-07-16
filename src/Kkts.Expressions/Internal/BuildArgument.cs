@@ -126,7 +126,7 @@ namespace Kkts.Expressions
             var isValid = _lookup.ContainsKey(value);
             if (isValid) return true;
 
-            if (!isValid && value.Contains('.') && _evaluationType != null)
+            if (value.Contains('.') && _evaluationType != null)
             {
                 _lookup = _lookup ?? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
                 var segments = value.Split('.');

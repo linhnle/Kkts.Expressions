@@ -337,43 +337,48 @@ namespace Kkts.Expressions.UnitTest.Units
         [Fact]
         public void ParsePredicate_DateTimeAndVariableResolver_Succeed()
         {
-            //var query = $"DateTime='{DF.DateTime1}' and DateTime<'{DF.DateTime2}' and DateTime<='{DF.DateTime1}' and DateTime>='{DF.DateTime1}' and DateTime in ['{DF.DateTime1}','{DF.DateTime2}','{DF.DateTime3}']";
-            //var query2 = $"DateTime='{DF.DateTimeString1}' and DateTime<'{DF.DateTimeString2}' and DateTime<='{DF.DateTimeString1}' and DateTime>='{DF.DateTimeString1}' and DateTime in ['{DF.DateTimeString1}','{DF.DateTimeString2}','{DF.DateTimeString3}']";
+            var query = $"DateTime='{DF.DateTime1}' and DateTime<'{DF.DateTime2}' and DateTime<='{DF.DateTime1}' and DateTime>='{DF.DateTime1}' and DateTime in ['{DF.DateTime1}','{DF.DateTime2}','{DF.DateTime3}']";
+            var query2 = $"DateTime='{DF.DateTimeString1}' and DateTime<'{DF.DateTimeString2}' and DateTime<='{DF.DateTimeString1}' and DateTime>='{DF.DateTimeString1}' and DateTime in ['{DF.DateTimeString1}','{DF.DateTimeString2}','{DF.DateTimeString3}']";
             var query3 = $"DateTime.Year=now.year and DateTime.Year==utcnow.year";
-            //var and1 = Interpreter.ParsePredicate<TestEntity>(query);
-            //var and1_1 = Interpreter.ParsePredicate<TestEntity>(query2);
+            var query4 = $"DateTime.Year=$now.year and DateTime.Year==$utcnow.year";
+            var and1 = Interpreter.ParsePredicate<TestEntity>(query);
+            var and1_1 = Interpreter.ParsePredicate<TestEntity>(query2);
             var and1_2 = Interpreter.ParsePredicate<TestEntity>(query3);
-            //var and2 = Interpreter.ParsePredicate<TestEntity>(query.Replace("and", "&&"));
-            //var and3 = Interpreter.ParsePredicate<TestEntity>(query.Replace("and", "&"));
-            //var or1 = Interpreter.ParsePredicate<TestEntity>(query.Replace("and", "or"));
-            //var or2 = Interpreter.ParsePredicate<TestEntity>(query.Replace("and", "||"));
-            //var or3 = Interpreter.ParsePredicate<TestEntity>(query.Replace("and", "|"));
-            //Assert.True(and1_1.Succeeded);
+            var and1_3 = Interpreter.ParsePredicate<TestEntity>(query4);
+            var and2 = Interpreter.ParsePredicate<TestEntity>(query.Replace("and", "&&"));
+            var and3 = Interpreter.ParsePredicate<TestEntity>(query.Replace("and", "&"));
+            var or1 = Interpreter.ParsePredicate<TestEntity>(query.Replace("and", "or"));
+            var or2 = Interpreter.ParsePredicate<TestEntity>(query.Replace("and", "||"));
+            var or3 = Interpreter.ParsePredicate<TestEntity>(query.Replace("and", "|"));
+            Assert.True(and1_1.Succeeded);
             Assert.True(and1_2.Succeeded);
-            //Assert.True(and1.Succeeded);
-            //Assert.True(and2.Succeeded);
-            //Assert.True(and3.Succeeded);
-            //Assert.True(or1.Succeeded);
-            //Assert.True(or2.Succeeded);
-            //Assert.True(or3.Succeeded);
+            Assert.True(and1_3.Succeeded);
+            Assert.True(and1.Succeeded);
+            Assert.True(and2.Succeeded);
+            Assert.True(and3.Succeeded);
+            Assert.True(or1.Succeeded);
+            Assert.True(or2.Succeeded);
+            Assert.True(or3.Succeeded);
             using (var context = DF.GetContext())
             {
-                //var value = context.Entities.Count(and1.Result);
-                //Assert.Equal(1, value);
-                //value = context.Entities.Count(and1_1.Result);
-                //Assert.Equal(1, value);
-                var value = context.Entities.Count(and1_2.Result);
+                var value = context.Entities.Count(and1.Result);
                 Assert.Equal(1, value);
-                //value = context.Entities.Count(and2.Result);
-                //Assert.Equal(1, value);
-                //value = context.Entities.Count(and3.Result);
-                //Assert.Equal(1, value);
-                //value = context.Entities.Count(or1.Result);
-                //Assert.True(value > 0);
-                //value = context.Entities.Count(or2.Result);
-                //Assert.True(value > 0);
-                //value = context.Entities.Count(or3.Result);
-                //Assert.True(value > 0);
+                value = context.Entities.Count(and1_1.Result);
+                Assert.Equal(1, value);
+                value = context.Entities.Count(and1_2.Result);
+                Assert.Equal(1, value);
+                value = context.Entities.Count(and1_3.Result);
+                Assert.Equal(1, value);
+                value = context.Entities.Count(and2.Result);
+                Assert.Equal(1, value);
+                value = context.Entities.Count(and3.Result);
+                Assert.Equal(1, value);
+                value = context.Entities.Count(or1.Result);
+                Assert.True(value > 0);
+                value = context.Entities.Count(or2.Result);
+                Assert.True(value > 0);
+                value = context.Entities.Count(or3.Result);
+                Assert.True(value > 0);
             }
         }
 
@@ -525,10 +530,35 @@ namespace Kkts.Expressions.UnitTest.Units
         public void ParsePredicate_CustomVariableResolver_Success()
         {
             var result = Interpreter.ParsePredicate<TestEntity>("Integer=user.Id", new CustomVariableResolver());
+            var result2 = Interpreter.ParsePredicate<TestEntity>("Integer=$user.Id", new CustomVariableResolver());
             Assert.True(result.Succeeded);
+            Assert.True(result2.Succeeded);
             using (var context = DF.GetContext())
             {
                 var value = context.Entities.Count(result.Result);
+                Assert.Equal(1, value);
+                value = context.Entities.Count(result2.Result);
+                Assert.Equal(1, value);
+            }
+        }
+
+        [Fact]
+        public void ParsePredicate_InOperatorAndCustomVariableResolver_Success()
+        {
+            var resolver = new CustomVariableResolver();
+            var result = Interpreter.ParsePredicate<TestEntity>("Integer in [$user.Id]", resolver);
+            var result2 = Interpreter.ParsePredicate<TestEntity>("Integer in userIds", resolver);
+            var result3 = Interpreter.ParsePredicate<TestEntity>("Integer in $userIds", resolver);
+            Assert.True(result.Succeeded);
+            Assert.True(result2.Succeeded);
+            Assert.True(result3.Succeeded);
+            using (var context = DF.GetContext())
+            {
+                var value = context.Entities.Count(result.Result);
+                Assert.Equal(1, value);
+                value = context.Entities.Count(result2.Result);
+                Assert.Equal(1, value);
+                value = context.Entities.Count(result3.Result);
                 Assert.Equal(1, value);
             }
         }
@@ -549,6 +579,7 @@ namespace Kkts.Expressions.UnitTest.Units
             exp = Interpreter.BuildPredicate<TestEntity>("Integer", ComparisonOperator.GreaterThan, "1");
             exp = Interpreter.BuildPredicate<TestEntity>("Integer", ComparisonOperator.GreaterThanOrEqual, "1");
             exp = Interpreter.BuildPredicate<TestEntity>("Integer", ComparisonOperator.In, "1, 2, 4");
+            exp = Interpreter.BuildPredicate<TestEntity>("Integer", ComparisonOperator.In, "$now.month, 2, 4");
             // integer nullable
             exp = Interpreter.BuildPredicate<TestEntity>("IntegerNullable", ComparisonOperator.Equal, "1");
             exp = Interpreter.BuildPredicate<TestEntity>("IntegerNullable", ComparisonOperator.Equal, "");
@@ -559,6 +590,7 @@ namespace Kkts.Expressions.UnitTest.Units
             exp = Interpreter.BuildPredicate<TestEntity>("IntegerNullable", ComparisonOperator.GreaterThan, "1");
             exp = Interpreter.BuildPredicate<TestEntity>("IntegerNullable", ComparisonOperator.GreaterThanOrEqual, "1");
             exp = Interpreter.BuildPredicate<TestEntity>("IntegerNullable", ComparisonOperator.In, "1, 2, 4");
+            exp = Interpreter.BuildPredicate<TestEntity>("IntegerNullable", ComparisonOperator.In, "$now.year, 2, 4");
 
             // double
             exp = Interpreter.BuildPredicate<TestEntity>("Double", ComparisonOperator.Equal, "1.0");
@@ -568,6 +600,7 @@ namespace Kkts.Expressions.UnitTest.Units
             exp = Interpreter.BuildPredicate<TestEntity>("Double", ComparisonOperator.GreaterThan, "1");
             exp = Interpreter.BuildPredicate<TestEntity>("Double", ComparisonOperator.GreaterThanOrEqual, "1");
             exp = Interpreter.BuildPredicate<TestEntity>("Double", ComparisonOperator.In, "1.2, 2, 4");
+            exp = Interpreter.BuildPredicate<TestEntity>("Double", ComparisonOperator.In, "1.2, 2, $now.day");
             // double nullable
             exp = Interpreter.BuildPredicate<TestEntity>("DoubleNullable", ComparisonOperator.Equal, "1.0");
             exp = Interpreter.BuildPredicate<TestEntity>("DoubleNullable", ComparisonOperator.Equal, "");

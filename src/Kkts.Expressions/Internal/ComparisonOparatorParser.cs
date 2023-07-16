@@ -80,7 +80,7 @@ namespace Kkts.Expressions.Internal
 				return new List<Parser>
 				{
 					new ArrayParser { LeftHand = false, Previous = this },
-					new PropertyParser { LeftHand = true, Previous = this, IsVariable = true }
+					new PropertyParser { LeftHand = true, Previous = this, IsVariable = true, ForInOperator = true }
 				};
 			}
 

@@ -20,7 +20,9 @@ namespace Kkts.Expressions.Internal.Nodes
 			var i = 0;
 			StringValues.ForEach((p) => 
 			{
-				var value = p.Cast(Type);
+				var value = p.StartsWith("$") && arg.VariableResolver.TryResolve(p.Substring(1), out var v)
+				 ? ConvertType(v, Type)
+                 : p.Cast(Type);
 				arr.SetValue(value, i++);
 			});
 
@@ -35,6 +37,7 @@ namespace Kkts.Expressions.Internal.Nodes
 			StringBuilder value = null;
 			var isSpecialChar = false;
 			var started = false;
+			var isVariable = false;
 			char openChar = char.MinValue;
 			var whiteSpaceCount = 0;
 			while (DrawValue[whiteSpaceCount].IsWhiteSpace()) ++whiteSpaceCount;
@@ -95,7 +98,8 @@ namespace Kkts.Expressions.Internal.Nodes
 						started = false;
 						StringValues.Add(value.ToString().Trim());
 						value = null;
-						IgnoreWhiteSpaceAndComma(drawValue, ref index);
+						isVariable = false;
+                        IgnoreWhiteSpaceAndComma(drawValue, ref index);
 					}
 
 					continue;
@@ -103,13 +107,24 @@ namespace Kkts.Expressions.Internal.Nodes
 
 				if (openChar == char.MinValue)
 				{
+					if (isVariable)
+					{
+                        value.Append(c);
+                        continue;
+					}
 					if (c == '.')
 					{
 						++dotCount;
 						if (dotCount > 1) throw new FormatException(GetErrorMessage());
 					}
-
-					else if (!char.IsDigit(c)) throw new FormatException(GetErrorMessage());
+                    else if (c == '$')
+                    {
+						isVariable = true;
+                        value.Append(c);
+                        continue;
+                    }
+                    else if (!char.IsDigit(c)) throw new FormatException(GetErrorMessage());
+					
 				}
 
 				value.Append(c);
@@ -137,5 +152,10 @@ namespace Kkts.Expressions.Internal.Nodes
 			--StartIndex;
 			--index;
 		}
+
+		private static object ConvertType(object value, Type type)
+		{
+			return value is string s ? s.Cast(type) : Convert.ChangeType(value, Nullable.GetUnderlyingType(type) ?? type);
+        }
 	}
 }

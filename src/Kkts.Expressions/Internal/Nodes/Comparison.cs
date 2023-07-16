@@ -37,10 +37,11 @@ namespace Kkts.Expressions.Internal.Nodes
 				else if (Left is Property p2 && Right is Constant c2)
 				{
 					var propEx = (MemberExpression)p2.Build(arg);
-					c2.Type = propEx.Type;
-					left = propEx;
+                    c2.Type = propEx.Type;
+                    left = propEx;
 					right = c2.Build(arg);
-				}
+					inOperatorDataType = c2.Type is null ? left.Type : c2.Type;
+                }
 				else if (Left is Property p3 && Right is ArrayList al)
 				{
 					var propEx = (MemberExpression)p3.Build(arg);

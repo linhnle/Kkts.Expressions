@@ -2,8 +2,8 @@
 
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
-    <Copyright>Copyright (C) 2016-2020 KKTS Ltd.</Copyright>
-    <Version>1.0.3</Version>
+    <Copyright>Copyright (C) 2016-2023 KKTS Ltd.</Copyright>
+    <Version>1.0.4</Version>
     <Authors>Linh Le</Authors>
     <Product>Dynamic Expression</Product>
     <Company>KKTS Ltd.</Company>
@@ -14,6 +14,7 @@
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <Description>Build string expression to lambda expression to support dynamic query from UI</Description>
     <PackageTags>Expression, LambdaExpression, DynamicExpression, StringExpression, Query, StringQuery</PackageTags>
+    <NeutralLanguage>en</NeutralLanguage>
   </PropertyGroup>
 
 </Project>

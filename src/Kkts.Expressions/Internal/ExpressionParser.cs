@@ -108,7 +108,6 @@ namespace Kkts.Expressions.Internal
 					{
 						groups.Push(group);
 						acceptedParsers = group.GetNextParsers(c);
-						continue;
 					}
 				}
 
@@ -304,6 +303,10 @@ namespace Kkts.Expressions.Internal
 			{
 				builtNode = new Constant { Value = result.ToLower(), Type = typeof(bool), StartIndex = parser.StartIndex, StartChar = parser.StartChar };
 			}
+			else if (parser.IsVariable && !parser.ForInOperator)
+			{
+                builtNode = new Constant { Value = result, StartIndex = parser.StartIndex, StartChar = parser.StartChar, IsVariable = true };
+            }
 			else if (arg.VariableResolver.IsVariable(result))
 			{
 				builtNode = new Constant { Value = result, StartIndex = parser.StartIndex, StartChar = parser.StartChar, IsVariable = true };

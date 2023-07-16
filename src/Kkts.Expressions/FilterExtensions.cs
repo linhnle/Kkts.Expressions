@@ -128,6 +128,7 @@ namespace Kkts.Expressions
 
 			return Expression.Lambda(body, param);
 		}
+
 		internal static EvaluationResult TryBuildPredicate(this Filter filter, Type type, BuildArgument arg)
 		{
 			var isInvalid = !arg.IsValidProperty(filter.Property);

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
@@ -12,9 +13,10 @@ namespace Kkts.Expressions
         private DateTime? _now;
         private DateTime? _utcNow;
         private IDictionary<string, PropertyInfo> _dictionary;
+        private readonly ConcurrentDictionary<string, object> _cache = new ConcurrentDictionary<string, object>();
 
-        public DateTime Now => _now.HasValue ? _now.Value : (_now = DateTime.Now).Value;
-        public DateTime UtcNow => _utcNow.HasValue ? _utcNow.Value : (_utcNow = DateTime.UtcNow).Value;
+        public DateTime Now => _now ?? (_now = DateTime.Now).Value;
+        public DateTime UtcNow => _utcNow ?? (_utcNow = DateTime.UtcNow).Value;
 
         public virtual bool IsVariable(string name)
         {
@@ -31,6 +33,11 @@ namespace Kkts.Expressions
             {
                 value = null;
                 return false;
+            }
+
+            if (_cache.TryGetValue(name.ToLower(), out value))
+            {
+                return true;
             }
 
             var segments = name.Split('.');
@@ -63,6 +70,7 @@ namespace Kkts.Expressions
                 }
 
                 value = tmp;
+                _cache.TryAdd(name.ToLower(), value);
 
                 return true;
             }

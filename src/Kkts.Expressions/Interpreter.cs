@@ -38,7 +38,7 @@ namespace Kkts.Expressions
 		internal const string LogicalOr = "||";
 		internal const string LogicalOr2 = "or";
 		internal const string LogicalOr3 = "|";
-		internal static string[] ComparisonOperators =
+		internal static readonly string[] ComparisonOperators =
 			{
 				ComparisonEqual,
 				ComparisonEqual2,
@@ -59,7 +59,7 @@ namespace Kkts.Expressions
 				ComparisonEndsWith3,
 				ComparisonIn
 			};
-		internal static string[] ComparisonFunctionOperators = 
+		internal static readonly string[] ComparisonFunctionOperators = 
 			{
 				ComparisonContains,
 				ComparisonContains2,
@@ -179,7 +179,7 @@ namespace Kkts.Expressions
 				case ComparisonOperator.EndsWith:
 					return Expression.Call(prop, StringEndsWithMethod, Expression.Constant(value, prop.Type));
 				case ComparisonOperator.In:
-					return Expression.Call(typeof(Enumerable), nameof(Enumerable.Contains), new Type[] { prop.Type }, new ArrayList { Type = prop.Type, DrawValue = value.ToString() }.Build(null), prop);
+					return Expression.Call(typeof(Enumerable), nameof(Enumerable.Contains), new Type[] { prop.Type }, new ArrayList { Type = prop.Type, DrawValue = value.ToString() }.Build(new BuildArgument { VariableResolver = variableResolver }), prop);
 				default:
 					return Expression.Equal(prop, Expression.Constant(value, prop.Type));
 			}
