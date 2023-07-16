@@ -16,24 +16,32 @@ namespace Kkts.Expressions.Internal.Nodes
 		{
 			try
 			{
-				if (IsVariable && arg.VariableResolver.TryResolve(Value, out var value))
+				if (IsVariable)
 				{
-					if (value is IEnumerable)
-					{
-						var valueType = value.GetType();
-						if (valueType.IsGenericType)
+					if (arg.VariableResolver.TryResolve(Value, out var value))
+                    {
+						if (value is IEnumerable)
 						{
-							Type = valueType.GetGenericArguments()[0];
-						}
-						else if (valueType.IsArray)
-						{
-							Type = valueType.GetElementType();
+							var valueType = value.GetType();
+							if (valueType.IsGenericType)
+							{
+								Type = valueType.GetGenericArguments()[0];
+							}
+							else if (valueType.IsArray)
+							{
+								Type = valueType.GetElementType();
+							}
+
+							return Expression.Constant(value);
 						}
 
-						return Expression.Constant(value);
-                    }
-
-					return Expression.Constant(Convert.ChangeType(value, Type));
+						return Expression.Constant(Convert.ChangeType(value, Type));
+					}
+					else
+                    {
+						arg.InvalidVariables.Add(Value);
+						throw new InvalidCastException($"Invalid variable, name {Value}");
+					}
 				}
 
 				return Expression.Constant(Value.Cast(Type), Type);

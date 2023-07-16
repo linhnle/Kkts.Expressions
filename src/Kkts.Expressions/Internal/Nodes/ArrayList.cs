@@ -20,7 +20,7 @@ namespace Kkts.Expressions.Internal.Nodes
 			var i = 0;
 			StringValues.ForEach((p) => 
 			{
-				var value = p.StartsWith("$") && arg.VariableResolver.TryResolve(p.Substring(1), out var v)
+				var value = p.StartsWith("$") && arg.VariableResolver.TryResolve(p, out var v)
 				 ? ConvertType(v, Type)
                  : p.Cast(Type);
 				arr.SetValue(value, i++);
