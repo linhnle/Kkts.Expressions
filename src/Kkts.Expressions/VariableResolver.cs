@@ -105,11 +105,23 @@ namespace Kkts.Expressions
             return Task.CompletedTask;
         }
 
-        protected virtual bool TryAddVariable(string name, object value)
+        public virtual bool TryAddVariable(string name, object value)
         {
             if (name is null) throw new ArgumentNullException(nameof(name));
 
             return _cache.TryAdd(name, value);
+        }
+
+        public virtual bool TryRemoveVariable(string name)
+        {
+            if (name is null) throw new ArgumentNullException(nameof(name));
+
+            return _cache.TryRemove(name, out var _);
+        }
+
+        public void ClearCache()
+        {
+            _cache.Clear();
         }
 
         private IDictionary<string, PropertyInfo> GetVariables()
