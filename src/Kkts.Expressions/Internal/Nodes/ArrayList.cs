@@ -22,7 +22,7 @@ namespace Kkts.Expressions.Internal.Nodes
 			foreach (var item in StringValues)
             {
 				object value;
-				if (item.StartsWith("$"))
+				if (item.StartsWith(VariableResolver.VariablePrefixString))
                 {
 					value = arg.VariableResolver.TryResolve(item, out var v)
 						? ConvertType(v, Type)
@@ -48,7 +48,7 @@ namespace Kkts.Expressions.Internal.Nodes
 			foreach (var item in StringValues)
             {
 				object value;
-				if (item.StartsWith("$"))
+				if (item.StartsWith(VariableResolver.VariablePrefixString))
                 {
 					var variableInfo = await arg.VariableResolver.ResolveAsync(item, arg.CancellationToken);
 					if (variableInfo.Resolved)
@@ -160,7 +160,7 @@ namespace Kkts.Expressions.Internal.Nodes
 						++dotCount;
 						if (dotCount > 1) throw new FormatException(GetErrorMessage());
 					}
-                    else if (c == '$')
+                    else if (c == VariableResolver.VariablePrefix)
                     {
 						isVariable = true;
                         value.Append(c);

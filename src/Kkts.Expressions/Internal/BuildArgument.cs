@@ -170,8 +170,6 @@ namespace Kkts.Expressions
                 }
             }
 
-            if (!isValid) InvalidProperties.Add(value);
-
             return isValid;
         }
 

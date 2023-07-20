@@ -58,7 +58,7 @@ namespace Kkts.Expressions.Internal
 
 			if (prevChar == char.MinValue)
 			{
-                if (@char == '$')
+                if (@char == VariableResolver.VariablePrefix)
                 {
                     IsVariable = true;
 					StartIndex = index;

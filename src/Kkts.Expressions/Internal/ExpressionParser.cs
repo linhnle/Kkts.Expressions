@@ -343,22 +343,16 @@ namespace Kkts.Expressions.Internal
 			{
                 builtNode = new Constant { Value = result, StartIndex = parser.StartIndex, StartChar = parser.StartChar, IsVariable = true };
             }
-			else if (arg.VariableResolver.IsVariable(result))
-			{
-				builtNode = new Constant { Value = result, StartIndex = parser.StartIndex, StartChar = parser.StartChar, IsVariable = true };
-			}
 			else
 			{
-				if (parser.IsVariable)
-				{
-					arg.InvalidVariables.Add(result);
+				if (arg.IsValidProperty(result))
+                {
+					builtNode = new Property { Name = result, Param = param, StartIndex = parser.StartIndex, StartChar = parser.StartChar };
 				}
-				else
-				{
-					arg.IsValidProperty(result);
+                else
+                {
+					builtNode = new Constant { Value = result, StartIndex = parser.StartIndex, StartChar = parser.StartChar, IsVariable = true };
 				}
-				
-				builtNode = new Property { Name = result, Param = param, StartIndex = parser.StartIndex, StartChar = parser.StartChar };
 			}
 
 			parser.BuiltNode = builtNode;

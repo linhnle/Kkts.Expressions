@@ -77,7 +77,8 @@ namespace Kkts.Expressions.Internal.Nodes
             else
             {
 				arg.InvalidVariables.Add(Value);
-				throw new InvalidCastException($"Invalid variable, name {Value}");
+				arg.InvalidProperties.Add(Value);
+				throw new InvalidCastException($"Invalid variable or property, name {Value}");
 			}
 		}
 	}

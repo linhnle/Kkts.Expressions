@@ -15,9 +15,25 @@ namespace Kkts.Expressions
         private DateTime? _utcNow;
         private IDictionary<string, PropertyInfo> _dictionary;
         private readonly ConcurrentDictionary<string, object> _cache = new ConcurrentDictionary<string, object>(StringComparer.OrdinalIgnoreCase);
-
+        private static string _variablePrefix = "$";
         public DateTime Now => _now ?? (_now = DateTime.Now).Value;
         public DateTime UtcNow => _utcNow ?? (_utcNow = DateTime.UtcNow).Value;
+
+        internal protected static string VariablePrefixString => _variablePrefix;
+
+        public static char VariablePrefix
+        {
+            get => _variablePrefix[0];
+            set
+            {
+                if (value == '\0')
+                {
+                    throw new InvalidOperationException("Variable Prefix must have a value");
+                }
+
+                _variablePrefix = value.ToString();
+            }
+        }
 
         /// <summary>
         /// If true, the variable must have prefix $ (example: '$now' instead of 'now'), otherwise it is a property
@@ -27,7 +43,7 @@ namespace Kkts.Expressions
         public virtual bool IsVariable(string name)
         {
             if (name == null) return false;
-            if (name.StartsWith("$"))
+            if (name.StartsWith(_variablePrefix))
             {
                 return true;
             }
@@ -56,7 +72,7 @@ namespace Kkts.Expressions
                 return false;
             }
 
-            if (name.StartsWith("$"))
+            if (name.StartsWith(_variablePrefix))
             {
                 name = name.Substring(1);
             }
