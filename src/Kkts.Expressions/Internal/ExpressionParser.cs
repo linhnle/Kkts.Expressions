@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
+using System.Threading.Tasks;
 
 namespace Kkts.Expressions.Internal
 {
@@ -34,6 +35,41 @@ namespace Kkts.Expressions.Internal
 				}
 
 				var body = rootNode.Build(arg);
+
+				return new EvaluationResult
+				{
+					Result = Expression.Lambda(body, param),
+					Succeeded = true
+				};
+			}
+			catch (Exception ex)
+			{
+				return new EvaluationResult
+				{
+					Exception = ex,
+					InvalidProperties = new List<string>(0),
+					InvalidVariables = new List<string>(0),
+					InvalidValues = arg.InvalidValues
+				};
+			}
+		}
+
+		public static async Task<EvaluationResult> ParseAsync(string expression, Type type, BuildArgument arg)
+		{
+			try
+			{
+				var param = type.CreateParameterExpression();
+				var rootNode = Parse(new ExpressionReader(expression), param, arg);
+				if (arg.InvalidProperties.Count > 0 || arg.InvalidVariables.Count > 0)
+				{
+					return new EvaluationResult
+					{
+						InvalidProperties = arg.InvalidProperties,
+						InvalidVariables = arg.InvalidVariables
+					};
+				}
+
+				var body = await rootNode.BuildAsync(arg);
 
 				return new EvaluationResult
 				{

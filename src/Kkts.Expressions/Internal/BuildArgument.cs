@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
+using System.Threading;
 
 namespace Kkts.Expressions
 {
@@ -67,6 +68,8 @@ namespace Kkts.Expressions
         public readonly ICollection<string> InvalidValues = new List<string>();
 
         public readonly ICollection<string> InvalidOrderByDirections = new List<string>();
+
+        public CancellationToken CancellationToken { get; set; } = CancellationToken.None;
 
         public IDictionary<string, string> PropertyMapping
         {

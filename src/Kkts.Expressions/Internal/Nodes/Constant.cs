@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections;
 using System.Linq.Expressions;
+using System.Threading.Tasks;
 
 namespace Kkts.Expressions.Internal.Nodes
 {
@@ -18,30 +19,9 @@ namespace Kkts.Expressions.Internal.Nodes
 			{
 				if (IsVariable)
 				{
-					if (arg.VariableResolver.TryResolve(Value, out var value))
-                    {
-						if (value is IEnumerable)
-						{
-							var valueType = value.GetType();
-							if (valueType.IsGenericType)
-							{
-								Type = valueType.GetGenericArguments()[0];
-							}
-							else if (valueType.IsArray)
-							{
-								Type = valueType.GetElementType();
-							}
+					var resolved = arg.VariableResolver.TryResolve(Value, out var value);
 
-							return Expression.Constant(value);
-						}
-
-						return Expression.Constant(Convert.ChangeType(value, Type));
-					}
-					else
-                    {
-						arg.InvalidVariables.Add(Value);
-						throw new InvalidCastException($"Invalid variable, name {Value}");
-					}
+					return GetVariableExpression(value, resolved, arg);
 				}
 
 				return Expression.Constant(Value.Cast(Type), Type);
@@ -50,6 +30,54 @@ namespace Kkts.Expressions.Internal.Nodes
 			{
 				arg.InvalidValues.Add(Value);
 				throw new FormatException(GetErrorMessage(), ex);
+			}
+		}
+
+		public override async Task<Expression> BuildAsync(BuildArgument arg)
+        {
+			try
+			{
+				if (IsVariable)
+				{
+					var variableInfo = await arg.VariableResolver.ResolveAsync(Value);
+
+					return GetVariableExpression(variableInfo.Value, variableInfo.Resolved, arg);
+				}
+
+				return Expression.Constant(Value.Cast(Type), Type);
+			}
+			catch (Exception ex)
+			{
+				arg.InvalidValues.Add(Value);
+				throw new FormatException(GetErrorMessage(), ex);
+			}
+		}
+
+		private Expression GetVariableExpression(object value, bool resolved, BuildArgument arg)
+        {
+			if (resolved)
+            {
+				if (value is IEnumerable)
+				{
+					var valueType = value.GetType();
+					if (valueType.IsGenericType)
+					{
+						Type = valueType.GetGenericArguments()[0];
+					}
+					else if (valueType.IsArray)
+					{
+						Type = valueType.GetElementType();
+					}
+
+					return Expression.Constant(value);
+				}
+
+				return Expression.Constant(Convert.ChangeType(value, Type));
+			}
+            else
+            {
+				arg.InvalidVariables.Add(Value);
+				throw new InvalidCastException($"Invalid variable, name {Value}");
 			}
 		}
 	}

@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Kkts.Expressions
@@ -40,6 +41,11 @@ namespace Kkts.Expressions
             var lookup = GetVariables();
 
             return lookup.ContainsKey(segments[0]);
+        }
+
+        public virtual Task<bool> IsVariableAsync(string name, CancellationToken cancellationToken = default)
+        {
+            return Task.FromResult(IsVariable(name));
         }
 
         public virtual bool TryResolve(string name, out object value)
@@ -98,6 +104,18 @@ namespace Kkts.Expressions
             value = null;
 
             return false;
+        }
+
+        public virtual Task<VariableInfo> ResolveAsync(string name, CancellationToken cancellationToken = default)
+        {
+            var status = TryResolve(name, out var value);
+
+            return Task.FromResult(new VariableInfo
+            {
+                Name = name,
+                Value = value,
+                Resolved = status
+            });
         }
 
         public virtual Task InitializeVariablesAsync(object state)

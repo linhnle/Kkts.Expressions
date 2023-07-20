@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq.Expressions;
 using System.Text;
+using System.Threading.Tasks;
 
 namespace Kkts.Expressions.Internal.Nodes
 {
@@ -18,13 +19,55 @@ namespace Kkts.Expressions.Internal.Nodes
 			ParseValues();
 			var arr = Array.CreateInstance(Type, StringValues.Count);
 			var i = 0;
-			StringValues.ForEach((p) => 
-			{
-				var value = p.StartsWith("$") && arg.VariableResolver.TryResolve(p, out var v)
-				 ? ConvertType(v, Type)
-                 : p.Cast(Type);
+			foreach (var item in StringValues)
+            {
+				object value;
+				if (item.StartsWith("$"))
+                {
+					value = arg.VariableResolver.TryResolve(item, out var v)
+						? ConvertType(v, Type)
+						: throw new FormatException($"Invalid variable, name {item}");
+
+				}
+                else
+                {
+					value = item.Cast(Type);
+				}
+
 				arr.SetValue(value, i++);
-			});
+			}
+
+			return Expression.Constant(arr);
+		}
+
+		public override async Task<Expression> BuildAsync(BuildArgument arg)
+		{
+			ParseValues();
+			var arr = Array.CreateInstance(Type, StringValues.Count);
+			var i = 0;
+			foreach (var item in StringValues)
+            {
+				object value;
+				if (item.StartsWith("$"))
+                {
+					var variableInfo = await arg.VariableResolver.ResolveAsync(item, arg.CancellationToken);
+					if (variableInfo.Resolved)
+                    {
+						value = ConvertType(variableInfo.Value, Type);
+                    }
+                    else
+                    {
+						arg.InvalidVariables.Add(item);
+						throw new FormatException($"Invalid variable, name {item}");
+					}
+                }
+                else
+                {
+					value = item.Cast(Type);
+                }
+				
+				arr.SetValue(value, i++);
+			}
 
 			return Expression.Constant(arr);
 		}
