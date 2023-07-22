@@ -207,7 +207,7 @@ namespace Kkts.Expressions
 				var varName = (string)value;
 				if (variableResolver.IsVariable(varName) && variableResolver.TryResolve(varName, out var result))
 				{
-					value = Convert.ChangeType(result, Nullable.GetUnderlyingType(prop.Type) ?? prop.Type);
+					value = result.Cast(prop.Type);
 				}
 				else if (@operator != ComparisonOperator.In)
 				{
@@ -229,7 +229,7 @@ namespace Kkts.Expressions
 					var variableInfo = await variableResolver.ResolveAsync(varName, cancellationToken);
 					if (variableInfo.Resolved)
                     {
-						value = Convert.ChangeType(variableInfo.Value, Nullable.GetUnderlyingType(prop.Type) ?? prop.Type);
+						value = variableInfo.Value.Cast(prop.Type);
 					}
 				}
 				else if (@operator != ComparisonOperator.In)

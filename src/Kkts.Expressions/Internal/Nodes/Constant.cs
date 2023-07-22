@@ -72,7 +72,7 @@ namespace Kkts.Expressions.Internal.Nodes
 					return Expression.Constant(value);
 				}
 
-				return Expression.Constant(Convert.ChangeType(value, Nullable.GetUnderlyingType(Type) ?? Type));
+				return Expression.Constant(value.Cast(Type));
 			}
             else
             {

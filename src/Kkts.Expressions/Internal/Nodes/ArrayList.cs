@@ -25,7 +25,7 @@ namespace Kkts.Expressions.Internal.Nodes
 				if (item.StartsWith(VariableResolver.VariablePrefixString))
                 {
 					value = arg.VariableResolver.TryResolve(item, out var v)
-						? ConvertType(v, Type)
+						? v.Cast(Type)
 						: throw new FormatException($"Invalid variable, name {item}");
 
 				}
@@ -53,7 +53,7 @@ namespace Kkts.Expressions.Internal.Nodes
 					var variableInfo = await arg.VariableResolver.ResolveAsync(item, arg.CancellationToken);
 					if (variableInfo.Resolved)
                     {
-						value = ConvertType(variableInfo.Value, Type);
+						value = variableInfo.Value.Cast(Type);
                     }
                     else
                     {
@@ -195,10 +195,5 @@ namespace Kkts.Expressions.Internal.Nodes
 			--StartIndex;
 			--index;
 		}
-
-		private static object ConvertType(object value, Type type)
-		{
-			return value is string s ? s.Cast(type) : Convert.ChangeType(value, Nullable.GetUnderlyingType(type) ?? type);
-        }
 	}
 }
