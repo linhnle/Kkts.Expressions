@@ -139,21 +139,21 @@ namespace Kkts.Expressions
             return Task.CompletedTask;
         }
 
-        public virtual bool TryAddVariable(string name, object value)
+        public virtual bool TryAdd(string variableName, object value)
         {
-            if (name is null) throw new ArgumentNullException(nameof(name));
+            if (variableName is null) throw new ArgumentNullException(nameof(variableName));
 
-            return _cache.TryAdd(name, value);
+            return _cache.TryAdd(variableName, value);
         }
 
-        public virtual bool TryRemoveVariable(string name)
+        public virtual bool TryRemove(string variableName)
         {
-            if (name is null) throw new ArgumentNullException(nameof(name));
+            if (variableName is null) throw new ArgumentNullException(nameof(variableName));
 
-            return _cache.TryRemove(name, out var _);
+            return _cache.TryRemove(variableName, out var _);
         }
 
-        public void ClearCache()
+        public void Clear()
         {
             _cache.Clear();
         }

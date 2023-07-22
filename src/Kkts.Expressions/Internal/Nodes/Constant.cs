@@ -39,7 +39,7 @@ namespace Kkts.Expressions.Internal.Nodes
 			{
 				if (IsVariable)
 				{
-					var variableInfo = await arg.VariableResolver.ResolveAsync(Value);
+					var variableInfo = await arg.VariableResolver.ResolveAsync(Value, arg.CancellationToken);
 
 					return GetVariableExpression(variableInfo.Value, variableInfo.Resolved, arg);
 				}

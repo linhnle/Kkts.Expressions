@@ -2,10 +2,10 @@
 {
     public class VariableInfo
     {
-        public string Name { get; internal set; }
+        public string Name { get; set; }
 
-        public bool Resolved { get; internal set; }
+        public bool Resolved { get; set; }
 
-        public object Value { get; internal set; }
+        public object Value { get; set; }
     }
 }
