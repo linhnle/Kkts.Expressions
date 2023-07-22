@@ -95,7 +95,7 @@ namespace Kkts.Expressions
 		{
 			var succeeded = DateTimeOffset.TryParse(value, out var result) || DateTimeOffset.TryParseExact(value, DateTimeFormats.ToArray(), provider ?? CultureInfo.InvariantCulture, DateTimeStyles.None, out result);
 
-			return succeeded ? result : throw new FormatException(value == null ? "Can not parse null value to DateTimeOffset" : $"String '{value}' was not recognized as a valid DateTime.");
+			return succeeded ? result : throw new FormatException(value == null ? "Can not parse null value to DateTimeOffset" : $"String '{value}' was not recognized as a valid DateTimeOffset.");
 		}
 
 		public static bool TryParseDateTimeOffset(this string value, out DateTimeOffset dateTimeOffset, IFormatProvider provider = null)

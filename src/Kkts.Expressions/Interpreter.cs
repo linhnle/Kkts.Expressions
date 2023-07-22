@@ -186,6 +186,20 @@ namespace Kkts.Expressions
 			return BuildPredicate(@operator, propertyName, value, type, variableResolver ?? new VariableResolver());
 		}
 
+		public static async Task<Expression<Func<TEntity, bool>>> BuildPredicateAsync<TEntity>(string propertyName, ComparisonOperator @operator, object value, VariableResolver variableResolver = null, CancellationToken cancellationToken = default)
+		{
+			if (string.IsNullOrWhiteSpace(propertyName)) throw new ArgumentException($"{nameof(propertyName)} is required", nameof(propertyName));
+			return (Expression<Func<TEntity, bool>>)(await BuildPredicateAsync(@operator, propertyName, value, typeof(TEntity), variableResolver ?? new VariableResolver(), cancellationToken));
+		}
+
+		public static Task<LambdaExpression> BuildPredicateAsync(string propertyName, ComparisonOperator @operator, object value, Type type, VariableResolver variableResolver = null, CancellationToken cancellationToken = default)
+		{
+			if (string.IsNullOrWhiteSpace(propertyName)) throw new ArgumentException($"{nameof(propertyName)} is required", nameof(propertyName));
+			if (type == null) throw new ArgumentNullException(nameof(type));
+
+			return BuildPredicateAsync(@operator, propertyName, value, type, variableResolver ?? new VariableResolver(), cancellationToken);
+		}
+
 		internal static Expression BuildBody(ComparisonOperator @operator, MemberExpression prop, object value, VariableResolver variableResolver)
 		{
 			if (value is string && prop.Type != typeof(string))
@@ -193,7 +207,7 @@ namespace Kkts.Expressions
 				var varName = (string)value;
 				if (variableResolver.IsVariable(varName) && variableResolver.TryResolve(varName, out var result))
 				{
-					value = Convert.ChangeType(result, prop.Type);
+					value = Convert.ChangeType(result, Nullable.GetUnderlyingType(prop.Type) ?? prop.Type);
 				}
 				else if (@operator != ComparisonOperator.In)
 				{
@@ -215,7 +229,7 @@ namespace Kkts.Expressions
 					var variableInfo = await variableResolver.ResolveAsync(varName, cancellationToken);
 					if (variableInfo.Resolved)
                     {
-						value = Convert.ChangeType(variableInfo.Value, prop.Type);
+						value = Convert.ChangeType(variableInfo.Value, Nullable.GetUnderlyingType(prop.Type) ?? prop.Type);
 					}
 				}
 				else if (@operator != ComparisonOperator.In)
@@ -361,6 +375,15 @@ namespace Kkts.Expressions
 			var param = type.CreateParameterExpression();
 			var prop = param.CreatePropertyExpression(propertyName);
 			var body = BuildBody(@operator, prop, value, variableResolver);
+
+			return Expression.Lambda(body, param);
+		}
+
+		internal static async Task<LambdaExpression> BuildPredicateAsync(ComparisonOperator @operator, string propertyName, object value, Type type, VariableResolver variableResolver, CancellationToken cancellationToken)
+		{
+			var param = type.CreateParameterExpression();
+			var prop = param.CreatePropertyExpression(propertyName);
+			var body = await BuildBodyAsync(@operator, prop, value, variableResolver, cancellationToken);
 
 			return Expression.Lambda(body, param);
 		}

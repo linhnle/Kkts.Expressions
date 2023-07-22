@@ -30,7 +30,9 @@ namespace Kkts.Expressions.Internal
 					return new EvaluationResult
 					{
 						InvalidProperties = arg.InvalidProperties,
-						InvalidVariables = arg.InvalidVariables
+						InvalidVariables = arg.InvalidVariables,
+						InvalidOperators = arg.InvalidOperators,
+						InvalidValues = arg.InvalidValues,
 					};
 				}
 
@@ -47,8 +49,9 @@ namespace Kkts.Expressions.Internal
 				return new EvaluationResult
 				{
 					Exception = ex,
-					InvalidProperties = new List<string>(0),
-					InvalidVariables = new List<string>(0),
+					InvalidProperties = arg.InvalidProperties,
+					InvalidVariables = arg.InvalidVariables,
+					InvalidOperators = arg.InvalidOperators,
 					InvalidValues = arg.InvalidValues
 				};
 			}
@@ -65,7 +68,9 @@ namespace Kkts.Expressions.Internal
 					return new EvaluationResult
 					{
 						InvalidProperties = arg.InvalidProperties,
-						InvalidVariables = arg.InvalidVariables
+						InvalidVariables = arg.InvalidVariables,
+						InvalidOperators = arg.InvalidOperators,
+						InvalidValues = arg.InvalidValues
 					};
 				}
 
@@ -82,8 +87,9 @@ namespace Kkts.Expressions.Internal
 				return new EvaluationResult
 				{
 					Exception = ex,
-					InvalidProperties = new List<string>(0),
-					InvalidVariables = new List<string>(0),
+					InvalidProperties = arg.InvalidProperties,
+					InvalidVariables = arg.InvalidVariables,
+					InvalidOperators = arg.InvalidOperators,
 					InvalidValues = arg.InvalidValues
 				};
 			}
