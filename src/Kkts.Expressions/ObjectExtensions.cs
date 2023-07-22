@@ -14,7 +14,7 @@ namespace Kkts.Expressions
             var conversionType = Nullable.GetUnderlyingType(type);
             if (value is null)
             {
-                return conversionType != null ? null : Activator.CreateInstance(type);
+                return conversionType != null ? null : Convert.ChangeType(value, type);
             }
 
             return conversionType == null 
