@@ -17,9 +17,7 @@ namespace Kkts.Expressions
                 return conversionType != null ? null : Convert.ChangeType(value, type);
             }
 
-            return conversionType == null 
-                ? Convert.ChangeType(value, type)
-                : Convert.ChangeType(value, conversionType);
+            return Convert.ChangeType(value, conversionType ?? type);
         }
     }
 }
