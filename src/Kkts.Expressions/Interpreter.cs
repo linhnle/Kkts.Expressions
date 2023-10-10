@@ -205,7 +205,7 @@ namespace Kkts.Expressions
 			if (value is string && prop.Type != typeof(string))
 			{
 				var varName = (string)value;
-				if (variableResolver.IsVariable(varName) && variableResolver.TryResolve(varName, out var result))
+				if (variableResolver.TryResolve(varName, out var result))
 				{
 					value = result.Cast(prop.Type);
 				}
@@ -223,15 +223,11 @@ namespace Kkts.Expressions
 			if (value is string && prop.Type != typeof(string))
 			{
 				var varName = (string)value;
-				var isVariable = await variableResolver.IsVariableAsync(varName, cancellationToken);
-				if (isVariable)
+                var variableInfo = await variableResolver.TryResolveAsync(varName, cancellationToken);
+                if (variableInfo.Resolved)
 				{
-					var variableInfo = await variableResolver.ResolveAsync(varName, cancellationToken);
-					if (variableInfo.Resolved)
-                    {
-						value = variableInfo.Value.Cast(prop.Type);
-					}
-				}
+                    value = variableInfo.Value.Cast(prop.Type);
+                }
 				else if (@operator != ComparisonOperator.In)
 				{
 					value = varName.Cast(prop.Type);

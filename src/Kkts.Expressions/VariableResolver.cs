@@ -38,8 +38,15 @@ namespace Kkts.Expressions
         /// <summary>
         /// If true, the variable must have prefix $ (example: '$now' instead of 'now'), otherwise it is a property
         /// </summary>
-        internal protected bool UseVariableQuery { get; set; } = false;
+        internal protected bool UseVariableQuery { get; set; } = true;
 
+        private static readonly TaskFactory _syncTaskFactory = new TaskFactory(CancellationToken.None,
+                  TaskCreationOptions.None,
+                  TaskContinuationOptions.None,
+                  TaskScheduler.Default);
+
+
+        [Obsolete]
         public virtual bool IsVariable(string name)
         {
             if (name == null) return false;
@@ -59,70 +66,15 @@ namespace Kkts.Expressions
             return lookup.ContainsKey(segments[0]);
         }
 
-        public virtual Task<bool> IsVariableAsync(string name, CancellationToken cancellationToken = default)
+        public bool TryResolve(string name, out object value)
         {
-            return Task.FromResult(IsVariable(name));
+            var result = RunSync(() => TryResolveCore(name));
+            value = result.Resolved ? result.Value : null;
+
+            return result.Resolved;
         }
 
-        public virtual bool TryResolve(string name, out object value)
-        {
-            if (name == null)
-            {
-                value = null;
-                return false;
-            }
-
-            if (name.StartsWith(_variablePrefix))
-            {
-                name = name.Substring(1);
-            }
-
-            if (_cache.TryGetValue(name, out value))
-            {
-                return true;
-            }
-
-            var segments = name.Split('.');
-            var lookup = GetVariables();
-            var segmentName = segments[0];
-            if (lookup.ContainsKey(segmentName))
-            {
-                var prop = lookup[segmentName];
-                var tmp = prop.GetValue(this);
-                value = null;
-                try
-                {
-                    for (var i = 1; i < segments.Length; ++i)
-                    {
-                        var member = Expression.PropertyOrField(Expression.Parameter(prop.PropertyType), segments[i]).Member;
-                        switch (member)
-                        {
-                            case PropertyInfo p:
-                                tmp = p.GetValue(tmp);
-                                break;
-                            case FieldInfo f:
-                                tmp = f.GetValue(tmp);
-                                break;
-                        }
-                    }
-                }
-                catch (Exception)
-                {
-                    return false;
-                }
-
-                value = tmp;
-                _cache.TryAdd(name, value);
-
-                return true;
-            }
-
-            value = null;
-
-            return false;
-        }
-
-        public virtual Task<VariableInfo> ResolveAsync(string name, CancellationToken cancellationToken = default)
+        public Task<VariableInfo> TryResolveAsync(string name, CancellationToken cancellationToken = default)
         {
             var status = TryResolve(name, out var value);
 
@@ -158,6 +110,63 @@ namespace Kkts.Expressions
             _cache.Clear();
         }
 
+        protected virtual Task<VariableInfo> TryResolveCore(string name)
+        {
+            if (name == null)
+            {
+                return Task.FromResult(new VariableInfo { Name = name });
+            }
+
+            if (name.StartsWith(_variablePrefix))
+            {
+                name = name.Substring(1);
+            }
+
+            if (_cache.TryGetValue(name, out var value))
+            {
+                return Task.FromResult(new VariableInfo { Name = name, Resolved = true, Value = value });
+            }
+
+            var segments = name.Split('.');
+            var lookup = GetVariables();
+            var segmentName = segments[0];
+            if (lookup.ContainsKey(segmentName))
+            {
+                var prop = lookup[segmentName];
+                var tmp = prop.GetValue(this);
+                value = null;
+                try
+                {
+                    for (var i = 1; i < segments.Length; ++i)
+                    {
+                        var member = Expression.PropertyOrField(Expression.Parameter(prop.PropertyType), segments[i]).Member;
+                        switch (member)
+                        {
+                            case PropertyInfo p:
+                                tmp = p.GetValue(tmp);
+                                break;
+                            case FieldInfo f:
+                                tmp = f.GetValue(tmp);
+                                break;
+                        }
+                    }
+                }
+                catch (Exception)
+                {
+                    return Task.FromResult(new VariableInfo { Name = name });
+                }
+
+                value = tmp;
+                _cache.TryAdd(name, value);
+
+                return Task.FromResult(new VariableInfo { Name = name, Resolved = true, Value = value });
+            }
+
+            value = null;
+
+            return Task.FromResult(new VariableInfo { Name = name });
+        }
+
         private IDictionary<string, PropertyInfo> GetVariables()
         {
             return _dictionary is null ?
@@ -167,5 +176,18 @@ namespace Kkts.Expressions
                 .ToDictionary(k => k.Name, StringComparer.OrdinalIgnoreCase)
                 : _dictionary;
         }
+
+        /// <summary>
+        /// Refer to: https://github.com/aspnet/AspNetIdentity/blob/master/src/Microsoft.AspNet.Identity.Core/AsyncHelper.cs
+        /// </summary>
+        private static TResult RunSync<TResult>(Func<Task<TResult>> func)
+        {
+            return _syncTaskFactory
+              .StartNew(func)
+              .Unwrap()
+              .GetAwaiter()
+              .GetResult();
+        }
+
     }
 }

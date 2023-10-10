@@ -50,7 +50,7 @@ namespace Kkts.Expressions.Internal.Nodes
 				object value;
 				if (item.StartsWith(VariableResolver.VariablePrefixString))
                 {
-					var variableInfo = await arg.VariableResolver.ResolveAsync(item, arg.CancellationToken);
+					var variableInfo = await arg.VariableResolver.TryResolveAsync(item, arg.CancellationToken);
 					if (variableInfo.Resolved)
                     {
 						value = variableInfo.Value.Cast(Type);
