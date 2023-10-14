@@ -75,7 +75,14 @@ namespace Kkts.Expressions.Internal
 
 		public override IList<Parser> GetNextParsers(char @char)
 		{
-			if (Result.ToLower() == Interpreter.ComparisonIn)
+			var opa = Result.ToLower();
+
+            if (!Interpreter.ComparisonOperators.Contains(opa))
+			{
+				return new List<Parser>(0);
+			}
+
+            if (opa == Interpreter.ComparisonIn)
 			{
 				return new List<Parser>
 				{

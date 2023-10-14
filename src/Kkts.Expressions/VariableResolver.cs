@@ -68,7 +68,7 @@ namespace Kkts.Expressions
 
         public bool TryResolve(string name, out object value)
         {
-            var result = RunSync(() => TryResolveCore(name));
+            var result = RunSync(() => TryResolveCore(name, CancellationToken.None));
             value = result.Resolved ? result.Value : null;
 
             return result.Resolved;
@@ -76,19 +76,7 @@ namespace Kkts.Expressions
 
         public Task<VariableInfo> TryResolveAsync(string name, CancellationToken cancellationToken = default)
         {
-            var status = TryResolve(name, out var value);
-
-            return Task.FromResult(new VariableInfo
-            {
-                Name = name,
-                Value = value,
-                Resolved = status
-            });
-        }
-
-        public virtual Task InitializeVariablesAsync(object state)
-        {
-            return Task.CompletedTask;
+            return TryResolveCore(name, cancellationToken);
         }
 
         public virtual bool TryAdd(string variableName, object value)
@@ -110,7 +98,7 @@ namespace Kkts.Expressions
             _cache.Clear();
         }
 
-        protected virtual Task<VariableInfo> TryResolveCore(string name)
+        protected virtual Task<VariableInfo> TryResolveCore(string name, CancellationToken cancellationToken)
         {
             if (name == null)
             {
@@ -134,11 +122,16 @@ namespace Kkts.Expressions
             {
                 var prop = lookup[segmentName];
                 var tmp = prop.GetValue(this);
-                value = null;
+
                 try
                 {
                     for (var i = 1; i < segments.Length; ++i)
                     {
+                        if (tmp is null)
+                        {
+                            return Task.FromResult(new VariableInfo { Name = name });
+                        }
+
                         var member = Expression.PropertyOrField(Expression.Parameter(prop.PropertyType), segments[i]).Member;
                         switch (member)
                         {
@@ -161,8 +154,6 @@ namespace Kkts.Expressions
 
                 return Task.FromResult(new VariableInfo { Name = name, Resolved = true, Value = value });
             }
-
-            value = null;
 
             return Task.FromResult(new VariableInfo { Name = name });
         }

@@ -54,5 +54,16 @@ namespace Kkts.Expressions
                 Predicates = op.Predicates.Cast<Expression<Func<T, bool>>>().ToList()
             };
         }
+
+        public static implicit operator Condition(Condition<T> op)
+        {
+            return op is null ? null : new Condition
+            {
+                Error = op.Error,
+                IsValid = op.IsValid,
+                OrderByClause = op.OrderByClause,
+                Predicates = op.Predicates.Cast<LambdaExpression>().ToList()
+            };
+        }
     }
 }
