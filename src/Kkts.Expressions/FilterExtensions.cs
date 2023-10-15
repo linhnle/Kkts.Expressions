@@ -5,7 +5,7 @@ using System.Linq.Expressions;
 
 namespace Kkts.Expressions
 {
-	public static class FilterExtensions
+	public static partial class FilterExtensions
 	{
 		#region Filter
 
