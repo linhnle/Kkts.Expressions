@@ -10,3 +10,6 @@
 /src/.vs/Kkts/v16/.suo
 *.v2
 /src/.vs
+/examples/Kkts.Examples/.vs
+/examples/Kkts.Examples/Kkts.Examples.VariableResolver/obj
+/examples/Kkts.Examples/Kkts.Examples.VariableResolver/bin

@@ -98,6 +98,11 @@ namespace Kkts.Expressions
             _cache.Clear();
         }
 
+        public virtual Task InitializeVariablesAsync(object state)
+        {
+            return Task.CompletedTask;
+        }
+
         protected virtual Task<VariableInfo> TryResolveCore(string name, CancellationToken cancellationToken)
         {
             return Task.FromResult(new VariableInfo { Name = name });

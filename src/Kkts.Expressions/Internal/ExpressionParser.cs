@@ -102,8 +102,7 @@ namespace Kkts.Expressions.Internal
 			var groups = new Stack<Parser>();
 			reader.IgnoreWhiteSpace();
             Parser lastAcceptedParser = null;
-            var currentIndex = reader.CurrentIndex;
-            var currentChar = reader.Current;
+
             while (!reader.IsEnd)
 			{
 				var noOfWhiteSpaceIgnored = 0;
@@ -113,8 +112,8 @@ namespace Kkts.Expressions.Internal
 				acceptedParsers = new List<Parser>();
 				var isStartGroup = false;
 				Parser group = null;
-				currentIndex = reader.CurrentIndex;
-				currentChar = reader.Current;
+				var currentIndex = reader.CurrentIndex;
+				var currentChar = reader.Current;
 				
 				foreach (var parser in parsers)
 				{
