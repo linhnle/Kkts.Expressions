@@ -101,7 +101,10 @@ namespace Kkts.Expressions.Internal
 			var keepTrack = false;
 			var groups = new Stack<Parser>();
 			reader.IgnoreWhiteSpace();
-			while (!reader.IsEnd)
+            Parser lastAcceptedParser = null;
+            var currentIndex = reader.CurrentIndex;
+            var currentChar = reader.Current;
+            while (!reader.IsEnd)
 			{
 				var noOfWhiteSpaceIgnored = 0;
 				if (!keepTrack) noOfWhiteSpaceIgnored = reader.IgnoreWhiteSpace();
@@ -110,6 +113,9 @@ namespace Kkts.Expressions.Internal
 				acceptedParsers = new List<Parser>();
 				var isStartGroup = false;
 				Parser group = null;
+				currentIndex = reader.CurrentIndex;
+				currentChar = reader.Current;
+				
 				foreach (var parser in parsers)
 				{
 					if (parser.Accept(c, noOfWhiteSpaceIgnored, reader.CurrentIndex, ref keepTrack, ref isStartGroup))
@@ -121,7 +127,8 @@ namespace Kkts.Expressions.Internal
 						else
 						{
 							acceptedParsers.Add(parser);
-						}
+							lastAcceptedParser = parser;
+                        }
 					}
 					else
 					{
@@ -131,7 +138,7 @@ namespace Kkts.Expressions.Internal
 							var nextParsers = parser.GetNextParsers(c);
 							foreach (var nextParser in nextParsers)
 							{
-								if (nextParser.Accept(c, 0, reader.CurrentIndex, ref keepTrack, ref isStartGroup))
+								if (nextParser.Accept(c, noOfWhiteSpaceIgnored, reader.CurrentIndex, ref keepTrack, ref isStartGroup))
 								{
 									if (isStartGroup)
 									{
@@ -140,7 +147,8 @@ namespace Kkts.Expressions.Internal
 									else
 									{
 										acceptedParsers.Add(nextParser);
-									}
+                                        lastAcceptedParser = parser;
+                                    }
 								}
 							}
 						}
@@ -170,7 +178,7 @@ namespace Kkts.Expressions.Internal
 					}
 					else
 					{
-						ThrowFormatException(c, reader.CurrentIndex);
+						ThrowFormatException(lastAcceptedParser?.Result ?? currentChar.ToString(), lastAcceptedParser?.StartIndex ?? currentIndex);
 					}
 				}
 			}
@@ -188,14 +196,14 @@ namespace Kkts.Expressions.Internal
 			}
 			if (acceptedCount != 1 || groups.Count > 0)
 			{
-				ThrowFormatException(reader.LastChar, reader.Length - 1);
+				ThrowFormatException(reader.LastChar.ToString(), reader.Length - 1);
 			}
 
 			var chain = BuildChain(null, lastestParser);
 
 			return BuildNode(parameter, chain, arg);
 
-			void ThrowFormatException(char c, int index) => throw new FormatException($"Incorrect syntax near '{c}', index {index}");
+			void ThrowFormatException(string c, int index) => throw new FormatException($"Incorrect syntax near '{c}', index {index}");
 		}
 
 		private static List<Parser> BuildChain(Parser root, Parser last)
