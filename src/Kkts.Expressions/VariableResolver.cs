@@ -68,7 +68,7 @@ namespace Kkts.Expressions
 
         public bool TryResolve(string name, out object value)
         {
-            var result = RunSync(() => TryResolveCore(name, CancellationToken.None));
+            var result = RunSync(() => TryResolve(name, CancellationToken.None));
             value = result.Resolved ? result.Value : null;
 
             return result.Resolved;
@@ -76,7 +76,7 @@ namespace Kkts.Expressions
 
         public Task<VariableInfo> TryResolveAsync(string name, CancellationToken cancellationToken = default)
         {
-            return TryResolveCore(name, cancellationToken);
+            return TryResolve(name, cancellationToken);
         }
 
         public virtual bool TryAdd(string variableName, object value)
@@ -100,9 +100,14 @@ namespace Kkts.Expressions
 
         protected virtual Task<VariableInfo> TryResolveCore(string name, CancellationToken cancellationToken)
         {
+            return Task.FromResult(new VariableInfo { Name = name });
+        }
+
+        private async Task<VariableInfo> TryResolve(string name, CancellationToken cancellationToken)
+        {
             if (name == null)
             {
-                return Task.FromResult(new VariableInfo { Name = name });
+                return new VariableInfo { Name = name };
             }
 
             if (name.StartsWith(_variablePrefix))
@@ -112,7 +117,7 @@ namespace Kkts.Expressions
 
             if (_cache.TryGetValue(name, out var value))
             {
-                return Task.FromResult(new VariableInfo { Name = name, Resolved = true, Value = value });
+                return new VariableInfo { Name = name, Resolved = true, Value = value };
             }
 
             var segments = name.Split('.');
@@ -129,7 +134,7 @@ namespace Kkts.Expressions
                     {
                         if (tmp is null)
                         {
-                            return Task.FromResult(new VariableInfo { Name = name });
+                            return new VariableInfo { Name = name };
                         }
 
                         var member = Expression.PropertyOrField(Expression.Parameter(prop.PropertyType), segments[i]).Member;
@@ -146,16 +151,22 @@ namespace Kkts.Expressions
                 }
                 catch (Exception)
                 {
-                    return Task.FromResult(new VariableInfo { Name = name });
+                    return new VariableInfo { Name = name };
                 }
 
                 value = tmp;
                 _cache.TryAdd(name, value);
 
-                return Task.FromResult(new VariableInfo { Name = name, Resolved = true, Value = value });
+                return new VariableInfo { Name = name, Resolved = true, Value = value };
             }
 
-            return Task.FromResult(new VariableInfo { Name = name });
+            var varInfo = await TryResolveCore(name, cancellationToken);
+            if (varInfo?.Resolved == true)
+            {
+                _cache.TryAdd(name, varInfo.Value);
+            }
+
+            return varInfo;
         }
 
         private IDictionary<string, PropertyInfo> GetVariables()
