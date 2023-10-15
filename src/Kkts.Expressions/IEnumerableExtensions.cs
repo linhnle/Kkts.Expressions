@@ -7,7 +7,6 @@ namespace Kkts.Expressions
 {
 	public static class IEnumerableExtensions
 	{
-		
 		public static IEnumerable<T> Take<T>(this IEnumerable<T> source, Condition<T> condition, Pagination pagination)
 		{
 			if (source == null) throw new ArgumentNullException(nameof(source));
