@@ -3,27 +3,19 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Kkts.Expressions
 {
 	public partial class ConditionOptions
 	{
-		public virtual string OrderBy { get; set; }
-
-		public virtual List<OrderByInfo> OrderBys { get; set; }
-
-		public virtual IEnumerable<FilterGroup> FilterGroups { get; set; }
-
-		public virtual IEnumerable<Filter> Filters { get; set; }
-
-		public virtual string Where { get; set; }
-
-		public virtual Condition<T> BuildCondition<T>(VariableResolver variableResolver = null, IEnumerable<string> validProperties = null, IDictionary<string, string> propertyMapping = null)
+		public virtual async Task<Condition<T>> BuildConditionAsync<T>(VariableResolver variableResolver = null, IEnumerable<string> validProperties = null, IDictionary<string, string> propertyMapping = null, CancellationToken cancellationToken = default)
 		{
-			return (Condition<T>)BuildCondition(typeof(T), variableResolver, validProperties, propertyMapping);
+			return (Condition<T>)(await BuildConditionAsync(typeof(T), variableResolver, validProperties, propertyMapping, cancellationToken));
 		}
 
-		public virtual Condition BuildCondition(Type type, VariableResolver variableResolver = null, IEnumerable<string> validProperties = null, IDictionary<string, string> propertyMapping = null)
+		public virtual async Task<Condition> BuildConditionAsync(Type type, VariableResolver variableResolver = null, IEnumerable<string> validProperties = null, IDictionary<string, string> propertyMapping = null, CancellationToken cancellationToken = default)
 		{
 			if (type == null) throw new ArgumentNullException(nameof(type));
 			var arg = new BuildArgument
@@ -31,7 +23,8 @@ namespace Kkts.Expressions
 				ValidProperties = validProperties,
 				VariableResolver = variableResolver,
 				EvaluationType = type,
-				PropertyMapping = propertyMapping
+				PropertyMapping = propertyMapping,
+				CancellationToken = cancellationToken
 			};
 
 			var error = new ConditionBase.ErrorInfo();
@@ -42,7 +35,7 @@ namespace Kkts.Expressions
 
 			if (Filters != null && Filters.Any())
 			{
-				var filtersResult = Filters.TryBuildPredicate(type, arg);
+				var filtersResult = await Filters.TryBuildPredicateAsync(type, arg, cancellationToken);
 				if (filtersResult.Succeeded)
 				{
 					predicates.Add(filtersResult.Result);
@@ -58,7 +51,7 @@ namespace Kkts.Expressions
 
 			if (FilterGroups != null && FilterGroups.Any())
 			{
-				var filterGroupsResult = FilterGroups.TryBuildPredicate(type, arg);
+				var filterGroupsResult = await FilterGroups.TryBuildPredicateAsync(type, arg, cancellationToken);
 				if (filterGroupsResult.Succeeded)
 				{
 					predicates.Add(filterGroupsResult.Result);
@@ -74,7 +67,7 @@ namespace Kkts.Expressions
 
 			if (!string.IsNullOrEmpty(Where))
 			{
-				var whereResult = ExpressionParser.Parse(Where, type, arg);
+				var whereResult = await ExpressionParser.ParseAsync(Where, type, arg);
 				if (whereResult.Succeeded)
 				{
 					predicates.Add(whereResult.Result);

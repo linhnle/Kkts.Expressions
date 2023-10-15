@@ -5,6 +5,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Kkts.Expressions
 {
@@ -38,7 +40,7 @@ namespace Kkts.Expressions
 		internal const string LogicalOr = "||";
 		internal const string LogicalOr2 = "or";
 		internal const string LogicalOr3 = "|";
-		internal static string[] ComparisonOperators =
+		internal static readonly string[] ComparisonOperators =
 			{
 				ComparisonEqual,
 				ComparisonEqual2,
@@ -59,7 +61,7 @@ namespace Kkts.Expressions
 				ComparisonEndsWith3,
 				ComparisonIn
 			};
-		internal static string[] ComparisonFunctionOperators = 
+		internal static readonly string[] ComparisonFunctionOperators = 
 			{
 				ComparisonContains,
 				ComparisonContains2,
@@ -96,6 +98,31 @@ namespace Kkts.Expressions
 			};
 		}
 
+		public static async Task<EvaluationResult<T, bool>> ParsePredicateAsync<T>(this string expression, VariableResolver variableResolver = null, IEnumerable<string> validProperties = null, IDictionary<string, string> propertyMapping = null, CancellationToken cancellationToken = default)
+		{
+			if (string.IsNullOrWhiteSpace(expression)) throw new ArgumentException("Invalid expression", nameof(expression));
+
+			var type = typeof(T);
+			var result = await ExpressionParser.ParseAsync(expression, type, new BuildArgument
+			{
+				ValidProperties = validProperties,
+				EvaluationType = type,
+				VariableResolver = variableResolver,
+				PropertyMapping = propertyMapping,
+				CancellationToken = cancellationToken
+			});
+
+			return new EvaluationResult<T, bool>
+			{
+				Result = (Expression<Func<T, bool>>)result.Result,
+				Exception = result.Exception,
+				InvalidProperties = result.InvalidProperties,
+				InvalidVariables = result.InvalidVariables,
+				InvalidOperators = result.InvalidOperators,
+				Succeeded = result.Succeeded
+			};
+		}
+
 		public static EvaluationResult ParsePredicate(this string expression, Type type, VariableResolver variableResolver = null, IEnumerable<string> validProperties = null, IDictionary<string, string> propertyMapping = null)
 		{
 			if (string.IsNullOrWhiteSpace(expression)) throw new ArgumentException($"{nameof(expression)} is required", nameof(expression));
@@ -107,6 +134,21 @@ namespace Kkts.Expressions
 				EvaluationType = type,
 				VariableResolver = variableResolver,
 				PropertyMapping = propertyMapping
+			});
+		}
+
+		public static Task<EvaluationResult> ParsePredicateAsync(this string expression, Type type, VariableResolver variableResolver = null, IEnumerable<string> validProperties = null, IDictionary<string, string> propertyMapping = null, CancellationToken cancellationToken = default)
+		{
+			if (string.IsNullOrWhiteSpace(expression)) throw new ArgumentException($"{nameof(expression)} is required", nameof(expression));
+			if (type == null) throw new ArgumentNullException(nameof(type));
+
+			return ExpressionParser.ParseAsync(expression, type, new BuildArgument
+			{
+				ValidProperties = validProperties,
+				EvaluationType = type,
+				VariableResolver = variableResolver,
+				PropertyMapping = propertyMapping,
+				CancellationToken = cancellationToken
 			});
 		}
 
@@ -144,21 +186,59 @@ namespace Kkts.Expressions
 			return BuildPredicate(@operator, propertyName, value, type, variableResolver ?? new VariableResolver());
 		}
 
+		public static async Task<Expression<Func<TEntity, bool>>> BuildPredicateAsync<TEntity>(string propertyName, ComparisonOperator @operator, object value, VariableResolver variableResolver = null, CancellationToken cancellationToken = default)
+		{
+			if (string.IsNullOrWhiteSpace(propertyName)) throw new ArgumentException($"{nameof(propertyName)} is required", nameof(propertyName));
+			return (Expression<Func<TEntity, bool>>)(await BuildPredicateAsync(@operator, propertyName, value, typeof(TEntity), variableResolver ?? new VariableResolver(), cancellationToken));
+		}
+
+		public static Task<LambdaExpression> BuildPredicateAsync(string propertyName, ComparisonOperator @operator, object value, Type type, VariableResolver variableResolver = null, CancellationToken cancellationToken = default)
+		{
+			if (string.IsNullOrWhiteSpace(propertyName)) throw new ArgumentException($"{nameof(propertyName)} is required", nameof(propertyName));
+			if (type == null) throw new ArgumentNullException(nameof(type));
+
+			return BuildPredicateAsync(@operator, propertyName, value, type, variableResolver ?? new VariableResolver(), cancellationToken);
+		}
+
 		internal static Expression BuildBody(ComparisonOperator @operator, MemberExpression prop, object value, VariableResolver variableResolver)
 		{
-			if (value is string && prop.Type != typeof(string) && @operator != ComparisonOperator.In)
+			if (value is string && prop.Type != typeof(string))
 			{
 				var varName = (string)value;
-				if (variableResolver.IsVariable(varName) && variableResolver.TryResolve(varName, out var result))
+				if (variableResolver.TryResolve(varName, out var result))
 				{
-					value = Convert.ChangeType(result, prop.Type);
+					value = result.Cast(prop.Type);
 				}
-				else
+				else if (@operator != ComparisonOperator.In)
 				{
 					value = varName.Cast(prop.Type);
 				}
 			}
 
+			return BuildBodyCore(@operator, prop, value, variableResolver);
+		}
+
+		internal static async Task<Expression> BuildBodyAsync(ComparisonOperator @operator, MemberExpression prop, object value, VariableResolver variableResolver, CancellationToken cancellationToken)
+		{
+			if (value is string && prop.Type != typeof(string))
+			{
+				var varName = (string)value;
+                var variableInfo = await variableResolver.TryResolveAsync(varName, cancellationToken);
+                if (variableInfo.Resolved)
+				{
+                    value = variableInfo.Value.Cast(prop.Type);
+                }
+				else if (@operator != ComparisonOperator.In)
+				{
+					value = varName.Cast(prop.Type);
+				}
+			}
+
+			return BuildBodyCore(@operator, prop, value, variableResolver);
+		}
+
+		private static Expression BuildBodyCore(ComparisonOperator @operator, MemberExpression prop, object value, VariableResolver variableResolver)
+        {
 			@operator = CorrectOperator(prop.Type, @operator);
 			switch (@operator)
 			{
@@ -179,7 +259,7 @@ namespace Kkts.Expressions
 				case ComparisonOperator.EndsWith:
 					return Expression.Call(prop, StringEndsWithMethod, Expression.Constant(value, prop.Type));
 				case ComparisonOperator.In:
-					return Expression.Call(typeof(Enumerable), nameof(Enumerable.Contains), new Type[] { prop.Type }, new ArrayList { Type = prop.Type, DrawValue = value.ToString() }.Build(null), prop);
+					return Expression.Call(typeof(Enumerable), nameof(Enumerable.Contains), new Type[] { prop.Type }, new ArrayList { Type = prop.Type, DrawValue = value.ToString() }.Build(new BuildArgument { VariableResolver = variableResolver }), prop);
 				default:
 					return Expression.Equal(prop, Expression.Constant(value, prop.Type));
 			}
@@ -291,6 +371,15 @@ namespace Kkts.Expressions
 			var param = type.CreateParameterExpression();
 			var prop = param.CreatePropertyExpression(propertyName);
 			var body = BuildBody(@operator, prop, value, variableResolver);
+
+			return Expression.Lambda(body, param);
+		}
+
+		internal static async Task<LambdaExpression> BuildPredicateAsync(ComparisonOperator @operator, string propertyName, object value, Type type, VariableResolver variableResolver, CancellationToken cancellationToken)
+		{
+			var param = type.CreateParameterExpression();
+			var prop = param.CreatePropertyExpression(propertyName);
+			var body = await BuildBodyAsync(@operator, prop, value, variableResolver, cancellationToken);
 
 			return Expression.Lambda(body, param);
 		}

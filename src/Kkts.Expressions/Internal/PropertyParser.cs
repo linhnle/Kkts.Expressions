@@ -15,6 +15,8 @@ namespace Kkts.Expressions.Internal
 
 		public bool IsVariable { get; set; }
 
+		public bool ForInOperator { get; set; }
+
 		public bool IsNestedProperty { get; set; }
 
 		public override bool Accept(char @char, int noOfWhiteSpaceIgnored, int index, ref bool keepTrack, ref bool isStartGroup)
@@ -53,8 +55,22 @@ namespace Kkts.Expressions.Internal
 				if (Done) EndIndex = index - noOfWhiteSpaceIgnored;
 				return false;
 			}
-			
-			if (prevChar == char.MinValue && char.IsDigit(@char)) return false;
+
+			if (prevChar == char.MinValue)
+			{
+                if (@char == VariableResolver.VariablePrefix)
+                {
+                    IsVariable = true;
+					StartIndex = index;
+                    return true;
+                }
+
+                if (char.IsDigit(@char))
+				{
+					return false;
+				}
+			}
+
 			if (char.IsLetter(@char) || @char == '_' || char.IsDigit(@char))
 			{
 				if (prevChar == char.MinValue) StartIndex = index;

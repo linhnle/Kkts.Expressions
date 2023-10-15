@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
+using System.Threading.Tasks;
 
 namespace Kkts.Expressions.Internal
 {
@@ -29,7 +30,9 @@ namespace Kkts.Expressions.Internal
 					return new EvaluationResult
 					{
 						InvalidProperties = arg.InvalidProperties,
-						InvalidVariables = arg.InvalidVariables
+						InvalidVariables = arg.InvalidVariables,
+						InvalidOperators = arg.InvalidOperators,
+						InvalidValues = arg.InvalidValues,
 					};
 				}
 
@@ -46,8 +49,47 @@ namespace Kkts.Expressions.Internal
 				return new EvaluationResult
 				{
 					Exception = ex,
-					InvalidProperties = new List<string>(0),
-					InvalidVariables = new List<string>(0),
+					InvalidProperties = arg.InvalidProperties,
+					InvalidVariables = arg.InvalidVariables,
+					InvalidOperators = arg.InvalidOperators,
+					InvalidValues = arg.InvalidValues
+				};
+			}
+		}
+
+		internal static async Task<EvaluationResult> ParseAsync(string expression, Type type, BuildArgument arg)
+		{
+			try
+			{
+				var param = type.CreateParameterExpression();
+				var rootNode = Parse(new ExpressionReader(expression), param, arg);
+				if (arg.InvalidProperties.Count > 0 || arg.InvalidVariables.Count > 0)
+				{
+					return new EvaluationResult
+					{
+						InvalidProperties = arg.InvalidProperties,
+						InvalidVariables = arg.InvalidVariables,
+						InvalidOperators = arg.InvalidOperators,
+						InvalidValues = arg.InvalidValues
+					};
+				}
+
+				var body = await rootNode.BuildAsync(arg);
+
+				return new EvaluationResult
+				{
+					Result = Expression.Lambda(body, param),
+					Succeeded = true
+				};
+			}
+			catch (Exception ex)
+			{
+				return new EvaluationResult
+				{
+					Exception = ex,
+					InvalidProperties = arg.InvalidProperties,
+					InvalidVariables = arg.InvalidVariables,
+					InvalidOperators = arg.InvalidOperators,
 					InvalidValues = arg.InvalidValues
 				};
 			}
@@ -59,7 +101,9 @@ namespace Kkts.Expressions.Internal
 			var keepTrack = false;
 			var groups = new Stack<Parser>();
 			reader.IgnoreWhiteSpace();
-			while (!reader.IsEnd)
+            Parser lastAcceptedParser = null;
+
+            while (!reader.IsEnd)
 			{
 				var noOfWhiteSpaceIgnored = 0;
 				if (!keepTrack) noOfWhiteSpaceIgnored = reader.IgnoreWhiteSpace();
@@ -68,6 +112,9 @@ namespace Kkts.Expressions.Internal
 				acceptedParsers = new List<Parser>();
 				var isStartGroup = false;
 				Parser group = null;
+				var currentIndex = reader.CurrentIndex;
+				var currentChar = reader.Current;
+				
 				foreach (var parser in parsers)
 				{
 					if (parser.Accept(c, noOfWhiteSpaceIgnored, reader.CurrentIndex, ref keepTrack, ref isStartGroup))
@@ -79,7 +126,8 @@ namespace Kkts.Expressions.Internal
 						else
 						{
 							acceptedParsers.Add(parser);
-						}
+							lastAcceptedParser = parser;
+                        }
 					}
 					else
 					{
@@ -89,7 +137,7 @@ namespace Kkts.Expressions.Internal
 							var nextParsers = parser.GetNextParsers(c);
 							foreach (var nextParser in nextParsers)
 							{
-								if (nextParser.Accept(c, 0, reader.CurrentIndex, ref keepTrack, ref isStartGroup))
+								if (nextParser.Accept(c, noOfWhiteSpaceIgnored, reader.CurrentIndex, ref keepTrack, ref isStartGroup))
 								{
 									if (isStartGroup)
 									{
@@ -98,7 +146,8 @@ namespace Kkts.Expressions.Internal
 									else
 									{
 										acceptedParsers.Add(nextParser);
-									}
+                                        lastAcceptedParser = parser;
+                                    }
 								}
 							}
 						}
@@ -108,7 +157,6 @@ namespace Kkts.Expressions.Internal
 					{
 						groups.Push(group);
 						acceptedParsers = group.GetNextParsers(c);
-						continue;
 					}
 				}
 
@@ -129,7 +177,7 @@ namespace Kkts.Expressions.Internal
 					}
 					else
 					{
-						ThrowFormatException(c, reader.CurrentIndex);
+						ThrowFormatException(lastAcceptedParser?.Result ?? currentChar.ToString(), lastAcceptedParser?.StartIndex ?? currentIndex);
 					}
 				}
 			}
@@ -147,14 +195,14 @@ namespace Kkts.Expressions.Internal
 			}
 			if (acceptedCount != 1 || groups.Count > 0)
 			{
-				ThrowFormatException(reader.LastChar, reader.Length - 1);
+				ThrowFormatException(reader.LastChar.ToString(), reader.Length - 1);
 			}
 
 			var chain = BuildChain(null, lastestParser);
 
 			return BuildNode(parameter, chain, arg);
 
-			void ThrowFormatException(char c, int index) => throw new FormatException($"Incorrect syntax near '{c}', index {index}");
+			void ThrowFormatException(string c, int index) => throw new FormatException($"Incorrect syntax near '{c}', index {index}");
 		}
 
 		private static List<Parser> BuildChain(Parser root, Parser last)
@@ -304,22 +352,20 @@ namespace Kkts.Expressions.Internal
 			{
 				builtNode = new Constant { Value = result.ToLower(), Type = typeof(bool), StartIndex = parser.StartIndex, StartChar = parser.StartChar };
 			}
-			else if (arg.VariableResolver.IsVariable(result))
+			else if (parser.IsVariable && !parser.ForInOperator)
 			{
-				builtNode = new Constant { Value = result, StartIndex = parser.StartIndex, StartChar = parser.StartChar, IsVariable = true };
-			}
+                builtNode = new Constant { Value = result, StartIndex = parser.StartIndex, StartChar = parser.StartChar, IsVariable = true };
+            }
 			else
 			{
-				if (parser.IsVariable)
-				{
-					arg.InvalidVariables.Add(result);
+				if (arg.IsValidProperty(result))
+                {
+					builtNode = new Property { Name = result, Param = param, StartIndex = parser.StartIndex, StartChar = parser.StartChar };
 				}
-				else
-				{
-					arg.IsValidProperty(result);
+                else
+                {
+					builtNode = new Constant { Value = result, StartIndex = parser.StartIndex, StartChar = parser.StartChar, IsVariable = true };
 				}
-				
-				builtNode = new Property { Name = result, Param = param, StartIndex = parser.StartIndex, StartChar = parser.StartChar };
 			}
 
 			parser.BuiltNode = builtNode;

@@ -5,7 +5,7 @@ using System.Linq.Expressions;
 
 namespace Kkts.Expressions
 {
-	public static class FilterExtensions
+	public static partial class FilterExtensions
 	{
 		#region Filter
 
@@ -128,6 +128,7 @@ namespace Kkts.Expressions
 
 			return Expression.Lambda(body, param);
 		}
+
 		internal static EvaluationResult TryBuildPredicate(this Filter filter, Type type, BuildArgument arg)
 		{
 			var isInvalid = !arg.IsValidProperty(filter.Property);

@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
+using System.Threading;
 
 namespace Kkts.Expressions
 {
@@ -68,6 +69,8 @@ namespace Kkts.Expressions
 
         public readonly ICollection<string> InvalidOrderByDirections = new List<string>();
 
+        public CancellationToken CancellationToken { get; set; } = CancellationToken.None;
+
         public IDictionary<string, string> PropertyMapping
         {
             set
@@ -126,7 +129,7 @@ namespace Kkts.Expressions
             var isValid = _lookup.ContainsKey(value);
             if (isValid) return true;
 
-            if (!isValid && value.Contains('.') && _evaluationType != null)
+            if (value.Contains('.') && _evaluationType != null)
             {
                 _lookup = _lookup ?? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
                 var segments = value.Split('.');
@@ -166,8 +169,6 @@ namespace Kkts.Expressions
                     isValid = _lookup?.ContainsKey(value.ToLower()) == true;
                 }
             }
-
-            if (!isValid) InvalidProperties.Add(value);
 
             return isValid;
         }

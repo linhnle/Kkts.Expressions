@@ -2,19 +2,21 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Kkts.Expressions
 {
 	public static partial class FilterGroupExtensions
 	{
 		#region FilterGroup
-		public static Expression<Func<T, bool>> BuildPredicate<T>(this FilterGroup filterGroup, VariableResolver variableResolver = null, IEnumerable<string> validProperties = null, IDictionary<string, string> propertyMapping = null)
+		public static async Task<Expression<Func<T, bool>>> BuildPredicateAsync<T>(this FilterGroup filterGroup, VariableResolver variableResolver = null, IEnumerable<string> validProperties = null, IDictionary<string, string> propertyMapping = null, CancellationToken cancellationToken = default)
 		{
 			if (filterGroup == null) throw new ArgumentNullException(nameof(filterGroup));
-			return (Expression<Func<T, bool>>)FilterExtensions.BuildPredicate(filterGroup.Filters, typeof(T), variableResolver, validProperties, propertyMapping);
+			return (Expression<Func<T, bool>>)(await FilterExtensions.BuildPredicateAsync(filterGroup.Filters, typeof(T), variableResolver, validProperties, propertyMapping, cancellationToken));
 		}
 
-		public static LambdaExpression BuildPredicate(this FilterGroup filterGroup, Type type, VariableResolver variableResolver = null, IEnumerable<string> validProperties = null, IDictionary<string, string> propertyMapping = null)
+		public static Task<LambdaExpression> BuildPredicateAsync(this FilterGroup filterGroup, Type type, VariableResolver variableResolver = null, IEnumerable<string> validProperties = null, IDictionary<string, string> propertyMapping = null, CancellationToken cancellationToken = default)
 		{
 			if (filterGroup == null) throw new ArgumentNullException(nameof(filterGroup));
 			if (type == null) throw new ArgumentNullException(nameof(type));
@@ -27,15 +29,15 @@ namespace Kkts.Expressions
 			};
 			if (!IsValid(filterGroup, arg)) throw new InvalidOperationException("The operator or property name is not valid");
 
-			return FilterExtensions.BuildPredicateInternal(filterGroup.Filters, type, arg);
+			return FilterExtensions.BuildPredicateInternalAsync(filterGroup.Filters, type, arg, cancellationToken);
 		}
 
-		public static Expression<Func<T, bool>> BuildPredicate<T>(this IEnumerable<FilterGroup> filterGroups, VariableResolver variableResolver = null, IEnumerable<string> validProperties = null, IDictionary<string, string> propertyMapping = null)
+		public static async Task<Expression<Func<T, bool>>> BuildPredicateAsync<T>(this IEnumerable<FilterGroup> filterGroups, VariableResolver variableResolver = null, IEnumerable<string> validProperties = null, IDictionary<string, string> propertyMapping = null, CancellationToken cancellationToken = default)
 		{
-			return (Expression<Func<T, bool>>)BuildPredicate(filterGroups, typeof(T), variableResolver, validProperties, propertyMapping);
+			return (Expression<Func<T, bool>>)(await BuildPredicateAsync(filterGroups, typeof(T), variableResolver, validProperties, propertyMapping, cancellationToken));
 		}
 
-		public static LambdaExpression BuildPredicate(this IEnumerable<FilterGroup> filterGroups, Type type, VariableResolver variableResolver = null, IEnumerable<string> validProperties = null, IDictionary<string, string> propertyMapping = null)
+		public static async Task<LambdaExpression> BuildPredicateAsync(this IEnumerable<FilterGroup> filterGroups, Type type, VariableResolver variableResolver = null, IEnumerable<string> validProperties = null, IDictionary<string, string> propertyMapping = null, CancellationToken cancellationToken = default)
 		{
 			if (filterGroups == null) throw new ArgumentNullException(nameof(filterGroups));
 			if (type == null) throw new ArgumentNullException(nameof(type));
@@ -53,14 +55,17 @@ namespace Kkts.Expressions
 			if (!allFilterGroups.Any()) return FilterExtensions.AlwaysTruePredicate(type);
 
 			var param = type.CreateParameterExpression();
-			var body = allFilterGroups.Aggregate((Expression)null, (current, next) => current == null
-				? FilterExtensions.BuildBody(next.Filters.ToArray(), param, arg)
-				: Expression.OrElse(current, FilterExtensions.BuildBody(next.Filters.ToArray(), param, arg)));
+			var body = await FilterExtensions.BuildBodyAsync(allFilterGroups[0].Filters.ToArray(), param, arg, cancellationToken);
+			for (var i = 1; i < allFilterGroups.Length; i++)
+            {
+				body = Expression.OrElse(body, await FilterExtensions.BuildBodyAsync(allFilterGroups[i].Filters.ToArray(), param, arg, cancellationToken));
+
+            }
 
 			return Expression.Lambda(body, param);
 		}
 
-		public static EvaluationResult<T, bool> TryBuildPredicate<T>(this FilterGroup filterGroup, VariableResolver variableResolver = null, IEnumerable<string> validProperties = null, IDictionary<string, string> propertyMapping = null)
+		public static Task<EvaluationResult<T, bool>> TryBuildPredicateAsync<T>(this FilterGroup filterGroup, VariableResolver variableResolver = null, IEnumerable<string> validProperties = null, IDictionary<string, string> propertyMapping = null, CancellationToken cancellationToken = default)
 		{
 			if (filterGroup == null) throw new ArgumentNullException(nameof(filterGroup)); ;
 			var arg = new BuildArgument
@@ -71,13 +76,13 @@ namespace Kkts.Expressions
 				PropertyMapping = propertyMapping
 			};
 
-			return TryBuildPredicate<T>(filterGroup, arg);
+			return TryBuildPredicateAsync<T>(filterGroup, arg, cancellationToken);
 		}
 
-		public static EvaluationResult<T, bool> TryBuildPredicate<T>(this IEnumerable<FilterGroup> filterGroups, VariableResolver variableResolver = null, IEnumerable<string> validProperties = null, IDictionary<string, string> propertyMapping = null)
+		public static async Task<EvaluationResult<T, bool>> TryBuildPredicateAsync<T>(this IEnumerable<FilterGroup> filterGroups, VariableResolver variableResolver = null, IEnumerable<string> validProperties = null, IDictionary<string, string> propertyMapping = null, CancellationToken cancellationToken = default)
 		{
 			if (filterGroups == null) throw new ArgumentNullException(nameof(filterGroups));
-			var result = TryBuildPredicate(filterGroups, typeof(T), variableResolver, validProperties, propertyMapping);
+			var result = await TryBuildPredicateAsync(filterGroups, typeof(T), variableResolver, validProperties, propertyMapping, cancellationToken);
 
 			return new EvaluationResult<T, bool>
 			{
@@ -90,7 +95,7 @@ namespace Kkts.Expressions
 			};
 		}
 
-		public static EvaluationResult TryBuildPredicate(this IEnumerable<FilterGroup> filterGroups, Type type, VariableResolver variableResolver = null, IEnumerable<string> validProperties = null, IDictionary<string, string> propertyMapping = null)
+		public static Task<EvaluationResult> TryBuildPredicateAsync(this IEnumerable<FilterGroup> filterGroups, Type type, VariableResolver variableResolver = null, IEnumerable<string> validProperties = null, IDictionary<string, string> propertyMapping = null, CancellationToken cancellationToken = default)
 		{
 			if (filterGroups == null) throw new ArgumentNullException(nameof(filterGroups));
 			if (type == null) throw new ArgumentNullException(nameof(type));
@@ -102,11 +107,11 @@ namespace Kkts.Expressions
 				PropertyMapping = propertyMapping
 			};
 
-			return TryBuildPredicate(filterGroups, type, arg);
+			return TryBuildPredicateAsync(filterGroups, type, arg, cancellationToken);
 		}
 
 		#region internal
-		internal static EvaluationResult<T, bool> TryBuildPredicate<T>(this FilterGroup filterGroup, BuildArgument arg)
+		internal static async Task<EvaluationResult<T, bool>> TryBuildPredicateAsync<T>(this FilterGroup filterGroup, BuildArgument arg, CancellationToken cancellationToken = default)
 		{
 			filterGroup.Filters.ForEach(f => { arg.IsValidProperty(f.Property); arg.IsValidOperator(f.Operator); });
 			if (arg.InvalidProperties.Any() || arg.InvalidOperators.Any())
@@ -120,7 +125,7 @@ namespace Kkts.Expressions
 
 			try
 			{
-				var expression = (Expression<Func<T, bool>>)FilterExtensions.BuildPredicateInternal(filterGroup.Filters, typeof(T), arg);
+				var expression = (Expression<Func<T, bool>>)(await FilterExtensions.BuildPredicateInternalAsync(filterGroup.Filters, typeof(T), arg, cancellationToken));
 
 				return new EvaluationResult<T, bool>
 				{
@@ -137,7 +142,7 @@ namespace Kkts.Expressions
 			}
 		}
 
-		internal static EvaluationResult TryBuildPredicate(this IEnumerable<FilterGroup> filterGroups, Type type, BuildArgument arg)
+		internal static async Task<EvaluationResult> TryBuildPredicateAsync(this IEnumerable<FilterGroup> filterGroups, Type type, BuildArgument arg, CancellationToken cancellationToken = default)
 		{
 			if (!filterGroups.Any()) return new EvaluationResult
 			{
@@ -171,9 +176,13 @@ namespace Kkts.Expressions
 			try
 			{
 				var param = type.CreateParameterExpression();
-				var body = allFilterGroups.Aggregate((Expression)null, (current, next) => current == null
-					? FilterExtensions.BuildBody(next.Filters.ToArray(), param, arg)
-					: Expression.OrElse(current, FilterExtensions.BuildBody(next.Filters.ToArray(), param, arg)));
+                var body = await FilterExtensions.BuildBodyAsync(allFilterGroups[0].Filters.ToArray(), param, arg, cancellationToken);
+                for (var i = 1; i < allFilterGroups.Length; i++)
+                {
+                    body = Expression.OrElse(body, await FilterExtensions.BuildBodyAsync(allFilterGroups[i].Filters.ToArray(), param, arg, cancellationToken));
+
+                }
+
 				return new EvaluationResult
 				{
 					Succeeded = true,
@@ -191,21 +200,5 @@ namespace Kkts.Expressions
 		#endregion internal
 
 		#endregion FilterGroup
-
-		#region Validation
-
-		internal static bool IsValid(FilterGroup filterGroup, BuildArgument arg)
-		{
-			return filterGroup != null
-				&& filterGroup.Filters != null
-				&& filterGroup.Filters.All(p => p.IsValid(arg));
-		}
-
-		internal static bool IsValid(this IEnumerable<FilterGroup> filterGroups, BuildArgument arg)
-		{
-			return filterGroups != null && filterGroups.All(p => IsValid(p, arg));
-		}
-
-		#endregion Validation
 	}
 }

@@ -5,6 +5,8 @@ namespace Kkts.Expressions.UnitTest
     internal class CustomVariableResolver : VariableResolver
     {
         public UserInfo User { get; } = new UserInfo { Id = DF.Integer1, UserName = "linhle" };
+
+        public int[] UserIds { get; } = { DF.Integer1 };
     }
 
     internal class UserInfo
