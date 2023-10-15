@@ -57,7 +57,7 @@ namespace Kkts.Expressions.Internal
 			}
 		}
 
-		public static async Task<EvaluationResult> ParseAsync(string expression, Type type, BuildArgument arg)
+		internal static async Task<EvaluationResult> ParseAsync(string expression, Type type, BuildArgument arg)
 		{
 			try
 			{
