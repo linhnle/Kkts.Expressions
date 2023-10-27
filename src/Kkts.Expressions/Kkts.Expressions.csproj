@@ -15,6 +15,11 @@
     <Description>Build string expression to lambda expression to support dynamic query from UI</Description>
     <PackageTags>Expression, LambdaExpression, DynamicExpression, StringExpression, Query, StringQuery, JiraFilter</PackageTags>
     <NeutralLanguage>en</NeutralLanguage>
+		<PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
+
+	<ItemGroup>
+		<None Include="..\..\README.md" Pack="true" PackagePath="\"/>
+	</ItemGroup>
 
 </Project>
