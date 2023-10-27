@@ -91,7 +91,7 @@ var ordered = context.Entities.OrderBy(new[]
 var evaluationResult = context.Entities.TryOrderBy(...);
 if (evaluationResult.Succeeded) var ordered = evaluationResult.Result;
 ```
-### Usage 4 (Variables)
+### Usage 4 (Variables) - V2 introduces Query Variables [Examples](https://github.com/linhnle/Kkts.Expressions/blob/main/examples/Kkts.Examples/Kkts.Examples.VariableResolver/Program.cs)
 ``` csharp
 // It has 2 default variables: now, utcnow (they are case insensitive)
 Expression<Func<Data, bool>> predicate = Interpreter.ParsePredicate<Data>("CreationDate = now or CreationDate = utcnow").Result; 
@@ -100,8 +100,11 @@ Expression<Func<Data, bool>> predicate = p => p.CreationDate == DateTime.Now || 
 
 // We can compare the year, month, day, ... like 
 Expression<Func<Data, bool>> predicate = Interpreter.ParsePredicate<Data>("CreationDate.year = now.year").Result;
+// From V2 It is applied Query Variables by adding prefix $ before a variable 
+Expression<Func<Data, bool>> predicate = Interpreter.ParsePredicate<Data>("CreationDate.year = $now.year").Result;
 ```
-### Usage 5 (Custom Variables)
+### Usage 5 (Custom Variables) - V2 introduces 2 new ways to declare variables [Examples](https://github.com/linhnle/Kkts.Expressions/blob/main/examples/Kkts.Examples/Kkts.Examples.VariableResolver/CustomVariableResolver.cs)
+#### V2 introduces ParsePredicateAsync
 ``` csharp
 class UserInfo
 {
@@ -115,7 +118,10 @@ class CustomVariableResolver : VariableResolver
 }
 
 // Now it has new variables user.id and user.username
-Expression<Func<Data, bool>> predicate = Interpreter.ParsePredicate<Data>("name = user.username and id = user.id", variableResolver: new CustomVariableResolver()).Result; 
+Expression<Func<Data, bool>> predicate = Interpreter.ParsePredicate<Data>("name = user.username and id = user.id", variableResolver: new CustomVariableResolver()).Result;
+
+// V2 introduces Async
+EvaluationResult<T, bool> result = await Interpreter.ParsePredicateAsync<Data>("name = user.username and id = user.id", variableResolver: new CustomVariableResolver()); 
 ```
 ### Usage 5 (Valid Properties)
 ``` csharp
@@ -178,6 +184,9 @@ var filters = new FilterGroup[]
             }
 Expression<Func<Data, bool>> predicate = filters.BuildPredicate<Data>(propertyMapping: mapping);
 ```
+### Usage 8 (Applies to V2 - Query Variables in In Operator) [Examples](https://github.com/linhnle/Kkts.Expressions/blob/main/examples/Kkts.Examples/Kkts.Examples.VariablesAndInOperator/Program.cs)
+
+
 ### Support operators
 | Operator             | Usage|Support data types|
 |--------------------|--------------------------------------------|-------------------------------------------------------------------|
