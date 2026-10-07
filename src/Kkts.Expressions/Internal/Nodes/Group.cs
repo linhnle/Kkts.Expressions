@@ -6,7 +6,7 @@ namespace Kkts.Expressions.Internal.Nodes
 	internal class Group : Node
 	{
 		public Node Node { get; set; }
-		public override bool ContainsAddition => Node.ContainsAddition;
+		public override bool ContainsArithmetic => Node.ContainsArithmetic;
 		public override bool IsConstantValue => Node.IsConstantValue;
 
 		public override Expression Build(BuildArgument arg)

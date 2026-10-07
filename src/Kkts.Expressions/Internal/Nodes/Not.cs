@@ -7,7 +7,7 @@ namespace Kkts.Expressions.Internal.Nodes
 	internal class Not : Node
 	{
 		public Node Node { get; set; }
-		public override bool ContainsAddition => Node?.ContainsAddition == true;
+		public override bool ContainsArithmetic => Node?.ContainsArithmetic == true;
 
 		public override Expression Build(BuildArgument arg)
 		{

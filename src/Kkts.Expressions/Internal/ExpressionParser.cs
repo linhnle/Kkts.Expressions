@@ -13,7 +13,7 @@ namespace Kkts.Expressions.Internal
 			{
 				 (t, p) => t == typeof(ArrayParser) || t == typeof(NumberParser) || t == typeof(PropertyParser) || t == typeof(StringParser),
 				 (t, p) => t == typeof(NotOperatorParser) || t == typeof(NotFunctionParser) || t == typeof(GroupParser) || t == typeof(ComparisonFunctionOperatorParser),
-				 (t, p) => t == typeof(AdditionOperatorParser),
+				 (t, p) => t == typeof(AdditiveOperatorParser),
 				 (t, p) => t == typeof(ComparisonOparatorParser),
 				 (t, p) => t == typeof(LogicalOperatorParser) && GetStandardOperator(p.NormalizedResult) == Interpreter.LogicalAnd,
 				 (t, p) => t == typeof(LogicalOperatorParser)
@@ -285,22 +285,24 @@ namespace Kkts.Expressions.Internal
 					return BuildNode(param, cfop, list, ref writeIndex, arg);
 				case ArrayParser ap:
 					return BuildNode(ap);
-				case AdditionOperatorParser addition:
-					return BuildNode(addition, list, ref currentIndex, ref writeIndex);
+				case AdditiveOperatorParser additive:
+					return BuildNode(additive, list, ref currentIndex, ref writeIndex);
 				default:
 					throw new FormatException($"Incorrect syntax near '{parser.Result}', index {parser.StartIndex}");
 			}
 
 		}
 
-		private static Node BuildNode(AdditionOperatorParser parser, List<Parser> list, ref int currentIndex, ref int writeIndex)
+		private static Node BuildNode(AdditiveOperatorParser parser, List<Parser> list, ref int currentIndex, ref int writeIndex)
 		{
 			if (parser.BuiltNode != null) return parser.BuiltNode;
 			ReadBinaryOperands(parser, list, ref currentIndex, ref writeIndex, out var left, out var right);
-			parser.BuiltNode = new Addition
-			{
-				Left = left, Right = right, StartIndex = parser.StartIndex, StartChar = '+'
-			};
+			Arithmetic arithmetic = parser.StartChar == '+' ? (Arithmetic)new Addition() : new Subtraction();
+			arithmetic.Left = left;
+			arithmetic.Right = right;
+			arithmetic.StartIndex = parser.StartIndex;
+			arithmetic.StartChar = parser.StartChar;
+			parser.BuiltNode = arithmetic;
 			return parser.BuiltNode;
 		}
 

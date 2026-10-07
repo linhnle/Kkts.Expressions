@@ -49,11 +49,11 @@ namespace Kkts.Expressions.Internal
 
 		public virtual void EndExpression() { }
 
-		protected IList<Parser> GetAdditionParsers()
+		protected IList<Parser> GetAdditiveParsers()
 		{
 			return new List<Parser>
 			{
-				new AdditionOperatorParser { Previous = this, LeftHand = LeftHand, EndFunction = EndFunction }
+				new AdditiveOperatorParser { Previous = this, LeftHand = LeftHand, EndFunction = EndFunction }
 			};
 		}
 

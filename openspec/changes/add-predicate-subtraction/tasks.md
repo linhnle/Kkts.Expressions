@@ -1,0 +1,29 @@
+# Tasks
+
+## 1. Shared additive parsing and numeric subtraction
+
+- [x] 1.1 Generalize `AdditionOperatorParser` and `Parser.GetAdditionParsers` into additive counterparts; update Number, Property, String, and Group transitions and `ExpressionParser` dispatch/reduction to handle both tokens in one left-to-right pass. Verify the library builds and parser tests distinguish `10 - 3 + 2`, `10 + 3 - 2`, `10 - 3 - 2`, grouping, compact syntax, both comparison sides, and logical composition.
+- [x] 1.2 Add a numeric-only Subtraction node using shared natural-type operand preparation, `NumericOperands.Normalize`, and `Expression.Subtract`; retain Addition's string branch. Generalize `ContainsAddition` propagation and Comparison's computed-operand path to arithmetic. Verify subtraction-only comparisons, literal/property/variable operands, nullable comparisons, and computed `in` operands compile and evaluate correctly.
+- [x] 1.3 Extend integral constant-tree recognition to subtraction with typed unchecked evaluation, and make numeric incompatibility messages operation-neutral. Verify nonnegative unsigned conversions, negative signed rejection, mixed constant subtrees, and overflow/wraparound cases alongside existing addition constant tests.
+- [x] 1.4 Add subtraction-focused tests adjacent to `InterpreterPlusTest`, reusing/extracting the numeric pair and nullable matrix helpers. Verify promoted type, `ExpressionType.Subtract`, lifted result type, and compiled values across the supported numeric matrix; assert incompatible pairs, int overflow, uint/ulong underflow, decimal overflow at evaluation, and floating-point behavior.
+- [x] 1.5 Add explicit failure coverage for missing operands, non-Boolean roots, strings/quoted numbers, Boolean, enum, date/time, TimeSpan, and custom subtraction types. Verify unsuccessful results, null predicates, `InvalidOperators` containing `-` for operand failures, source indices, and unchanged string concatenation/function behavior in mixed additive chains.
+- [x] 1.6 Update README's v3.0 predicate arithmetic section with subtraction examples, equal precedence, numeric/null/overflow rules, string rejection, and retained provider/structured-filter/order/array limitations. Verify each supported example with an interpreter test and keep existing addition examples valid.
+
+## 2. Negative literal tokenization
+
+- [x] 2.1 Extend NumberParser to accept one contiguous leading minus in operand positions and invariant signed decimal-point validation without enabling unary expressions. Add tests for `Price - -5`, `Price--5`, parenthesized negative literals, `Price + -5`, signed comparison literals, and negative fractional values; verify all generic/runtime-type sync/async predicate entry points agree.
+- [x] 2.2 Add signed-literal boundary and invalid-syntax tests: arithmetic `int.MinValue`/`long.MinValue` types, below-long-minimum rejection, isolated/repeated signs, whitespace between sign and digits, property/variable/group negation, unary plus, exponent/suffix syntax, and quoted minus text. Verify expected types or explicit errors and run existing culture/parser regression coverage.
+- [x] 2.3 Document negative numeric literals and the distinction from unsupported general unary negation in README, revising its previous no-new-signs limitation. Verify documented compact/spaced examples are covered by tests and do not imply arithmetic support inside membership arrays.
+
+## 3. Public predicate and condition integration
+
+- [x] 3.1 Extend subtraction API tests to exercise property mappings and allowlists on either operand, missing properties, variables on both sides, mixed resolved numeric types, null-valued variables, and unresolved-variable diagnostics. Verify equivalent generic/runtime-type sync/async results and existing validation collections.
+- [x] 3.2 Add async-only resolver and cancellation tests following existing addition patterns. Verify no synchronous resolution occurs, tokens reach operand resolution, and cancellation produces an unsuccessful evaluation result with the cancellation error and no predicate.
+- [x] 3.3 Add subtraction condition tests adjacent to `ConditionOptionsPlusTest` for generic/runtime-type sync/async `Where`, variables, nullable operands, malformed/unsupported expressions, and in-memory query execution. Verify correct matching rows, `IsValid`/error behavior, and no invalid condition predicates.
+- [x] 3.4 Update README's predicate/condition examples and async notes to include subtraction without new public signatures or `ComparisonOperator` members. Verify examples are represented in integration tests and existing structured filter and ordering APIs remain unchanged.
+
+## 4. Cross-cutting validation
+
+- [x] 4.1 Run one focused xUnit/VSTest invocation covering interpreter, condition, parser-cache, culture, regression, and TimeSpan tests using `dotnet test src/Kkts.Expressions.UnitTest/Kkts.Expressions.UnitTest.csproj --filter "FullyQualifiedName~InterpreterTest|FullyQualifiedName~ConditionOptionsTest|FullyQualifiedName~ConditionOptionsAsyncTest|FullyQualifiedName~ParserCacheTest|FullyQualifiedName~TimeSpanTest"`; include any separately named parser/culture classes discovered in those files. Verify new subtraction cases and existing addition/concatenation behavior all pass; broaden only if targeted failures require baseline comparison.
+- [x] 4.2 Build `src/Kkts.Expressions/Kkts.Expressions.csproj` for its existing target and verify no new dependency, public enum member, or API signature is required; inspect only relevant API/dependency changes to confirm structured-filter compatibility.
+- [x] 4.3 Run `openspec validate add-predicate-subtraction --strict` after implementation task updates and verify every delta scenario has corresponding automated coverage or a documented provider limitation, with no edits to the completed plus change or the read-only attachment.

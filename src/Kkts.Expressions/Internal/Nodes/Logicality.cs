@@ -11,7 +11,7 @@ namespace Kkts.Expressions.Internal.Nodes
 		public Node Left { get; set; }
 
 		public Node Right { get; set; }
-		public override bool ContainsAddition => Left.ContainsAddition || Right.ContainsAddition;
+		public override bool ContainsArithmetic => Left.ContainsArithmetic || Right.ContainsArithmetic;
 
 		public override Expression Build(BuildArgument arg)
 		{

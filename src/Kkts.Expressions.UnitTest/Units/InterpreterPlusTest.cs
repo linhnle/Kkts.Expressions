@@ -394,6 +394,8 @@ namespace Kkts.Expressions.UnitTest.Units
             public string String { get; set; }
             public bool Boolean { get; set; }
             public DateTime DateTime { get; set; }
+            public DateTimeOffset Timestamp { get; set; }
+            public TimeSpan Duration { get; set; }
             public TestOptions Option { get; set; }
             public ParentEntity Parent { get; set; }
             public CustomPlus Custom { get; set; }
@@ -402,6 +404,7 @@ namespace Kkts.Expressions.UnitTest.Units
         public class CustomPlus
         {
             public static CustomPlus operator +(CustomPlus left, CustomPlus right) => left;
+            public static CustomPlus operator -(CustomPlus left, CustomPlus right) => left;
             public static bool operator ==(CustomPlus left, CustomPlus right) => ReferenceEquals(left, right);
             public static bool operator !=(CustomPlus left, CustomPlus right) => !ReferenceEquals(left, right);
             public override bool Equals(object obj) => ReferenceEquals(this, obj);

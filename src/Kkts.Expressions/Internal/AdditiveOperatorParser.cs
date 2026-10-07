@@ -2,11 +2,11 @@ using System.Collections.Generic;
 
 namespace Kkts.Expressions.Internal
 {
-	internal class AdditionOperatorParser : Parser
+	internal class AdditiveOperatorParser : Parser
 	{
 		public override bool Accept(char @char, int noOfWhiteSpaceIgnored, int index, ref bool keepTrack, ref bool isStartGroup)
 		{
-			if (Done || @char != '+') return false;
+			if (Done || (@char != '+' && @char != '-')) return false;
 			StartIndex = EndIndex = index;
 			Append(@char);
 			Done = true;

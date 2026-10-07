@@ -12,7 +12,7 @@ namespace Kkts.Expressions.Internal.Nodes
 		public Node Left { get; set; }
 
 		public Node Right { get; set; }
-		public override bool ContainsAddition => Left.ContainsAddition || Right?.ContainsAddition == true;
+		public override bool ContainsArithmetic => Left.ContainsArithmetic || Right?.ContainsArithmetic == true;
 
 		public override Expression Build(BuildArgument arg)
 		{
@@ -44,7 +44,7 @@ namespace Kkts.Expressions.Internal.Nodes
 
 		private async Task<(Expression Left, Expression Right, Type InType)> BuildOperands(Func<Node, Task<Expression>> build)
 		{
-			if (ContainsAddition) return await BuildAdditionOperands(build);
+			if (ContainsArithmetic) return await BuildArithmeticOperands(build);
 			if (Left is Constant constant && Right is Property property)
 				return await BuildConstantProperty(constant, property, build);
 			if (Left is Property leftProperty && Right is Constant rightConstant)
@@ -77,13 +77,13 @@ namespace Kkts.Expressions.Internal.Nodes
 			return (await build(constant), right, typeof(string));
 		}
 
-		private async Task<(Expression Left, Expression Right, Type InType)> BuildAdditionOperands(Func<Node, Task<Expression>> build)
+		private async Task<(Expression Left, Expression Right, Type InType)> BuildArithmeticOperands(Func<Node, Task<Expression>> build)
 		{
 			Expression left;
 			Expression right;
 			var inType = typeof(string);
 			var constant = Unwrap(Left) as Constant;
-			if (!Left.ContainsAddition && constant != null && !constant.IsVariable)
+			if (!Left.ContainsArithmetic && constant != null && !constant.IsVariable)
 			{
 				right = await build(Right);
 				PrepareCounterpart(Left, right.Type);

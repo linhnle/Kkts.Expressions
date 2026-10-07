@@ -430,7 +430,8 @@ separate elements in `in` arrays; they are not decimal separators.
   empty. An evaluation result is not a guarantee that every API call is
   exception-free.
 - Async parsing awaits variable resolution for all expression shapes, not
-  only expressions containing addition. Cancellation produces an unsuccessful
+  only expressions containing addition or subtraction. Cancellation produces
+  an unsuccessful
   evaluation result whose `Exception` is an `OperationCanceledException` or a
   derived exception; it is not reported as an invalid value.
 - Nested variable paths can traverse properties and fields at multiple levels.
@@ -458,14 +459,15 @@ and fractional seconds are supported. Empty or whitespace input becomes null
 for `TimeSpan?`; invalid input throws through `Cast` and returns false through
 `TryCast`.
 
-Duration arithmetic with `+` is not supported.
+Duration arithmetic with `+` or `-` is not supported.
 
-## Binary plus in predicates (v3.0 only)
+## Binary addition and subtraction in predicates (v3.0 only)
 
-**The Plus (`+`) operator applies only to v3.0.**
+**The binary `+` and `-` operators apply only to v3.0.**
 
-Binary `+` supports property + property, property + value, and property +
-variable, as well as literal expressions and parenthesized values:
+Binary `+` and numeric-only `-` support properties, literals, variables, and
+parenthesized values. These are predicate arithmetic operators, not members
+of `ComparisonOperator` for structured filters:
 
 ```csharp
 var numeric = Interpreter.ParsePredicate<Data>("Id + 1 = 5");
@@ -473,50 +475,73 @@ var grouped = Interpreter.ParsePredicate<Data>("(Id + 1) = (2 + 3)");
 var concatenated = Interpreter.ParsePredicate<Data>("Name + '!' = 'Test!'");
 var mixed = Interpreter.ParsePredicate<Data>("'ID: ' + Id = 'ID: 7'");
 var propertyPair = Interpreter.ParsePredicate<Data>("Id + Id = 8");
+var difference = Interpreter.ParsePredicate<Data>("Id - 1 = 3");
+var negativeLiteral = Interpreter.ParsePredicate<Data>("Id - -5 = 9");
+var additive = Interpreter.ParsePredicate<Data>("(Id + 2) - 1 >= 5");
 
 var variables = new VariableResolver();
 variables.TryAdd("increment", 2);
 variables.TryAdd("target", 6);
 var variableSum = await Interpreter.ParsePredicateAsync<Data>(
     "Id + $increment = $target", variableResolver: variables);
+var variableDifference = await Interpreter.ParsePredicateAsync<Data>(
+    "Id - $increment > 0", variableResolver: variables);
 
 var condition = new ConditionOptions { Where = "Id + 1 = 5" }
     .BuildCondition<Data>();
+var differenceCondition = new ConditionOptions { Where = "Id - 1 = 3" }
+    .BuildCondition<Data>();
 ```
 
-### Addition and concatenation rules
+### Arithmetic and concatenation rules
 
-- Additions associate left to right, before comparisons and logical operators.
+- Binary `+` and `-` have equal precedence and associate left to right, before
+  comparisons and logical operators: `10 - 3 + 2 = 9` and `10 - 3 - 2 = 5`.
   Parentheses override grouping: `1 + 2 + 'x'` produces `"3x"`, while
   `1 + (2 + 'x')` produces `"12x"`.
 - Numeric operands follow C# numeric promotion, including small integer
-  promotion to `int` and mixed integer/floating-point sums. Whole-number
-  addition literals use the first fitting `int`, `uint`, `long`, or `ulong`;
+  promotion to `int` and mixed integer/floating-point results. Whole-number
+  arithmetic literals use the first fitting `int`, `uint`, `long`, or `ulong`;
   fractional literals use `double`. Decimal operands cannot be mixed with
   `float` or `double`.
-- Nullable numeric addition propagates null rather than replacing it with zero.
-  For example, `NullableId + 1 = null` is true when `NullableId` is null.
-  Integral overflow wraps as in unchecked C# addition; decimal overflow still
+- Nullable numeric addition and subtraction propagate null rather than
+  replacing it with zero. For example, `NullableId - 1 = null` is true when
+  `NullableId` is null. A bare null paired with a number also produces null;
+  `null - null` is rejected because no numeric type can be inferred.
+  Integral overflow/underflow wraps as in unchecked C# arithmetic; decimal
+  overflow still
   throws when the predicate is evaluated.
 - If either operand is a string, `+` concatenates, converting other operands
   using ordinary .NET/current-culture formatting. Null contributes an empty
   string. Quoted numeric text stays a string: `'1' + 2` produces `"12"`.
-  Plus characters inside quoted strings are literal text.
+  Plus and minus characters inside quoted strings are literal text.
+- Subtraction rejects strings (including quoted numeric text), Boolean, enum,
+  date/time, duration, and user-defined arithmetic operands. Mixed chains
+  remain left associative: `10 - 3 + 'x'` produces `"7x"`, but
+  `10 + 'x' - 3` fails because the left subtraction operand is a string.
+- Negative numeric literals are accepted where a value is expected. The sign
+  must be adjacent to the number: `Id - -5`, `Id--5`, and `Id - (-5)` all
+  subtract negative five. Negative fractional literals use the invariant
+  decimal point. This does not enable `-Id`, `-$value`, or `-(Id + 1)`.
 - Computed strings work in infix comparisons and existing string-function
   arguments, such as `Name + '!' contains 'Test!'` and
   `Name.contains('Te' + 'st')`.
 - Both synchronous and asynchronous predicate APIs, including runtime-type
-  overloads and condition `Where`, support plus in v3.0. Property mappings,
+  overloads and condition `Where`, support both operators in v3.0. Async APIs
+  retain asynchronous variable resolution and cancellation. Property mappings,
   allowlists, and variable diagnostics apply to both operands.
-- A predicate must return Boolean: `Id + 1` alone is not a predicate. Check
+- A predicate must return Boolean: `Id + 1` or `Id - 1` alone is not a predicate.
+  Check
   `Succeeded` and `Exception`, or `IsValid` and `Error` for a condition.
   Missing operands and unsupported operand pairs fail explicitly.
 
 ### Limitations
 
-Unary plus, other arithmetic operators, date/time arithmetic, user-defined
-addition, additions inside `in` array literals, and computed ordering are not
-supported. No new numeric signs, exponent notation, or suffix syntax is added.
+Unary plus, general unary negation, multiplication/division, date/time
+arithmetic, user-defined arithmetic, arithmetic inside `in` array literals,
+and computed ordering are not supported. A computed membership operand such
+as `Id - 1 in [3,5]` is supported. No exponent notation or suffix syntax is
+added.
 
 The library emits native expression trees. Relational query translation,
 especially mixed string concatenation, depends on the query provider.

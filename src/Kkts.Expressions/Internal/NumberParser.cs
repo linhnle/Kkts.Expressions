@@ -15,7 +15,7 @@ namespace Kkts.Expressions.Internal
 				return false;
 			}
 
-			if (char.IsDigit(@char) || @char == '.')
+			if (char.IsDigit(@char) || @char == '.' || (@char == '-' && Length == 0))
 			{
 				if (PreviousChar == char.MinValue) StartIndex = index;
 				Append(@char);
@@ -31,7 +31,7 @@ namespace Kkts.Expressions.Internal
 
 		public override IList<Parser> GetNextParsers(char @char)
 		{
-			if (@char == '+') return GetAdditionParsers();
+			if (@char == '+' || @char == '-') return GetAdditiveParsers();
 			if (EndFunction) return new List<Parser>(0);
 			if (LeftHand)
 			{
@@ -49,7 +49,7 @@ namespace Kkts.Expressions.Internal
 
 		public override bool Validate()
 		{
-			return double.TryParse(Result, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out _);
+			return double.TryParse(Result, NumberStyles.AllowLeadingSign | NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out _);
 		}
 	}
 }

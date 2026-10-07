@@ -48,6 +48,7 @@ namespace Kkts.Expressions.Internal
 				_isEnd = true;
 				_parsers = new List<Parser>
 				{
+					new AdditiveOperatorParser { Previous = this, LeftHand = LeftHand, EndFunction = EndFunction },
 					new ComparisonOparatorParser { Previous = this },
 					new LogicalOperatorParser { Previous = this }
 				};
@@ -64,8 +65,7 @@ namespace Kkts.Expressions.Internal
 
 		public override IList<Parser> GetNextParsers(char @char)
 		{
-			if (_isEnd && @char == '+') return GetAdditionParsers();
-			if (_isEnd && EndFunction) return new List<Parser>(0);
+			if (_isEnd && EndFunction) return GetAdditiveParsers();
 			return _parsers;
 		}
 	}

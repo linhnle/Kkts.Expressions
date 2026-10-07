@@ -64,13 +64,15 @@ namespace Kkts.Expressions.Internal
 			}
 			if (expression is UnaryExpression conversion && conversion.NodeType == ExpressionType.Convert)
 				return TryGetIntegralConstant(conversion.Operand, out value);
-			if (expression is BinaryExpression sum && sum.NodeType == ExpressionType.Add &&
-				TryGetIntegralConstant(sum.Left, out var left) && TryGetIntegralConstant(sum.Right, out var right))
+			if (expression is BinaryExpression arithmetic &&
+				(arithmetic.NodeType == ExpressionType.Add || arithmetic.NodeType == ExpressionType.Subtract) &&
+				TryGetIntegralConstant(arithmetic.Left, out var left) && TryGetIntegralConstant(arithmetic.Right, out var right))
 			{
-				if (sum.Type == typeof(int)) value = unchecked((int)left + (int)right);
-				else if (sum.Type == typeof(uint)) value = unchecked((uint)left + (uint)right);
-				else if (sum.Type == typeof(long)) value = unchecked((long)left + (long)right);
-				else if (sum.Type == typeof(ulong)) value = unchecked((ulong)left + (ulong)right);
+				var subtract = arithmetic.NodeType == ExpressionType.Subtract;
+				if (arithmetic.Type == typeof(int)) value = subtract ? unchecked((int)left - (int)right) : unchecked((int)left + (int)right);
+				else if (arithmetic.Type == typeof(uint)) value = subtract ? unchecked((uint)left - (uint)right) : unchecked((uint)left + (uint)right);
+				else if (arithmetic.Type == typeof(long)) value = subtract ? unchecked((long)left - (long)right) : unchecked((long)left + (long)right);
+				else if (arithmetic.Type == typeof(ulong)) value = subtract ? unchecked((ulong)left - (ulong)right) : unchecked((ulong)left + (ulong)right);
 				else
 				{
 					value = 0;
@@ -122,14 +124,14 @@ namespace Kkts.Expressions.Internal
 		private static Type PromoteDecimal(Type left, Type right)
 		{
 			if (left == typeof(float) || right == typeof(float) || left == typeof(double) || right == typeof(double))
-				throw new InvalidOperationException("Decimal cannot be added to float or double.");
+				throw new InvalidOperationException("Decimal cannot be combined with float or double.");
 			return typeof(decimal);
 		}
 
 		private static Type PromoteUnsignedLong(Type other)
 		{
 			if (IsSignedSmallIntegral(other) || other == typeof(long))
-				throw new InvalidOperationException("UInt64 cannot be added to a signed integral operand.");
+				throw new InvalidOperationException("UInt64 cannot be combined with a signed integral operand.");
 			return typeof(ulong);
 		}
 	}

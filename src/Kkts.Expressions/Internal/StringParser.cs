@@ -65,7 +65,7 @@ namespace Kkts.Expressions.Internal
 
 		public override IList<Parser> GetNextParsers(char @char)
 		{
-			if (@char == '+') return GetAdditionParsers();
+			if (@char == '+' || @char == '-') return GetAdditiveParsers();
 			if (@char == '.')
 			{
 				return new List<Parser> { new ComparisonFunctionOperatorParser { Previous = this } };
