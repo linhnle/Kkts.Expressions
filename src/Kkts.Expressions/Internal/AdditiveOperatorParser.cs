@@ -6,7 +6,7 @@ namespace Kkts.Expressions.Internal
 	{
 		public override bool Accept(char @char, int noOfWhiteSpaceIgnored, int index, ref bool keepTrack, ref bool isStartGroup)
 		{
-			if (Done || (@char != '+' && @char != '-')) return false;
+			if (Done || !ExpressionGrammar.IsAdditive(@char)) return false;
 			StartIndex = EndIndex = index;
 			Append(@char);
 			Done = true;

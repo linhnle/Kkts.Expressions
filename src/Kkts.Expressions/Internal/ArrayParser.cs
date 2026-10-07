@@ -1,11 +1,9 @@
 ﻿using System.Collections.Generic;
-using System.Linq;
 
 namespace Kkts.Expressions.Internal
 {
 	internal class ArrayParser : Parser
 	{
-		private readonly char[] StartScopes = { '[', '(', '{' };
 		private bool _endArray = false;
 		private bool _startArray = false;
 		private bool _isInEntity = false;
@@ -16,12 +14,12 @@ namespace Kkts.Expressions.Internal
 			if (_endArray) return false;
 			if (!_startArray)
 			{
-				if (StartScopes.Contains(@char))
+				if (ExpressionGrammar.IsListStart(@char))
 				{
 					StartIndex = index;
 					keepTrack = true;
 					_startArray = true;
-					_endScope = GetEndScope(@char);
+					_endScope = ExpressionGrammar.ListEnd(@char);
 					return true;
 				}
 
@@ -39,11 +37,11 @@ namespace Kkts.Expressions.Internal
 				}
 				else
 				{
-					Append('\\');
+					Append(ExpressionGrammar.Escape);
 				}
 			}
 
-			if (@char == '\\')
+			if (@char == ExpressionGrammar.Escape)
 			{
 				_isInEntity = true;
 				return true;
@@ -84,14 +82,5 @@ namespace Kkts.Expressions.Internal
 			return _endArray;
 		}
 
-		private static char GetEndScope(char startScope)
-		{
-			switch (startScope)
-			{
-				case '[': return ']';
-				case '(': return ')';
-				default: return '}';
-			}
-		}
 	}
 }

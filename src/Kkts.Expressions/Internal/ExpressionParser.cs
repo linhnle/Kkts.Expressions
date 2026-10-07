@@ -103,7 +103,7 @@ namespace Kkts.Expressions.Internal
 
 		private static Node Parse(ExpressionReader reader, ParameterExpression parameter, BuildArgument arg)
 		{
-			var state = new ParsingState();
+			var state = new ExpressionSyntaxParser();
 			reader.IgnoreWhiteSpace();
 			while (!reader.IsEnd)
 			{
@@ -111,132 +111,6 @@ namespace Kkts.Expressions.Internal
 			}
 
 			return BuildNode(parameter, state.Complete(reader), arg);
-		}
-
-		private sealed class ParsingState
-		{
-			private List<Parser> _accepted = GetBeginningParsers();
-			private List<Parser> _next = new List<Parser>(6);
-			private readonly Stack<Parser> _groups = new Stack<Parser>();
-			private bool _keepTrack;
-			private bool _isStartGroup;
-			private Parser _lastAccepted;
-
-			public void Read(ExpressionReader reader)
-			{
-				var whitespace = _keepTrack ? 0 : reader.IgnoreWhiteSpace();
-				var value = reader.Read();
-				var parsers = _accepted;
-				_accepted = _next;
-				_accepted.Clear();
-				_next = parsers;
-				_isStartGroup = false;
-				Parser group = null;
-
-				foreach (var parser in parsers)
-				{
-					AcceptParser(parser, value, whitespace, reader.CurrentIndex, ref group);
-					if (group == null) continue;
-					_groups.Push(group);
-					_accepted.Clear();
-					_accepted.AddRange(group.GetNextParsers(value));
-				}
-
-				if (_accepted.Count == 0) CloseGroup(reader, value, whitespace);
-			}
-
-			private void AcceptParser(Parser parser, char value, int whitespace, int index, ref Parser group)
-			{
-				if (parser.Accept(value, whitespace, index, ref _keepTrack, ref _isStartGroup))
-				{
-					RecordAccepted(parser, parser, ref group);
-				}
-				else if (parser.Done && parser.Validate())
-				{
-					if (_groups.Count > 0) _groups.Peek().LastSuccess = parser;
-					AcceptNextParsers(parser, value, whitespace, index, ref group);
-				}
-			}
-
-			private void AcceptNextParsers(Parser parser, char value, int whitespace, int index, ref Parser group)
-			{
-				foreach (var next in parser.GetNextParsers(value))
-				{
-					if (next.Accept(value, whitespace, index, ref _keepTrack, ref _isStartGroup))
-						RecordAccepted(next, parser, ref group);
-				}
-			}
-
-			private void RecordAccepted(Parser accepted, Parser last, ref Parser group)
-			{
-				if (_isStartGroup) group = accepted;
-				else
-				{
-					_accepted.Add(accepted);
-					_lastAccepted = last;
-				}
-			}
-
-			private void CloseGroup(ExpressionReader reader, char value, int whitespace)
-			{
-				var group = _groups.Count > 0 ? _groups.Pop() : null;
-				if (group == null || !group.Accept(value, whitespace, reader.CurrentIndex, ref _keepTrack, ref _isStartGroup))
-					throw SyntaxError(_lastAccepted?.Result ?? reader.Current.ToString(), _lastAccepted?.StartIndex ?? reader.CurrentIndex);
-
-				if (reader.HasNext) _accepted.AddRange(group.GetNextParsers(value));
-				else _accepted.Add(group);
-				group.Body = BuildChain(group, group.LastSuccess);
-				if (_groups.Count > 0) _groups.Peek().LastSuccess = group;
-			}
-
-			public List<Parser> Complete(ExpressionReader reader)
-			{
-				Parser last = null;
-				var count = 0;
-				foreach (var parser in _accepted)
-				{
-					parser.EndExpression();
-					if (!parser.Validate()) continue;
-					++count;
-					last = parser;
-				}
-
-				if (count != 1 || _groups.Count > 0)
-					throw SyntaxError(reader.LastChar.ToString(), reader.Length - 1);
-				return BuildChain(null, last);
-			}
-
-			private static FormatException SyntaxError(string value, int index)
-			{
-				return new FormatException($"Incorrect syntax near '{value}', index {index}");
-			}
-			private static List<Parser> BuildChain(Parser root, Parser last)
-			{
-				var chain = new List<Parser>();
-				do
-				{
-					chain.Add(last);
-					var tmp = last;
-					last = last.Previous;
-					tmp.Previous = null;
-				} while (last != root);
-
-				chain.Reverse();
-				return chain;
-			}
-
-			private static List<Parser> GetBeginningParsers()
-			{
-				return new List<Parser>
-				{
-					new PropertyParser(),
-					new NumberParser(),
-					new StringParser(),
-					new NotOperatorParser(),
-					new NotFunctionParser(),
-					new GroupParser()
-				};
-			}
 		}
 
 		private static Node BuildNode(ParameterExpression param, List<Parser> parsers, BuildArgument arg)
@@ -437,7 +311,7 @@ namespace Kkts.Expressions.Internal
 
 		private static void ReadBinaryOperands(Parser parser, List<Parser> list, ref int currentIndex, ref int writeIndex, out Node left, out Node right)
 		{
-			if (writeIndex == 0 || currentIndex + 1 >= list.Count)
+			if (!ExpressionGrammar.HasBinaryOperands(writeIndex, currentIndex + 1 < list.Count))
 				throw new FormatException($"Incorrect syntax near '{parser.Result}', index {parser.StartIndex}");
 
 			left = list[writeIndex - 1].BuiltNode;

@@ -31,7 +31,7 @@ namespace Kkts.Expressions.Internal
 
 		public override IList<Parser> GetNextParsers(char @char)
 		{
-			if (@char == '+' || @char == '-') return GetAdditiveParsers();
+			if (ExpressionGrammar.IsAdditive(@char)) return GetAdditiveParsers();
 			if (EndFunction) return new List<Parser>(0);
 			if (LeftHand)
 			{
