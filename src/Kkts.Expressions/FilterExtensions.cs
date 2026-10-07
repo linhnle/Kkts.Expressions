@@ -217,7 +217,7 @@ namespace Kkts.Expressions
 		{
 			return arg.IsValidProperty(filter.Property)
 				&& !string.IsNullOrWhiteSpace(filter?.Operator)
-				&& Interpreter.ComparisonOperators.Contains(filter.Operator, StringComparer.OrdinalIgnoreCase);
+				&& Interpreter.ComparisonOperators.Contains(Interpreter.NormalizeComparisonOperator(filter.Operator), StringComparer.OrdinalIgnoreCase);
 		}
 
 		internal static bool IsValid(this IEnumerable<Filter> filters, BuildArgument arg)

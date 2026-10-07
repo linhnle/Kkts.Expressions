@@ -30,6 +30,7 @@ namespace Kkts.Expressions
 		internal const string ComparisonEndsWith2 = "endwith";
 		internal const string ComparisonEndsWith3 = "*@";
 		internal const string ComparisonIn = "in";
+		internal const string ComparisonNotIn = "not in";
 		internal const string Null = "null";
 		internal const string True = "true";
 		internal const string False = "false";
@@ -59,7 +60,8 @@ namespace Kkts.Expressions
 				ComparisonEndsWith,
 				ComparisonEndsWith2,
 				ComparisonEndsWith3,
-				ComparisonIn
+				ComparisonIn,
+				ComparisonNotIn
 			};
 		internal static readonly string[] ComparisonFunctionOperators = 
 			{
@@ -187,14 +189,14 @@ namespace Kkts.Expressions
 		internal static Expression BuildBody(ComparisonOperator @operator, MemberExpression prop, object value, VariableResolver variableResolver)
 		{
 			if (value is string && prop.Type != typeof(string) &&
-				(@operator != ComparisonOperator.In || (Nullable.GetUnderlyingType(prop.Type) ?? prop.Type) != typeof(TimeSpan)))
+				(!IsMembership(@operator) || (Nullable.GetUnderlyingType(prop.Type) ?? prop.Type) != typeof(TimeSpan)))
 			{
 				var varName = (string)value;
 				if (variableResolver.TryResolve(varName, out var result))
 				{
 					value = result.Cast(prop.Type);
 				}
-				else if (@operator != ComparisonOperator.In)
+				else if (!IsMembership(@operator))
 				{
 					value = varName.Cast(prop.Type);
 				}
@@ -205,8 +207,16 @@ namespace Kkts.Expressions
 
 		internal static async Task<Expression> BuildBodyAsync(ComparisonOperator @operator, MemberExpression prop, object value, VariableResolver variableResolver, CancellationToken cancellationToken)
 		{
+			cancellationToken.ThrowIfCancellationRequested();
+			if (IsMembership(@operator))
+			{
+				@operator = CorrectOperator(prop.Type, @operator);
+				var collection = await new ArrayList { Type = prop.Type, DrawValue = value.ToString() }
+					.BuildAsync(new BuildArgument { VariableResolver = variableResolver, CancellationToken = cancellationToken });
+				return BuildMembership(prop, collection, prop.Type, @operator == ComparisonOperator.NotIn);
+			}
 			if (value is string && prop.Type != typeof(string) &&
-				(@operator != ComparisonOperator.In || (Nullable.GetUnderlyingType(prop.Type) ?? prop.Type) != typeof(TimeSpan)))
+				(!IsMembership(@operator) || (Nullable.GetUnderlyingType(prop.Type) ?? prop.Type) != typeof(TimeSpan)))
 			{
 				var varName = (string)value;
                 var variableInfo = await variableResolver.TryResolveAsync(varName, cancellationToken);
@@ -214,7 +224,7 @@ namespace Kkts.Expressions
 				{
                     value = variableInfo.Value.Cast(prop.Type);
                 }
-				else if (@operator != ComparisonOperator.In)
+				else if (!IsMembership(@operator))
 				{
 					value = varName.Cast(prop.Type);
 				}
@@ -245,7 +255,8 @@ namespace Kkts.Expressions
 				case ComparisonOperator.EndsWith:
 					return Expression.Call(prop, StringEndsWithMethod, Expression.Constant(value, prop.Type));
 				case ComparisonOperator.In:
-					return Expression.Call(typeof(Enumerable), nameof(Enumerable.Contains), new Type[] { prop.Type }, new ArrayList { Type = prop.Type, DrawValue = value.ToString() }.Build(new BuildArgument { VariableResolver = variableResolver }), prop);
+				case ComparisonOperator.NotIn:
+					return BuildMembership(prop, new ArrayList { Type = prop.Type, DrawValue = value.ToString() }.Build(new BuildArgument { VariableResolver = variableResolver }), prop.Type, @operator == ComparisonOperator.NotIn);
 				default:
 					return Expression.Equal(prop, Expression.Constant(value, prop.Type));
 			}
@@ -255,7 +266,7 @@ namespace Kkts.Expressions
 		{
 			if (string.IsNullOrEmpty(operatorString)) throw new ArgumentNullException(nameof(operatorString));
 
-			switch (operatorString.ToLowerInvariant())
+			switch (NormalizeComparisonOperator(operatorString))
 			{
 				case ComparisonNotEqual2:
 				case ComparisonNotEqual:
@@ -285,9 +296,32 @@ namespace Kkts.Expressions
 					return ComparisonOperator.Equal;
 				case ComparisonIn:
 					return ComparisonOperator.In;
+				case ComparisonNotIn:
+					return ComparisonOperator.NotIn;
 				default:
 					throw new NotSupportedException($"Operator {operatorString} not supported");
 			}
+		}
+
+		internal static bool IsMembership(string @operator) =>
+			@operator == ComparisonIn || @operator == ComparisonNotIn;
+
+		internal static bool IsMembership(ComparisonOperator @operator) =>
+			@operator == ComparisonOperator.In || @operator == ComparisonOperator.NotIn;
+
+		internal static Expression BuildMembership(Expression value, Expression collection, Type elementType, bool negate)
+		{
+			var membership = Expression.Call(typeof(Enumerable), nameof(Enumerable.Contains), new[] { elementType }, collection, value);
+			return negate ? (Expression)Expression.Not(membership) : membership;
+		}
+
+		internal static string NormalizeComparisonOperator(string value)
+		{
+			if (value == null) return null;
+			var normalized = value.ToLowerInvariant();
+			var words = normalized.Trim().Split(new[] { ' ', '\t', '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
+			return words.Length == 2 && words[0] == "not" && words[1] == "in"
+				? ComparisonNotIn : normalized;
 		}
 
 		private static ComparisonOperator CorrectOperator(Type type, ComparisonOperator @operator)
@@ -297,6 +331,7 @@ namespace Kkts.Expressions
 				switch (@operator)
 				{
 					case ComparisonOperator.In:
+					case ComparisonOperator.NotIn:
 					case ComparisonOperator.Equal:
 					case ComparisonOperator.NotEqual:
 					case ComparisonOperator.Contains:
@@ -314,6 +349,7 @@ namespace Kkts.Expressions
 				switch (@operator)
 				{
 					case ComparisonOperator.In:
+					case ComparisonOperator.NotIn:
 					case ComparisonOperator.Equal:
 					case ComparisonOperator.NotEqual:
 						return @operator;
@@ -327,6 +363,7 @@ namespace Kkts.Expressions
 				switch (@operator)
 				{
 					case ComparisonOperator.In:
+					case ComparisonOperator.NotIn:
 					case ComparisonOperator.Equal:
 					case ComparisonOperator.NotEqual:
 						return @operator;
@@ -341,6 +378,7 @@ namespace Kkts.Expressions
 			switch (@operator)
 			{
 				case ComparisonOperator.In:
+				case ComparisonOperator.NotIn:
 				case ComparisonOperator.Equal:
 				case ComparisonOperator.NotEqual:
 				case ComparisonOperator.LessThan:

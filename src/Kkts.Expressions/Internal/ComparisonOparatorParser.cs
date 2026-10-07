@@ -10,6 +10,12 @@ namespace Kkts.Expressions.Internal
 
 		public override bool Accept(char @char, int noOfWhiteSpaceIgnored, int index, ref bool keepTrack, ref bool isStartGroup)
 		{
+			if (!Done && noOfWhiteSpaceIgnored > 0 && NormalizedResult == "not")
+			{
+				Append(' ');
+				Append(@char);
+				return true;
+			}
 			return AcceptOperator(@char, noOfWhiteSpaceIgnored, index, SpecialChars, ref _isSpecialChar);
 		}
 
@@ -22,7 +28,7 @@ namespace Kkts.Expressions.Internal
 				return new List<Parser>(0);
 			}
 
-            if (opa == Interpreter.ComparisonIn)
+            if (Interpreter.IsMembership(opa))
 			{
 				return new List<Parser>
 				{

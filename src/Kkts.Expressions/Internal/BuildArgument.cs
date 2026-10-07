@@ -104,7 +104,7 @@ namespace Kkts.Expressions
 
         public bool IsValidOperator(string value)
         {
-            var isValid = value != null && Interpreter.ComparisonOperators.Contains(value, StringComparer.OrdinalIgnoreCase);
+            var isValid = value != null && Interpreter.ComparisonOperators.Contains(Interpreter.NormalizeComparisonOperator(value), StringComparer.OrdinalIgnoreCase);
             if (!isValid) InvalidOperators.Add(value ?? "null");
 
             return isValid;

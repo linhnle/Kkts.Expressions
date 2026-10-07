@@ -93,7 +93,7 @@ namespace Kkts.Expressions.Internal.Nodes
 			{
 				if (constant?.IsVariable == true) constant.UseNaturalType = true;
 				left = await build(Left);
-				if (Operator == Interpreter.ComparisonIn) inType = left.Type;
+				if (Interpreter.IsMembership(Operator)) inType = left.Type;
 				if (Right is ArrayList array)
 				{
 					array.Type = left.Type;
@@ -103,7 +103,7 @@ namespace Kkts.Expressions.Internal.Nodes
 				right = await build(Right);
 			}
 
-			if (Operator != Interpreter.ComparisonIn) NormalizeComparison(ref left, ref right);
+			if (!Interpreter.IsMembership(Operator)) NormalizeComparison(ref left, ref right);
 			return (left, right, inType);
 		}
 
@@ -145,7 +145,8 @@ namespace Kkts.Expressions.Internal.Nodes
 				case Interpreter.LogicalNot:
 					return left;
 				case Interpreter.ComparisonIn:
-					return Expression.Call(typeof(Enumerable), nameof(Enumerable.Contains), new[] { inType }, right, left);
+				case Interpreter.ComparisonNotIn:
+					return Interpreter.BuildMembership(left, right, inType, Operator == Interpreter.ComparisonNotIn);
 				default:
 					throw new FormatException(GetErrorMessage());
 			}

@@ -22,7 +22,7 @@ namespace Kkts.Expressions.Internal.Nodes
 			foreach (var item in StringValues)
             {
 				object value;
-				if (item.StartsWith(VariableResolver.VariablePrefixString, StringComparison.Ordinal))
+				if (item != null && item.StartsWith(VariableResolver.VariablePrefixString, StringComparison.Ordinal))
                 {
 					if (!arg.VariableResolver.TryResolve(item, out var resolved))
 					{
@@ -33,7 +33,7 @@ namespace Kkts.Expressions.Internal.Nodes
 				}
                 else
                 {
-					value = item.Cast(Type);
+					value = ((object)item).Cast(Type);
 				}
 
 				arr.SetValue(value, i++);
@@ -52,7 +52,7 @@ namespace Kkts.Expressions.Internal.Nodes
             {
 				arg.CancellationToken.ThrowIfCancellationRequested();
 				object value;
-				if (item.StartsWith(VariableResolver.VariablePrefixString, StringComparison.Ordinal))
+				if (item != null && item.StartsWith(VariableResolver.VariablePrefixString, StringComparison.Ordinal))
                 {
 					var variableInfo = await arg.VariableResolver.TryResolveAsync(item, arg.CancellationToken);
 					if (variableInfo.Resolved)
@@ -67,7 +67,7 @@ namespace Kkts.Expressions.Internal.Nodes
                 }
                 else
                 {
-					value = item.Cast(Type);
+					value = ((object)item).Cast(Type);
                 }
 				
 				arr.SetValue(value, i++);
@@ -95,6 +95,16 @@ namespace Kkts.Expressions.Internal.Nodes
 			for (var index = 0; index < drawValue.Length; ++index, ++StartIndex)
 			{
 				var c = drawValue[index];
+				if (!started && index + 4 <= drawValue.Length &&
+					string.Compare(drawValue, index, "null", 0, 4, StringComparison.OrdinalIgnoreCase) == 0 &&
+					(index + 4 == drawValue.Length || drawValue[index + 4] == ',' || drawValue[index + 4].IsWhiteSpace()))
+				{
+					StringValues.Add(null);
+					index += 3;
+					StartIndex += 3;
+					IgnoreWhiteSpaceAndComma(drawValue, ref index);
+					continue;
+				}
 				value = value ?? new StringBuilder();
 				if (StartValue(c, ref started, ref openChar, ref dotCount)) continue;
 				if (AppendEscapedCharacter(c, value, ref isSpecialChar)) continue;

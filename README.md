@@ -102,6 +102,22 @@ Expression<Func<Data, bool>> predicate = filters.BuildPredicate<Data>();
 `filters.TryBuildPredicate<Data>()` to obtain an evaluation result and inspect
 its `Succeeded` flag and diagnostics instead.
 
+In v3.0 only, exclude a set of values with the same comma-separated list
+representation as `in`:
+
+```csharp
+var filter = new Filter { Property = "Id", Operator = "not in", Value = "1, 2" };
+Expression<Func<Data, bool>> predicate = filter.BuildPredicate<Data>();
+```
+
+Direct builders in v3.0 expose the equivalent additive enum member,
+`ComparisonOperator.NotIn` (v3.0 only):
+
+```csharp
+var predicate = Interpreter.BuildPredicate<Data>(
+    "Id", ComparisonOperator.NotIn, "1, 2");
+```
+
 ### Filter groups
 
 Filters within each group are combined with AND; groups are combined with OR.
@@ -362,6 +378,21 @@ var records = context.Entities.Where(condition).ToList();
 Always check `IsValid` first; `Error` contains exceptions and evaluation
 diagnostics for an invalid condition.
 
+In v3.0 only, exclusion also works in `Where`, using the same validation pattern:
+
+```csharp
+var condition = new ConditionOptions { Where = "Id not in [1, 2]" }
+    .BuildCondition<Data>();
+
+if (!condition.IsValid)
+{
+    throw new InvalidOperationException(
+        "Invalid condition. Inspect condition.Error for details.");
+}
+
+var records = context.Entities.Where(condition).ToList();
+```
+
 ### Retrieve a page
 
 Use either offset/limit or page/page-size notation:
@@ -397,7 +428,8 @@ Use an explicit, stable sort order for predictable pagination.
 | Less than or equal | `Id <= 1` | Number, DateTime, DateTimeOffset, TimeSpan, nullable |
 | Greater than | `Id > 1` | Number, DateTime, DateTimeOffset, TimeSpan, nullable |
 | Greater than or equal | `Id >= 1` | Number, DateTime, DateTimeOffset, TimeSpan, nullable |
-| In | `Id in [1, 2, 3, 4]` or `Name in ['String1', 'String2']` | Number, string, Guid, DateTime, DateTimeOffset, TimeSpan, enum, nullable |
+| In | `Id in [1, 2, 3, 4]` or `Name in ['String1', 'String2']` | Number, string, Guid, Boolean, DateTime, DateTimeOffset, TimeSpan, enum, nullable |
+| Not in (v3.0 only) | `Id not in [1, 2]` or `Name not in ['String1', 'String2']` | Number, string, Guid, Boolean, DateTime, DateTimeOffset, TimeSpan, enum, nullable |
 | Contains | `Name.contains('Text')` or `Name @ 'Text'` | String |
 | Starts with | `Name.startsWith('Text')` or `Name @* 'Text'` | String |
 | Ends with | `Name.endsWith('Text')` or `Name *@ 'Text'` | String |
@@ -410,6 +442,25 @@ Numeric literals use invariant culture and a period as the decimal separator
 (for example, `8.3`), regardless of the current culture. When building queries
 with interpolated numeric values, use `FormattableString.Invariant`. Commas
 separate elements in `in` arrays; they are not decimal separators.
+
+**The `not in` operator and `ComparisonOperator.NotIn` apply only to v3.0**
+across predicate parsing, direct builders, structured filters, and conditions.
+
+`not in` is case-insensitive and requires one or more spaces, tabs, carriage
+returns, or newlines between its keywords. Structured filters also accept
+leading/trailing whitespace. `notin` and `!in` are not aliases.
+
+Exclusion is exactly the Boolean complement of `in`, emitted as a native
+`Not(Contains(...))` expression tree. It supports the same list-element and
+collection variables and computed left operands. A null nullable value satisfies
+`NullableInteger not in [1, 2]`, but not `NullableInteger not in [null, 1]`.
+Unquoted `null` is a null element in either membership operator; quoted `'null'`
+remains text. Boolean list values use quoted forms such as `['true', 'false']`.
+An empty list always yields true for `not in`, and duplicate elements do not
+change the result. There is no SQL-style unknown result or implicit null
+filtering. Relational translation and null behavior depend on the query
+provider; compiled LINQ and EF Core InMemory tests do not guarantee translation
+by every relational provider.
 
 ## Parsing and validation behavior
 
