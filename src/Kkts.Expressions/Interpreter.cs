@@ -87,15 +87,7 @@ namespace Kkts.Expressions
 				PropertyMapping = propertyMapping
 			});
 
-			return new EvaluationResult<T, bool>
-			{
-				Result = (Expression<Func<T, bool>>)result.Result,
-				Exception = result.Exception,
-				InvalidProperties = result.InvalidProperties,
-				InvalidVariables = result.InvalidVariables,
-				InvalidOperators = result.InvalidOperators,
-				Succeeded = result.Succeeded
-			};
+			return result.ToGeneric<T, bool>();
 		}
 
 		public static async Task<EvaluationResult<T, bool>> ParsePredicateAsync<T>(this string expression, VariableResolver variableResolver = null, IEnumerable<string> validProperties = null, IDictionary<string, string> propertyMapping = null, CancellationToken cancellationToken = default)
@@ -112,15 +104,7 @@ namespace Kkts.Expressions
 				CancellationToken = cancellationToken
 			});
 
-			return new EvaluationResult<T, bool>
-			{
-				Result = (Expression<Func<T, bool>>)result.Result,
-				Exception = result.Exception,
-				InvalidProperties = result.InvalidProperties,
-				InvalidVariables = result.InvalidVariables,
-				InvalidOperators = result.InvalidOperators,
-				Succeeded = result.Succeeded
-			};
+			return result.ToGeneric<T, bool>();
 		}
 
 		public static EvaluationResult ParsePredicate(this string expression, Type type, VariableResolver variableResolver = null, IEnumerable<string> validProperties = null, IDictionary<string, string> propertyMapping = null)
@@ -269,7 +253,7 @@ namespace Kkts.Expressions
 		{
 			if (string.IsNullOrEmpty(operatorString)) throw new ArgumentNullException(nameof(operatorString));
 
-			switch (operatorString.ToLower())
+			switch (operatorString.ToLowerInvariant())
 			{
 				case ComparisonNotEqual2:
 				case ComparisonNotEqual:

@@ -15,6 +15,6 @@ namespace Kkts.Expressions.Internal.Nodes
 		}
 
 		public override Task<Expression> BuildAsync(BuildArgument arg) =>
-			arg.BuildAdditionAsync ? Node.BuildAsync(arg) : base.BuildAsync(arg);
+			Node.BuildAsync(arg);
 	}
 }

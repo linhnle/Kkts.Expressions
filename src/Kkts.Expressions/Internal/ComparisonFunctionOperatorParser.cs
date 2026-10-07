@@ -29,7 +29,7 @@ namespace Kkts.Expressions.Internal
 
 				if (@char == Beginning)
 				{
-					var funcName = Result.ToLower();
+					var funcName = NormalizedResult;
 					_startBoby = Interpreter.ComparisonFunctionOperators.Contains(funcName);
 					if (!_startBoby)
 					{

@@ -6,6 +6,8 @@ namespace Kkts.Expressions.Internal
 	internal abstract class Parser
 	{
 		private readonly List<char> _chars = new List<char>();
+		private string _result;
+		private string _normalizedResult;
 
 		public Node BuiltNode { get; set; }
 
@@ -29,7 +31,9 @@ namespace Kkts.Expressions.Internal
 
 		public int Length => _chars.Count;
 
-		public string Result => new string(_chars.ToArray());
+		public string Result => _result ?? (_result = new string(_chars.ToArray()));
+
+		public string NormalizedResult => _normalizedResult ?? (_normalizedResult = Result.ToLowerInvariant());
 
 		public char PreviousChar => _chars.Count == 0 ? char.MinValue : _chars[_chars.Count - 1];
 		
@@ -55,11 +59,13 @@ namespace Kkts.Expressions.Internal
 		protected void Append(char @char)
 		{
 			_chars.Add(@char);
+			_result = _normalizedResult = null;
 		}
 
 		protected void Append(Parser parser)
 		{
 			_chars.AddRange(parser._chars);
+			_result = _normalizedResult = null;
 		}
 	}
 }

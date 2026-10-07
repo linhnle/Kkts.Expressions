@@ -10,7 +10,8 @@ namespace Kkts.Expressions
 {
     internal class BuildArgument
     {
-        private IDictionary<string, string> _lookup;
+        private IReadOnlyDictionary<string, string> _lookup;
+        private HashSet<string> _nestedProperties;
         private Type _evaluationType;
         private IDictionary<string, string> _mapping;
         private Func<string, string> _evaluateMapping;
@@ -35,13 +36,14 @@ namespace Kkts.Expressions
         {
             set
             {
-                if (value == null || !value.Any())
+                var lookup = value?.ToDictionary(k => k, StringComparer.OrdinalIgnoreCase);
+                if (lookup == null || lookup.Count == 0)
                 {
                     _evaluateValidProperty = TryEvaluateValidProperty;
                 }
                 else
                 {
-                    _lookup = value?.ToDictionary(k => k, StringComparer.OrdinalIgnoreCase);
+                    _lookup = lookup;
                     _evaluateValidProperty = IsExactValidProperty;
                 }
             }
@@ -53,7 +55,7 @@ namespace Kkts.Expressions
             set
             {
                 _evaluationType = value;
-                if (_lookup?.Any() == true) return;
+                if (_lookup?.Count > 0) return;
                 ImportValidProperties();
                 _evaluateValidProperty = TryEvaluateValidProperty;
             }
@@ -70,7 +72,6 @@ namespace Kkts.Expressions
         public readonly ICollection<string> InvalidOrderByDirections = new List<string>();
 
         public CancellationToken CancellationToken { get; set; } = CancellationToken.None;
-        public bool BuildAdditionAsync { get; set; }
 
         public IDictionary<string, string> PropertyMapping
         {
@@ -101,7 +102,7 @@ namespace Kkts.Expressions
 
         public bool IsValidOperator(string value)
         {
-            var isValid = value != null && Interpreter.ComparisonOperators.Contains(value.ToLower());
+            var isValid = value != null && Interpreter.ComparisonOperators.Contains(value, StringComparer.OrdinalIgnoreCase);
             if (!isValid) InvalidOperators.Add(value ?? "null");
 
             return isValid;
@@ -109,7 +110,7 @@ namespace Kkts.Expressions
 
         public bool IsValidOrderByDirection(string value)
         {
-            var isValid = value != null && OrderByParser.Options.Contains(value.ToLower());
+            var isValid = value != null && OrderByParser.Options.Contains(value, StringComparer.OrdinalIgnoreCase);
             if (!isValid) InvalidOrderByDirections.Add(value ?? "null");
 
             return isValid;
@@ -127,12 +128,12 @@ namespace Kkts.Expressions
         {
             if (value == null) return false;
             value = MapProperty(value);
-            var isValid = _lookup.ContainsKey(value);
+            var isValid = _lookup.ContainsKey(value) || _nestedProperties?.Contains(value) == true;
             if (isValid) return true;
 
             if (value.Contains('.') && _evaluationType != null)
             {
-                _lookup = _lookup ?? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                _nestedProperties = _nestedProperties ?? new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 var segments = value.Split('.');
                 Type type = null;
                 var parentProp = string.Empty;
@@ -154,11 +155,10 @@ namespace Kkts.Expressions
                             propertyExpression = Expression.PropertyOrField(propertyExpression, segment);
                             type = GetMemberType(propertyExpression.Member);
                             parentProp = $"{parentProp}.{segment}";
-                            if (_lookup.ContainsKey(parentProp)) continue;
-                            _lookup[parentProp] = parentProp;
+                            _nestedProperties.Add(parentProp);
                         }
                     }
-                    catch (Exception)
+                    catch (ArgumentException)
                     {
                         hasException = true;
                         break;
@@ -167,7 +167,7 @@ namespace Kkts.Expressions
 
                 if (!hasException)
                 {
-                    isValid = _lookup?.ContainsKey(value.ToLower()) == true;
+                    isValid = _nestedProperties.Contains(value);
                 }
             }
 
@@ -176,9 +176,7 @@ namespace Kkts.Expressions
 
         private void ImportValidProperties()
         {
-            _lookup = _evaluationType.GetMembers(BindingFlags.Public | BindingFlags.Instance)
-                .Where(p => p is PropertyInfo pi && pi.CanRead || p is FieldInfo)
-                .ToDictionary(k => k.Name, v => v.Name, StringComparer.OrdinalIgnoreCase);
+            _lookup = PropertyMetadata.GetPropertyNames(_evaluationType);
         }
 
         private Type GetMemberType(MemberInfo memberInfo)
@@ -201,9 +199,9 @@ namespace Kkts.Expressions
 
         private string PartialMap(string prop)
         {
-            if (_mapping.ContainsKey(prop))
+            if (_mapping.TryGetValue(prop, out var mapped))
             {
-                return _mapping[prop];
+                return mapped;
             }
 
             return prop;

@@ -27,6 +27,11 @@ namespace Kkts.Expressions.Internal
 			{
 				if (@char == '.')
 				{
+					if (_nestedParser != null)
+					{
+						Append('.');
+						Append(_nestedParser);
+					}
 					_nestedParser = new PropertyParser();
 					return true;
 				}
@@ -116,7 +121,7 @@ namespace Kkts.Expressions.Internal
 
 		public override bool Validate()
 		{
-			var result = Result;
+			var result = NormalizedResult;
 
 			IsNull = result == KeyWordNull;
 			IsBoolean = result == KeyWordFalse || result == KeyWordTrue;

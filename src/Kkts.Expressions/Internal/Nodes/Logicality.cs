@@ -15,7 +15,6 @@ namespace Kkts.Expressions.Internal.Nodes
 
 		public override Expression Build(BuildArgument arg)
 		{
-			Operator = Operator.ToLower();
 			switch (Operator) 
 			{
 				case Interpreter.LogicalAnd:
@@ -25,14 +24,14 @@ namespace Kkts.Expressions.Internal.Nodes
 				case Interpreter.LogicalOr2:
 					return Expression.OrElse(Left.Build(arg), Right.Build(arg));
 				default:
-					return null;
+					throw new FormatException(GetErrorMessage());
 			}
 
 		}
 
 		public override async Task<Expression> BuildAsync(BuildArgument arg)
 		{
-			if (!arg.BuildAdditionAsync) return await base.BuildAsync(arg);
+			arg.CancellationToken.ThrowIfCancellationRequested();
 			var left = await Left.BuildAsync(arg);
 			var right = await Right.BuildAsync(arg);
 			switch (Operator)

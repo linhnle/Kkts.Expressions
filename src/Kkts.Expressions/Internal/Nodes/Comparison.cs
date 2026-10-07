@@ -21,7 +21,8 @@ namespace Kkts.Expressions.Internal.Nodes
 
 		public override Task<Expression> BuildAsync(BuildArgument arg)
 		{
-			return arg.BuildAdditionAsync ? BuildCore(arg, node => node.BuildAsync(arg)) : base.BuildAsync(arg);
+			arg.CancellationToken.ThrowIfCancellationRequested();
+			return BuildCore(arg, node => node.BuildAsync(arg));
 		}
 
 		private async Task<Expression> BuildCore(BuildArgument arg, Func<Node, Task<Expression>> build)
@@ -148,6 +149,10 @@ namespace Kkts.Expressions.Internal.Nodes
 					default:
 						throw new FormatException(GetErrorMessage());
 				}
+			}
+			catch (OperationCanceledException)
+			{
+				throw;
 			}
 			catch (Exception ex)
 			{

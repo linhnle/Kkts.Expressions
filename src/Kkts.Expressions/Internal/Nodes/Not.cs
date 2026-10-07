@@ -25,8 +25,20 @@ namespace Kkts.Expressions.Internal.Nodes
 
 		public override async Task<Expression> BuildAsync(BuildArgument arg)
 		{
-			if (!arg.BuildAdditionAsync) return await base.BuildAsync(arg);
-			return Expression.Not(await Node.BuildAsync(arg));
+			arg.CancellationToken.ThrowIfCancellationRequested();
+			if (Node == null) throw new FormatException(GetErrorMessage());
+			try
+			{
+				return Expression.Not(await Node.BuildAsync(arg));
+			}
+			catch (OperationCanceledException)
+			{
+				throw;
+			}
+			catch (Exception ex)
+			{
+				throw new FormatException(GetErrorMessage(), ex);
+			}
 		}
 	}
 }

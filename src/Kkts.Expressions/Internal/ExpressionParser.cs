@@ -15,7 +15,7 @@ namespace Kkts.Expressions.Internal
 				 (t, p) => t == typeof(NotOperatorParser) || t == typeof(NotFunctionParser) || t == typeof(GroupParser) || t == typeof(ComparisonFunctionOperatorParser),
 				 (t, p) => t == typeof(AdditionOperatorParser),
 				 (t, p) => t == typeof(ComparisonOparatorParser),
-				 (t, p) => t == typeof(LogicalOperatorParser) && GetStandardOperator(p.Result) == Interpreter.LogicalAnd,
+				 (t, p) => t == typeof(LogicalOperatorParser) && GetStandardOperator(p.NormalizedResult) == Interpreter.LogicalAnd,
 				 (t, p) => t == typeof(LogicalOperatorParser)
 			};
 
@@ -37,7 +37,7 @@ namespace Kkts.Expressions.Internal
 				}
 
 				var body = rootNode.Build(arg);
-				if (rootNode.ContainsAddition && body.Type != typeof(bool))
+				if (body.Type != typeof(bool))
 					throw new FormatException("A predicate must have a Boolean result.");
 
 				return new EvaluationResult
@@ -63,6 +63,7 @@ namespace Kkts.Expressions.Internal
 		{
 			try
 			{
+				arg.CancellationToken.ThrowIfCancellationRequested();
 				var param = type.CreateParameterExpression();
 				var rootNode = Parse(new ExpressionReader(expression), param, arg);
 				if (arg.InvalidProperties.Count > 0 || arg.InvalidVariables.Count > 0)
@@ -76,10 +77,9 @@ namespace Kkts.Expressions.Internal
 					};
 				}
 
-				var containsAddition = rootNode.ContainsAddition;
-				arg.BuildAdditionAsync = containsAddition;
+				arg.CancellationToken.ThrowIfCancellationRequested();
 				var body = await rootNode.BuildAsync(arg);
-				if (containsAddition && body.Type != typeof(bool))
+				if (body.Type != typeof(bool))
 					throw new FormatException("A predicate must have a Boolean result.");
 
 				return new EvaluationResult
@@ -350,7 +350,7 @@ namespace Kkts.Expressions.Internal
 			{
 				Left = left,
 				Right = right,
-				Operator = GetStandardOperator(parser.Result),
+				Operator = GetStandardOperator(parser.NormalizedResult),
 				StartIndex = parser.StartIndex,
 				StartChar = parser.StartChar
 			};
@@ -365,7 +365,7 @@ namespace Kkts.Expressions.Internal
 			{
 				Left = list[writeIndex - 1].BuiltNode,
 				Right = BuildNode(param, parser.Body, arg),
-				Operator = GetStandardOperator(parser.Result),
+				Operator = GetStandardOperator(parser.NormalizedResult),
 				StartIndex = parser.StartIndex,
 				StartChar = parser.StartChar
 			};
@@ -389,7 +389,7 @@ namespace Kkts.Expressions.Internal
 			}
 			else if (parser.IsBoolean)
 			{
-				builtNode = new Constant { Value = result.ToLower(), Type = typeof(bool), StartIndex = parser.StartIndex, StartChar = parser.StartChar };
+				builtNode = new Constant { Value = parser.NormalizedResult, Type = typeof(bool), StartIndex = parser.StartIndex, StartChar = parser.StartChar };
 			}
 			else if (parser.IsVariable)
 			{
@@ -430,7 +430,7 @@ namespace Kkts.Expressions.Internal
 			{
 				Left = left,
 				Right = right,
-				Operator = GetStandardOperator(parser.Result),
+				Operator = GetStandardOperator(parser.NormalizedResult),
 				StartIndex = parser.StartIndex,
 				StartChar = parser.StartChar
 			};
@@ -454,7 +454,6 @@ namespace Kkts.Expressions.Internal
 
 		private static string GetStandardOperator(string op)
 		{
-			op = op.ToLower();
 			switch (op)
 			{
 				case Interpreter.LogicalAnd2:

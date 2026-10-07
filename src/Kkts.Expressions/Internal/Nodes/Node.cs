@@ -11,7 +11,11 @@ namespace Kkts.Expressions.Internal.Nodes
 		public virtual bool IsConstantValue => false;
 		public abstract Expression Build(BuildArgument arg);
 
-		public virtual Task<Expression> BuildAsync(BuildArgument arg) => Task.FromResult(Build(arg));
+		public virtual Task<Expression> BuildAsync(BuildArgument arg)
+		{
+			arg.CancellationToken.ThrowIfCancellationRequested();
+			return Task.FromResult(Build(arg));
+		}
 
 		public string GetErrorMessage()
 		{

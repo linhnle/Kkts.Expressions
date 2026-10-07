@@ -75,7 +75,7 @@ namespace Kkts.Expressions.Internal
 
 		public override IList<Parser> GetNextParsers(char @char)
 		{
-			var opa = Result.ToLower();
+			var opa = NormalizedResult;
 
             if (!Interpreter.ComparisonOperators.Contains(opa))
 			{
@@ -104,7 +104,7 @@ namespace Kkts.Expressions.Internal
 
 		public override bool Validate()
 		{
-			var result = Result.ToLower();
+			var result = NormalizedResult;
 
 			var valid = Interpreter.ComparisonOperators.Contains(result);
 

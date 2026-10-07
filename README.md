@@ -11,8 +11,29 @@ trims the unused tail once. Parser entries are never marked as consumed with
 `null`, and long operator chains do not require repeated list shifts. This
 avoids per-character candidate-list allocations and intermediate collections
 without changing operator precedence, validation, or variable resolution.
-Buffers are local to each parse; expressions and resolved variable values are
-not cached across calls.
+Buffers and token-text caches are local to each parse. Read-only property-name
+metadata is shared by entity type, while property mappings, whitelists, nested
+path validation, and diagnostics remain local to the call. Expressions and
+resolved variable values are not cached by the parser across calls; a supplied
+`VariableResolver` retains its own value cache.
+
+### Parsing behavior
+- Every predicate must return `bool`. Numeric or string-only expressions return
+  an unsuccessful evaluation result with a `FormatException`, including through
+  generic overloads.
+- Operators and keywords are case-insensitive and independent of the current
+  culture. String values are not normalized.
+- Each `!` is a separate negation: `!!IsEnabled` is equivalent to
+  `!(!IsEnabled)`.
+- Generic and runtime-type parsing results retain the same validation
+  diagnostics, including `InvalidValues`.
+- Async parsing awaits variable resolution for all expression shapes, not only
+  expressions containing addition. Cancellation is captured as an unsuccessful
+  evaluation result whose `Exception` is an `OperationCanceledException` or a
+  derived exception; it is not reported as an invalid value.
+- Nested variable paths can traverse properties and fields at multiple levels.
+  A missing member or null intermediate value is unresolved; exceptions thrown
+  by getters are surfaced rather than silently treated as missing variables.
 
 ### Sample class
 ``` csharp

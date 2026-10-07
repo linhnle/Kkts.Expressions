@@ -112,7 +112,7 @@ namespace Kkts.Expressions.Internal
 				};
 
 			bool IsDescending(string[] parts)
-				=> parts.Length >= 2 && DescendingOptions.Contains(parts[1].ToLower());
+				=> parts.Length >= 2 && DescendingOptions.Contains(parts[1], StringComparer.OrdinalIgnoreCase);
 		}
 
 	}

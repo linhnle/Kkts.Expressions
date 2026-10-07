@@ -22,12 +22,14 @@ namespace Kkts.Expressions.Internal.Nodes
 			foreach (var item in StringValues)
             {
 				object value;
-				if (item.StartsWith(VariableResolver.VariablePrefixString))
+				if (item.StartsWith(VariableResolver.VariablePrefixString, StringComparison.Ordinal))
                 {
-					value = arg.VariableResolver.TryResolve(item, out var v)
-						? v.Cast(Type)
-						: throw new FormatException($"Invalid variable, name {item}");
-
+					if (!arg.VariableResolver.TryResolve(item, out var resolved))
+					{
+						arg.InvalidVariables.Add(item);
+						throw new FormatException($"Invalid variable, name {item}");
+					}
+					value = resolved.Cast(Type);
 				}
                 else
                 {
@@ -42,13 +44,15 @@ namespace Kkts.Expressions.Internal.Nodes
 
 		public override async Task<Expression> BuildAsync(BuildArgument arg)
 		{
+			arg.CancellationToken.ThrowIfCancellationRequested();
 			ParseValues();
 			var arr = Array.CreateInstance(Type, StringValues.Count);
 			var i = 0;
 			foreach (var item in StringValues)
             {
+				arg.CancellationToken.ThrowIfCancellationRequested();
 				object value;
-				if (item.StartsWith(VariableResolver.VariablePrefixString))
+				if (item.StartsWith(VariableResolver.VariablePrefixString, StringComparison.Ordinal))
                 {
 					var variableInfo = await arg.VariableResolver.TryResolveAsync(item, arg.CancellationToken);
 					if (variableInfo.Resolved)

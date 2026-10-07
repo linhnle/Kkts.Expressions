@@ -37,6 +37,7 @@ namespace Kkts.Expressions.Internal.Nodes
 
 		public override async Task<Expression> BuildAsync(BuildArgument arg)
         {
+			arg.CancellationToken.ThrowIfCancellationRequested();
 			try
 			{
 				if (IsVariable)
@@ -47,6 +48,10 @@ namespace Kkts.Expressions.Internal.Nodes
 				}
 
 				return BuildValue();
+			}
+			catch (OperationCanceledException)
+			{
+				throw;
 			}
 			catch (Exception ex)
 			{

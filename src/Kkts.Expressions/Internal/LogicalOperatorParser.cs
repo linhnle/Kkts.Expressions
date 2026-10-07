@@ -96,7 +96,7 @@ namespace Kkts.Expressions.Internal
 		}
 		public override bool Validate()
 		{
-			var result = Result.ToLower();
+			var result = NormalizedResult;
 
 			var valid = Oparators.Contains(result);
 
