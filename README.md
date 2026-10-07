@@ -2,6 +2,18 @@
 Build string expression to lambda expression to support dynamic query from UI
 
 get via nuget **[Kkts.Expressions](https://www.nuget.org/packages/Kkts.Expressions)** 
+
+### Parser performance
+Synchronous and asynchronous predicate parsing reuse per-call candidate buffers
+and build token chains directly in lists. Each precedence pass uses read/write
+cursors to replace consumed operands with their operator's built node, then
+trims the unused tail once. Parser entries are never marked as consumed with
+`null`, and long operator chains do not require repeated list shifts. This
+avoids per-character candidate-list allocations and intermediate collections
+without changing operator precedence, validation, or variable resolution.
+Buffers are local to each parse; expressions and resolved variable values are
+not cached across calls.
+
 ### Sample class
 ``` csharp
 class Data

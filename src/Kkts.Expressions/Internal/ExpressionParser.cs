@@ -1,7 +1,6 @@
 ﻿using Kkts.Expressions.Internal.Nodes;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Linq.Expressions;
 using System.Threading.Tasks;
 
@@ -77,9 +76,10 @@ namespace Kkts.Expressions.Internal
 					};
 				}
 
-				arg.BuildAdditionAsync = rootNode.ContainsAddition;
+				var containsAddition = rootNode.ContainsAddition;
+				arg.BuildAdditionAsync = containsAddition;
 				var body = await rootNode.BuildAsync(arg);
-				if (rootNode.ContainsAddition && body.Type != typeof(bool))
+				if (containsAddition && body.Type != typeof(bool))
 					throw new FormatException("A predicate must have a Boolean result.");
 
 				return new EvaluationResult
@@ -104,6 +104,7 @@ namespace Kkts.Expressions.Internal
 		private static Node Parse(ExpressionReader reader, ParameterExpression parameter, BuildArgument arg)
 		{
 			var acceptedParsers = GetBeginningParsers();
+			var nextAcceptedParsers = new List<Parser>(acceptedParsers.Count);
 			var keepTrack = false;
 			var groups = new Stack<Parser>();
 			reader.IgnoreWhiteSpace();
@@ -115,7 +116,9 @@ namespace Kkts.Expressions.Internal
 				if (!keepTrack) noOfWhiteSpaceIgnored = reader.IgnoreWhiteSpace();
 				var c = reader.Read();
 				var parsers = acceptedParsers;
-				acceptedParsers = new List<Parser>();
+				acceptedParsers = nextAcceptedParsers;
+				acceptedParsers.Clear();
+				nextAcceptedParsers = parsers;
 				var isStartGroup = false;
 				Parser group = null;
 				var currentIndex = reader.CurrentIndex;
@@ -162,7 +165,8 @@ namespace Kkts.Expressions.Internal
 					if (group != null)
 					{
 						groups.Push(group);
-						acceptedParsers = group.GetNextParsers(c);
+						acceptedParsers.Clear();
+						acceptedParsers.AddRange(group.GetNextParsers(c));
 					}
 				}
 
@@ -172,7 +176,7 @@ namespace Kkts.Expressions.Internal
 					{
 						if (reader.HasNext)
 						{
-							acceptedParsers = group.GetNextParsers(c);
+							acceptedParsers.AddRange(group.GetNextParsers(c));
 						}
 						else
 						{
@@ -214,19 +218,20 @@ namespace Kkts.Expressions.Internal
 
 		private static List<Parser> BuildChain(Parser root, Parser last)
 		{
-			var chain = new LinkedList<Parser>();
+			var chain = new List<Parser>();
 			do
 			{
-				chain.AddFirst(last);
+				chain.Add(last);
 				var tmp = last;
 				last = last.Previous;
 				tmp.Previous = null;
 			} while (last != root);
 
-			return chain.ToList();
+			chain.Reverse();
+			return chain;
 		}
 
-		private static IList<Parser> GetBeginningParsers()
+		private static List<Parser> GetBeginningParsers()
 		{
 			return new List<Parser>
 			{
@@ -243,27 +248,25 @@ namespace Kkts.Expressions.Internal
 		{
 			foreach (var step in BuildSteps)
 			{
+				// The written prefix holds reduced operands; the unread suffix stays intact.
+				var writeIndex = 0;
 				for (var index = 0; index < parsers.Count; ++index)
 				{
 					var parser = parsers[index];
-					if (parsers[index] != null && step(parser.GetType(), parser))
+					if (step(parser.GetType(), parser))
 					{
-						BuildNode(param, parser, parsers, ref index, arg);
-						if (parser is AdditionOperatorParser)
-						{
-							parsers = parsers.Where(p => p != null).ToList();
-							index = parsers.IndexOf(parser);
-						}
+						BuildNode(param, parser, parsers, ref index, ref writeIndex, arg);
 					}
+					parsers[writeIndex++] = parser;
 				}
 
-				parsers = parsers.Where(p => p != null).ToList();
+				parsers.RemoveRange(writeIndex, parsers.Count - writeIndex);
 			}
 
 			return parsers[0].BuiltNode;
 		}
 
-		private static Node BuildNode(ParameterExpression param, Parser parser, List<Parser> list, ref int currentIndex, BuildArgument arg)
+		private static Node BuildNode(ParameterExpression param, Parser parser, List<Parser> list, ref int currentIndex, ref int writeIndex, BuildArgument arg)
 		{
 			switch (parser)
 			{
@@ -274,48 +277,57 @@ namespace Kkts.Expressions.Internal
 				case NumberParser np:
 					return BuildNode(np);
 				case NotOperatorParser nop:
-					return BuildNode(param, nop, list, ref currentIndex, arg);
+					return BuildNode(param, nop, list, ref currentIndex, ref writeIndex, arg);
 				case NotFunctionParser nfp:
 					return BuildNode(param, nfp, arg);
 				case LogicalOperatorParser lop:
-					return BuildNode(param, lop, list, ref currentIndex, arg);
+					return BuildNode(lop, list, ref currentIndex, ref writeIndex);
 				case GroupParser gp:
 					return BuildNode(param, gp, arg);
 				case ComparisonOparatorParser cop:
-					return BuildNode(param, cop, list, ref currentIndex, arg);
+					return BuildNode(cop, list, ref currentIndex, ref writeIndex);
 				case ComparisonFunctionOperatorParser cfop:
-					return BuildNode(param, cfop, list, ref currentIndex, arg);
+					return BuildNode(param, cfop, list, ref writeIndex, arg);
 				case ArrayParser ap:
 					return BuildNode(ap);
 				case AdditionOperatorParser addition:
-					return BuildNode(addition, list, currentIndex);
-				default: return null;
+					return BuildNode(addition, list, ref currentIndex, ref writeIndex);
+				default:
+					throw new FormatException($"Incorrect syntax near '{parser.Result}', index {parser.StartIndex}");
 			}
 
 		}
 
-		private static Node BuildNode(AdditionOperatorParser parser, List<Parser> list, int index)
+		private static void ReadBinaryOperands(Parser parser, List<Parser> list, ref int currentIndex, ref int writeIndex, out Node left, out Node right)
+		{
+			if (writeIndex == 0 || currentIndex + 1 >= list.Count)
+				throw new FormatException($"Incorrect syntax near '{parser.Result}', index {parser.StartIndex}");
+
+			left = list[writeIndex - 1].BuiltNode;
+			right = list[currentIndex + 1].BuiltNode;
+			if (left == null || right == null)
+				throw new FormatException($"Incorrect syntax near '{parser.Result}', index {parser.StartIndex}");
+
+			--writeIndex;
+			++currentIndex;
+		}
+
+		private static Node BuildNode(AdditionOperatorParser parser, List<Parser> list, ref int currentIndex, ref int writeIndex)
 		{
 			if (parser.BuiltNode != null) return parser.BuiltNode;
-			var left = list[index - 1].BuiltNode;
-			var right = list[index + 1].BuiltNode;
-			if (left == null || right == null) throw new FormatException($"Incorrect syntax near '+', index {parser.StartIndex}");
+			ReadBinaryOperands(parser, list, ref currentIndex, ref writeIndex, out var left, out var right);
 			parser.BuiltNode = new Addition
 			{
 				Left = left, Right = right, StartIndex = parser.StartIndex, StartChar = '+'
 			};
-			list[index - 1] = null;
-			list[index + 1] = null;
 			return parser.BuiltNode;
 		}
 
-		private static Node BuildNode(ParameterExpression param, NotOperatorParser parser, List<Parser> list, ref int currentIndex, BuildArgument arg)
+		private static Node BuildNode(ParameterExpression param, NotOperatorParser parser, List<Parser> list, ref int currentIndex, ref int writeIndex, BuildArgument arg)
 		{
 			if (parser.BuiltNode != null) return parser.BuiltNode;
-			var index = currentIndex;
 			var nextParser = list[++currentIndex];
-			var result = new Not { Node = BuildNode(param, nextParser, list, ref currentIndex, arg), StartIndex = parser.StartIndex, StartChar = '!' };
-			list[index + 1] = null;
+			var result = new Not { Node = BuildNode(param, nextParser, list, ref currentIndex, ref writeIndex, arg), StartIndex = parser.StartIndex, StartChar = '!' };
 			parser.BuiltNode = result;
 
 			return result;
@@ -330,38 +342,35 @@ namespace Kkts.Expressions.Internal
 			return result;
 		}
 
-		private static Node BuildNode(ParameterExpression param, ComparisonOparatorParser parser, List<Parser> list, ref int currentIndex, BuildArgument arg)
+		private static Node BuildNode(ComparisonOparatorParser parser, List<Parser> list, ref int currentIndex, ref int writeIndex)
 		{
 			if (parser.BuiltNode != null) return parser.BuiltNode;
+			ReadBinaryOperands(parser, list, ref currentIndex, ref writeIndex, out var left, out var right);
 			var result = new Comparison
 			{
-				Left = BuildNode(param, list[currentIndex - 1], list, ref currentIndex, arg),
-				Right = BuildNode(param, list[currentIndex + 1], list, ref currentIndex, arg),
+				Left = left,
+				Right = right,
 				Operator = GetStandardOperator(parser.Result),
 				StartIndex = parser.StartIndex,
 				StartChar = parser.StartChar
 			};
 			parser.BuiltNode = result;
-			list[currentIndex - 1] = null;
-			list[currentIndex + 1] = null;
-			++currentIndex;
-
 			return result;
 		}
 
-		private static Node BuildNode(ParameterExpression param, ComparisonFunctionOperatorParser parser, List<Parser> list, ref int currentIndex, BuildArgument arg)
+		private static Node BuildNode(ParameterExpression param, ComparisonFunctionOperatorParser parser, List<Parser> list, ref int writeIndex, BuildArgument arg)
 		{
 			if (parser.BuiltNode != null) return parser.BuiltNode;
 			var result = new Comparison
 			{
-				Left = BuildNode(param, list[currentIndex - 1], list, ref currentIndex, arg),
+				Left = list[writeIndex - 1].BuiltNode,
 				Right = BuildNode(param, parser.Body, arg),
 				Operator = GetStandardOperator(parser.Result),
 				StartIndex = parser.StartIndex,
 				StartChar = parser.StartChar
 			};
 			parser.BuiltNode = result;
-			list[currentIndex - 1] = null;
+			--writeIndex;
 
 			return result;
 		}
@@ -413,23 +422,19 @@ namespace Kkts.Expressions.Internal
 			return parser.BuiltNode ?? (parser.BuiltNode = new Constant { Value = parser.Result, StartIndex = parser.StartIndex, StartChar = parser.StartChar });
 		}
 
-		private static Node BuildNode(ParameterExpression param, LogicalOperatorParser parser, List<Parser> list, ref int currentIndex, BuildArgument arg)
+		private static Node BuildNode(LogicalOperatorParser parser, List<Parser> list, ref int currentIndex, ref int writeIndex)
 		{
 			if (parser.BuiltNode != null) return parser.BuiltNode;
+			ReadBinaryOperands(parser, list, ref currentIndex, ref writeIndex, out var left, out var right);
 			var result = new Logicality
 			{
-				Left = BuildNode(param, list[currentIndex - 1], list, ref currentIndex, arg),
-				Right = BuildNode(param, list[currentIndex + 1], list, ref currentIndex, arg),
+				Left = left,
+				Right = right,
 				Operator = GetStandardOperator(parser.Result),
 				StartIndex = parser.StartIndex,
 				StartChar = parser.StartChar
 			};
 			parser.BuiltNode = result;
-			list[currentIndex - 1] = null;
-			list[currentIndex] = null;
-			list[currentIndex + 1] = parser;
-			++currentIndex;
-
 			return result;
 		}
 
