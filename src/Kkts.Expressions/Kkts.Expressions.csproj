@@ -2,8 +2,8 @@
 
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
-    <Copyright>Copyright (C) 2016-2023 KKTS Ltd.</Copyright>
-    <Version>2.0.1</Version>
+    <Copyright>Copyright (C) 2016-2026 KKTS Ltd.</Copyright>
+    <Version>3.0.0-preview.1</Version>
     <Authors>Linh Le</Authors>
     <Product>Dynamic Expression</Product>
     <Company>KKTS Ltd.</Company>
