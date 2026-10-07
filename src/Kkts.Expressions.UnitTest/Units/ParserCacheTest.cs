@@ -114,6 +114,44 @@ namespace Kkts.Expressions.UnitTest.Units
             Assert.False(argument.IsValidProperty("String"));
         }
 
+        [Fact]
+        public void BuildArgument_GettersExposeEffectiveConfiguration()
+        {
+            var argument = new BuildArgument();
+            Assert.Null(argument.ValidProperties);
+            Assert.Null(argument.PropertyMapping);
+
+            argument.EvaluationType = typeof(TestEntity);
+            Assert.Contains("Integer", argument.ValidProperties);
+
+            argument.ValidProperties = new[] { "String" };
+            Assert.Equal(new[] { "String" }, argument.ValidProperties);
+
+            var mapping = new Dictionary<string, string> { ["alias"] = "String" };
+            argument.PropertyMapping = mapping;
+            Assert.NotSame(mapping, argument.PropertyMapping);
+            Assert.Equal("String", argument.PropertyMapping["ALIAS"]);
+
+            argument.PropertyMapping = new Dictionary<string, string>();
+            Assert.Null(argument.PropertyMapping);
+            Assert.Equal("alias", argument.MapProperty("alias"));
+        }
+
+        [Theory]
+        [InlineData("Parent.Id", true)]
+        [InlineData("parent.id", true)]
+        [InlineData("Parent.Missing", false)]
+        [InlineData("Missing.Id", false)]
+        [InlineData("Parent.Id.Missing", false)]
+        [InlineData("Parent..Id", false)]
+        public void BuildArgument_NestedPropertyValidationPreservesResults(string property, bool expected)
+        {
+            var argument = new BuildArgument { EvaluationType = typeof(TestEntity) };
+            Assert.Equal(expected, argument.IsValidProperty(property));
+            Assert.Equal(expected, argument.IsValidProperty(property));
+            Assert.True(argument.IsValidProperty("Parent.Id"));
+        }
+
         private static int CountCachedProperties()
         {
             var count = 0;

@@ -121,14 +121,20 @@ namespace Kkts.Expressions.UnitTest.Units
             {
                 var cells = rows[i].Split(' ');
                 for (var j = 0; j < names.Length; ++j)
-                    foreach (var leftNullable in new[] { false, true })
-                        foreach (var rightNullable in new[] { false, true })
-                            yield return new object[]
-                            {
-                                (leftNullable ? "N" : "P") + names[i], (rightNullable ? "N" : "P") + names[j],
-                                types[cells[j]], leftNullable || rightNullable
-                            };
+                    foreach (var pair in NullableNumericPairs(names[i], names[j], types[cells[j]]))
+                        yield return pair;
             }
+        }
+
+        private static IEnumerable<object[]> NullableNumericPairs(string left, string right, Type type)
+        {
+            foreach (var leftNullable in new[] { false, true })
+                foreach (var rightNullable in new[] { false, true })
+                    yield return new object[]
+                    {
+                        (leftNullable ? "N" : "P") + left, (rightNullable ? "N" : "P") + right,
+                        type, leftNullable || rightNullable
+                    };
         }
 
         [Theory]
@@ -136,43 +142,46 @@ namespace Kkts.Expressions.UnitTest.Units
         public async Task ParsePredicate_Plus_NumericPairMatrix(string left, string right, Type expected, bool nullable)
         {
             var entity = new PlusEntity();
-            foreach (var name in new[] { left, right })
-            {
-                var property = typeof(PlusEntity).GetProperty(name);
-                var type = Nullable.GetUnderlyingType(property.PropertyType) ?? property.PropertyType;
-                property.SetValue(entity, type == typeof(char) ? (object)(char)1 : Convert.ChangeType(1, type));
-            }
+            SetNumericOperands(entity, new[] { left, right });
             var query = $"{left} + {right} = 2";
             var sync = Interpreter.ParsePredicate<PlusEntity>(query);
             var asyncResult = await Interpreter.ParsePredicateAsync<PlusEntity>(query);
             foreach (var result in new[] { sync, asyncResult })
             {
-                if (expected == null)
-                {
-                    Assert.False(result.Succeeded);
-                    Assert.Contains("+", result.InvalidOperators);
-                    continue;
-                }
-                Assert.True(result.Succeeded, result.Exception?.ToString());
-                var sum = Assert.IsAssignableFrom<BinaryExpression>(((BinaryExpression)result.Result.Body).Left);
-                Assert.Equal(ExpressionType.Add, sum.NodeType);
-                Assert.Equal(nullable ? typeof(Nullable<>).MakeGenericType(expected) : expected, sum.Type);
-                var inspector = new PlusTreeInspector();
-                inspector.Visit(result.Result);
-                Assert.False(inspector.HasInvocation);
-                Assert.True(result.Result.Compile()(entity));
-                if (nullable)
-                {
-                    typeof(PlusEntity).GetProperty(left.StartsWith("N") ? left : right).SetValue(entity, null);
-                    Assert.False(result.Result.Compile()(entity));
-                    foreach (var name in new[] { left, right }.Where(n => n.StartsWith("N")))
-                    {
-                        var p = typeof(PlusEntity).GetProperty(name);
-                        var t = Nullable.GetUnderlyingType(p.PropertyType);
-                        p.SetValue(entity, t == typeof(char) ? (object)(char)1 : Convert.ChangeType(1, t));
-                    }
-                }
+                AssertNumericPair(result, entity, left, right, expected, nullable);
             }
+        }
+
+        private static void SetNumericOperands(PlusEntity entity, IEnumerable<string> names)
+        {
+            foreach (var name in names)
+            {
+                var property = typeof(PlusEntity).GetProperty(name);
+                var type = Nullable.GetUnderlyingType(property.PropertyType) ?? property.PropertyType;
+                property.SetValue(entity, type == typeof(char) ? (object)(char)1 : Convert.ChangeType(1, type));
+            }
+        }
+
+        private static void AssertNumericPair(EvaluationResult<PlusEntity, bool> result, PlusEntity entity, string left, string right, Type expected, bool nullable)
+        {
+            if (expected == null)
+            {
+                Assert.False(result.Succeeded);
+                Assert.Contains("+", result.InvalidOperators);
+                return;
+            }
+            Assert.True(result.Succeeded, result.Exception?.ToString());
+            var sum = Assert.IsAssignableFrom<BinaryExpression>(((BinaryExpression)result.Result.Body).Left);
+            Assert.Equal(ExpressionType.Add, sum.NodeType);
+            Assert.Equal(nullable ? typeof(Nullable<>).MakeGenericType(expected) : expected, sum.Type);
+            var inspector = new PlusTreeInspector();
+            inspector.Visit(result.Result);
+            Assert.False(inspector.HasInvocation);
+            Assert.True(result.Result.Compile()(entity));
+            if (!nullable) return;
+            typeof(PlusEntity).GetProperty(left.StartsWith('N') ? left : right).SetValue(entity, null);
+            Assert.False(result.Result.Compile()(entity));
+            SetNumericOperands(entity, new[] { left, right }.Where(name => name.StartsWith('N')));
         }
 
         [Theory]
@@ -249,7 +258,7 @@ namespace Kkts.Expressions.UnitTest.Units
             try
             {
                 CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo("fr-FR");
-                var entity = new PlusEntity { PDouble = 1.5, DateTime = new DateTime(2026, 1, 2), Option = TestOptions.Option1 };
+                var entity = new PlusEntity { PDouble = 1.5, DateTime = new DateTime(2026, 1, 2, 0, 0, 0, DateTimeKind.Unspecified), Option = TestOptions.Option1 };
                 var resolver = new VariableResolver();
                 resolver.TryAdd("expected", "prefix:" + entity.PDouble + entity.Boolean + entity.DateTime + entity.Option);
                 var result = Interpreter.ParsePredicate<PlusEntity>("'prefix:' + PDouble + Boolean + DateTime + Option = $expected", resolver);
@@ -276,7 +285,7 @@ namespace Kkts.Expressions.UnitTest.Units
         {
             var entity = new PlusEntity { PInt = 4, String = "a", Parent = new ParentEntity { Id = 2 } };
             var mapping = new Dictionary<string, string> { ["alias"] = "PInt" };
-            foreach (var async in new[] { false, true })
+            foreach (var useAsync in new[] { false, true })
             {
                 var resolver = new VariableResolver();
                 resolver.TryAdd("increment", 2);
@@ -285,43 +294,55 @@ namespace Kkts.Expressions.UnitTest.Units
                 resolver.TryAdd("suffix", "b");
                 resolver.TryAdd("prefix", "b");
                 var allowed = new[] { "alias", "String" };
-                var valid = async
+                var valid = useAsync
                     ? await Interpreter.ParsePredicateAsync<PlusEntity>(query, resolver, allowed, mapping)
                     : Interpreter.ParsePredicate<PlusEntity>(query, resolver, allowed, mapping);
                 Assert.True(valid.Succeeded, valid.Exception?.ToString());
                 Assert.True(valid.Result.Compile()(entity));
-                var runtime = async
+                var runtime = useAsync
                     ? await Interpreter.ParsePredicateAsync(query, typeof(PlusEntity), resolver, allowed, mapping)
                     : Interpreter.ParsePredicate(query, typeof(PlusEntity), resolver, allowed, mapping);
                 Assert.True(runtime.Succeeded, runtime.Exception?.ToString());
                 Assert.True(((Expression<Func<PlusEntity, bool>>)runtime.Result).Compile()(entity));
                 Assert.True(Interpreter.ParsePredicate<PlusEntity>("PInt + Parent.Id = 6").Result.Compile()(entity));
-                foreach (var invalidQuery in new[] { "PInt + PDouble = 5", "PDouble + PInt = 5" })
-                {
-                    var invalid = async
-                        ? await Interpreter.ParsePredicateAsync<PlusEntity>(invalidQuery, validProperties: new[] { "PInt" })
-                        : Interpreter.ParsePredicate<PlusEntity>(invalidQuery, validProperties: new[] { "PInt" });
-                    Assert.False(invalid.Succeeded);
-                    Assert.Contains("PDouble", invalid.InvalidProperties);
-                    var invalidRuntime = async
-                        ? await Interpreter.ParsePredicateAsync(invalidQuery, typeof(PlusEntity), validProperties: new[] { "PInt" })
-                        : Interpreter.ParsePredicate(invalidQuery, typeof(PlusEntity), validProperties: new[] { "PInt" });
-                    Assert.False(invalidRuntime.Succeeded);
-                    Assert.Contains("PDouble", invalidRuntime.InvalidProperties);
-                    Assert.Null(invalidRuntime.Result);
-                }
-                foreach (var invalidQuery in new[] { "PInt + $missing = 5", "$missing + PInt = 5" })
-                {
-                    var invalid = async ? await Interpreter.ParsePredicateAsync<PlusEntity>(invalidQuery) : Interpreter.ParsePredicate<PlusEntity>(invalidQuery);
-                    Assert.False(invalid.Succeeded);
-                    Assert.Contains("missing", invalid.InvalidVariables);
-                    var invalidRuntime = async
-                        ? await Interpreter.ParsePredicateAsync(invalidQuery, typeof(PlusEntity))
-                        : Interpreter.ParsePredicate(invalidQuery, typeof(PlusEntity));
-                    Assert.False(invalidRuntime.Succeeded);
-                    Assert.Contains("missing", invalidRuntime.InvalidVariables);
-                    Assert.Null(invalidRuntime.Result);
-                }
+                await AssertRestrictedProperties(useAsync);
+                await AssertMissingVariables(useAsync);
+            }
+        }
+
+        private static async Task AssertRestrictedProperties(bool useAsync)
+        {
+            foreach (var query in new[] { "PInt + PDouble = 5", "PDouble + PInt = 5" })
+            {
+                var generic = useAsync
+                    ? await Interpreter.ParsePredicateAsync<PlusEntity>(query, validProperties: new[] { "PInt" })
+                    : Interpreter.ParsePredicate<PlusEntity>(query, validProperties: new[] { "PInt" });
+                Assert.False(generic.Succeeded);
+                Assert.Contains("PDouble", generic.InvalidProperties);
+                var runtime = useAsync
+                    ? await Interpreter.ParsePredicateAsync(query, typeof(PlusEntity), validProperties: new[] { "PInt" })
+                    : Interpreter.ParsePredicate(query, typeof(PlusEntity), validProperties: new[] { "PInt" });
+                Assert.False(runtime.Succeeded);
+                Assert.Contains("PDouble", runtime.InvalidProperties);
+                Assert.Null(runtime.Result);
+            }
+        }
+
+        private static async Task AssertMissingVariables(bool useAsync)
+        {
+            foreach (var query in new[] { "PInt + $missing = 5", "$missing + PInt = 5" })
+            {
+                var generic = useAsync
+                    ? await Interpreter.ParsePredicateAsync<PlusEntity>(query)
+                    : Interpreter.ParsePredicate<PlusEntity>(query);
+                Assert.False(generic.Succeeded);
+                Assert.Contains("missing", generic.InvalidVariables);
+                var runtime = useAsync
+                    ? await Interpreter.ParsePredicateAsync(query, typeof(PlusEntity))
+                    : Interpreter.ParsePredicate(query, typeof(PlusEntity));
+                Assert.False(runtime.Succeeded);
+                Assert.Contains("missing", runtime.InvalidVariables);
+                Assert.Null(runtime.Result);
             }
         }
 
@@ -381,6 +402,10 @@ namespace Kkts.Expressions.UnitTest.Units
         public class CustomPlus
         {
             public static CustomPlus operator +(CustomPlus left, CustomPlus right) => left;
+            public static bool operator ==(CustomPlus left, CustomPlus right) => ReferenceEquals(left, right);
+            public static bool operator !=(CustomPlus left, CustomPlus right) => !ReferenceEquals(left, right);
+            public override bool Equals(object obj) => ReferenceEquals(this, obj);
+            public override int GetHashCode() => System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(this);
         }
     }
 

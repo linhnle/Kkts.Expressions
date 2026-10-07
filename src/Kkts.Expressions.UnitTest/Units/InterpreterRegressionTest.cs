@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Linq.Expressions;
 using System.Reflection;
@@ -9,6 +10,7 @@ using Xunit;
 
 namespace Kkts.Expressions.UnitTest.Units
 {
+    [SuppressMessage("SonarAnalyzer.CSharp", "S6966", Justification = "Parity tests must exercise synchronous APIs alongside their async counterparts.")]
     public class InterpreterRegressionTest
     {
         [Theory]
@@ -204,6 +206,8 @@ namespace Kkts.Expressions.UnitTest.Units
         {
             var syncResolver = new NestedResolver();
             var asyncResolver = new NestedResolver();
+            Assert.Null(syncResolver.Root.Empty);
+            Assert.Equal(4, syncResolver.Root.Profile.Leaf.Id);
             Assert.Equal(expected, syncResolver.TryResolve("$" + path, out var value));
             var asynchronous = await asyncResolver.TryResolveAsync("$" + path);
             Assert.Equal(expected, asynchronous.Resolved);
@@ -224,6 +228,7 @@ namespace Kkts.Expressions.UnitTest.Units
         public async Task VariableResolver_NestedGetterFailure_IsNotReportedAsMissing()
         {
             var resolver = new NestedResolver();
+            Assert.Throws<InvalidOperationException>(() => resolver.Root.Profile.Broken);
             var exception = await Assert.ThrowsAsync<TargetInvocationException>(
                 () => resolver.TryResolveAsync("$Root.Profile.Broken"));
             Assert.IsType<InvalidOperationException>(exception.InnerException);
@@ -324,12 +329,14 @@ namespace Kkts.Expressions.UnitTest.Units
         private sealed class Root
         {
             public Profile Profile { get; } = new Profile();
+            [SuppressMessage("SonarAnalyzer.CSharp", "S2325", Justification = "Instance property is resolved by reflection to test null intermediate values.")]
             public Profile Empty => null;
         }
 
         private sealed class Profile
         {
             public Leaf Leaf = new Leaf();
+            [SuppressMessage("SonarAnalyzer.CSharp", "S2325", Justification = "Instance getter is resolved by reflection to test failure propagation.")]
             public int Broken => throw new InvalidOperationException("Getter failed");
         }
 

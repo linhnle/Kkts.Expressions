@@ -1,5 +1,6 @@
 ﻿using Kkts.Expressions.Internal.Nodes;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace Kkts.Expressions.Internal
 {
@@ -54,6 +55,32 @@ namespace Kkts.Expressions.Internal
 			{
 				new AdditionOperatorParser { Previous = this, LeftHand = LeftHand, EndFunction = EndFunction }
 			};
+		}
+
+		protected bool AcceptOperator(char value, int whitespace, int index, char[] specialChars, ref bool isSpecialChar)
+		{
+			if (Done || whitespace > 0 && Length > 0)
+			{
+				Done = Length > 0;
+				if (Done) EndIndex = index - whitespace;
+				return false;
+			}
+
+			if (PreviousChar == char.MinValue)
+			{
+				StartIndex = index;
+				isSpecialChar = specialChars.Contains(value);
+				if (!isSpecialChar && !char.IsLetter(value)) return false;
+			}
+			else if (!(isSpecialChar ? specialChars.Contains(value) : char.IsLetter(value)))
+			{
+				Done = true;
+				EndIndex = index - 1;
+				return false;
+			}
+
+			Append(value);
+			return true;
 		}
 
 		protected void Append(char @char)

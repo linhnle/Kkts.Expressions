@@ -8,6 +8,7 @@ namespace Kkts.Expressions
 {
 	public static class IQueryableExtensions
 	{
+		private const string InvalidOrderByMessage = "The property name or direction is not valid";
 		public static IQueryable<T> Take<T>(this IQueryable<T> source, Condition<T> condition, Pagination pagination)
 		{
 			if (source == null) throw new ArgumentNullException(nameof(source));
@@ -73,10 +74,6 @@ namespace Kkts.Expressions
 			return source;
 		}
 
-		#region OrderBy
-
-		#region Generic
-
 		public static IOrderedQueryable<T> OrderBy<T>(this IQueryable<T> source, string expression, IEnumerable<string> validProperties = null, IDictionary<string, string> propertyMapping = null)
 		{
 			if (source == null) throw new ArgumentNullException(nameof(source));
@@ -89,7 +86,7 @@ namespace Kkts.Expressions
 				PropertyMapping = propertyMapping
 			});
 
-			if (!evaluationResult.Succeeded) throw new InvalidOperationException("The property name or direction is not valid");
+			if (!evaluationResult.Succeeded) throw new InvalidOperationException(InvalidOrderByMessage);
 
 			return evaluationResult.Result.Sort(source);
 		}
@@ -106,7 +103,41 @@ namespace Kkts.Expressions
 				PropertyMapping = propertyMapping
 			});
 
-			if (!evaluationResult.Succeeded) throw new InvalidOperationException("The property name or direction is not valid");
+			if (!evaluationResult.Succeeded) throw new InvalidOperationException(InvalidOrderByMessage);
+
+			return evaluationResult.Result.Sort(source);
+		}
+
+		public static IOrderedQueryable OrderBy(this IQueryable source, string expression, IEnumerable<string> validProperties = null, IDictionary<string, string> propertyMapping = null)
+		{
+			if (source == null) throw new ArgumentNullException(nameof(source));
+			if (string.IsNullOrWhiteSpace(expression)) throw new ArgumentException($"{expression} is required", nameof(expression));
+
+			var evaluationResult = OrderByParser.Parse(expression, new BuildArgument
+			{
+				ValidProperties = validProperties,
+				EvaluationType = source.ElementType,
+				PropertyMapping = propertyMapping
+			});
+
+			if (!evaluationResult.Succeeded) throw new InvalidOperationException(InvalidOrderByMessage);
+
+			return evaluationResult.Result.Sort(source);
+		}
+
+		public static IOrderedQueryable OrderBy(this IQueryable source, IEnumerable<OrderByInfo> orderByInfos, IEnumerable<string> validProperties = null, IDictionary<string, string> propertyMapping = null)
+		{
+			if (source == null) throw new ArgumentNullException(nameof(source));
+			if (orderByInfos == null) throw new ArgumentNullException(nameof(orderByInfos));
+
+			var evaluationResult = OrderByParser.Parse(orderByInfos.ToArray(), new BuildArgument
+			{
+				ValidProperties = validProperties,
+				EvaluationType = source.ElementType,
+				PropertyMapping = propertyMapping
+			});
+
+			if (!evaluationResult.Succeeded) throw new InvalidOperationException(InvalidOrderByMessage);
 
 			return evaluationResult.Result.Sort(source);
 		}
@@ -136,8 +167,6 @@ namespace Kkts.Expressions
 				PropertyMapping = propertyMapping
 			});
 		}
-
-		#region Internal
 
 		internal static EvaluationResult<IOrderedQueryable<T>> TryOrderBy<T>(this IQueryable<T> source, string expression, BuildArgument arg)
 		{
@@ -181,46 +210,6 @@ namespace Kkts.Expressions
 			};
 		}
 
-		#endregion Internal
-
-		#endregion Generic
-
-		#region Common
-
-		public static IOrderedQueryable OrderBy(this IQueryable source, string expression, IEnumerable<string> validProperties = null, IDictionary<string, string> propertyMapping = null) 
-		{
-			if (source == null) throw new ArgumentNullException(nameof(source));
-			if (string.IsNullOrWhiteSpace(expression)) throw new ArgumentException($"{expression} is required", nameof(expression));
-
-			var evaluationResult = OrderByParser.Parse(expression, new BuildArgument
-			{
-				ValidProperties = validProperties,
-				EvaluationType = source.ElementType,
-				PropertyMapping = propertyMapping
-			});
-
-			if (!evaluationResult.Succeeded) throw new InvalidOperationException("The property name or direction is not valid");
-
-			return evaluationResult.Result.Sort(source);
-		}
-
-		public static IOrderedQueryable OrderBy(this IQueryable source, IEnumerable<OrderByInfo> orderByInfos, IEnumerable<string> validProperties = null, IDictionary<string, string> propertyMapping = null)
-		{
-			if (source == null) throw new ArgumentNullException(nameof(source));
-			if (orderByInfos == null) throw new ArgumentNullException(nameof(orderByInfos));
-
-			var evaluationResult = OrderByParser.Parse(orderByInfos.ToArray(), new BuildArgument
-			{
-				ValidProperties = validProperties,
-				EvaluationType = source.ElementType,
-				PropertyMapping = propertyMapping
-			});
-
-			if (!evaluationResult.Succeeded) throw new InvalidOperationException("The property name or direction is not valid");
-
-			return evaluationResult.Result.Sort(source);
-		}
-
 		public static EvaluationResult<IOrderedQueryable> TryOrderBy(this IQueryable source, string expression, IEnumerable<string> validProperties = null, IDictionary<string, string> propertyMapping = null)
 		{
 			if (source == null) throw new ArgumentNullException(nameof(source));
@@ -246,8 +235,6 @@ namespace Kkts.Expressions
 				PropertyMapping = propertyMapping
 			});
 		}
-
-		#region Internal
 
 		internal static EvaluationResult<IOrderedQueryable> TryOrderBy(this IQueryable source, string expression, BuildArgument arg)
 		{
@@ -291,10 +278,5 @@ namespace Kkts.Expressions
 			};
 		}
 
-		#endregion Internal
-
-		#endregion Common
-
-		#endregion OrderBy
 	}
 }

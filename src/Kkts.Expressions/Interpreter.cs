@@ -90,6 +90,20 @@ namespace Kkts.Expressions
 			return result.ToGeneric<T, bool>();
 		}
 
+		public static EvaluationResult ParsePredicate(this string expression, Type type, VariableResolver variableResolver = null, IEnumerable<string> validProperties = null, IDictionary<string, string> propertyMapping = null)
+		{
+			if (string.IsNullOrWhiteSpace(expression)) throw new ArgumentException($"{nameof(expression)} is required", nameof(expression));
+			if (type == null) throw new ArgumentNullException(nameof(type));
+
+			return ExpressionParser.Parse(expression, type, new BuildArgument
+			{
+				ValidProperties = validProperties,
+				EvaluationType = type,
+				VariableResolver = variableResolver,
+				PropertyMapping = propertyMapping
+			});
+		}
+
 		public static async Task<EvaluationResult<T, bool>> ParsePredicateAsync<T>(this string expression, VariableResolver variableResolver = null, IEnumerable<string> validProperties = null, IDictionary<string, string> propertyMapping = null, CancellationToken cancellationToken = default)
 		{
 			if (string.IsNullOrWhiteSpace(expression)) throw new ArgumentException("Invalid expression", nameof(expression));
@@ -105,20 +119,6 @@ namespace Kkts.Expressions
 			});
 
 			return result.ToGeneric<T, bool>();
-		}
-
-		public static EvaluationResult ParsePredicate(this string expression, Type type, VariableResolver variableResolver = null, IEnumerable<string> validProperties = null, IDictionary<string, string> propertyMapping = null)
-		{
-			if (string.IsNullOrWhiteSpace(expression)) throw new ArgumentException($"{nameof(expression)} is required", nameof(expression));
-			if (type == null) throw new ArgumentNullException(nameof(type));
-
-			return ExpressionParser.Parse(expression, type, new BuildArgument
-			{
-				ValidProperties = validProperties,
-				EvaluationType = type,
-				VariableResolver = variableResolver,
-				PropertyMapping = propertyMapping
-			});
 		}
 
 		public static Task<EvaluationResult> ParsePredicateAsync(this string expression, Type type, VariableResolver variableResolver = null, IEnumerable<string> validProperties = null, IDictionary<string, string> propertyMapping = null, CancellationToken cancellationToken = default)

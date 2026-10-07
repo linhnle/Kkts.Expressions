@@ -3,7 +3,7 @@ using System;
 
 namespace Kkts.Expressions.UnitTest
 {
-    public class DF
+    public static class DF
     {
         public static readonly DbContextOptions<TestDbContext> Options = new DbContextOptionsBuilder<TestDbContext>()
                                                        .UseInMemoryDatabase(databaseName: "Test")
@@ -16,10 +16,10 @@ namespace Kkts.Expressions.UnitTest
         public static readonly int Integer2 = 4;
         public static readonly int Integer3 = 8;
         public static readonly int IntegerN = 16;
-        public static readonly DateTime DateTime1 = new DateTime(2016, 05, 15);
-        public static readonly DateTime DateTime2 = new DateTime(2017, 06, 15);
-        public static readonly DateTime DateTime3 = new DateTime(2019, 07, 15);
-        public static readonly DateTime DateTimeN = new DateTime(DateTime.Now.Year, 08, 15);
+        public static readonly DateTime DateTime1 = new DateTime(2016, 05, 15, 0, 0, 0, DateTimeKind.Unspecified);
+        public static readonly DateTime DateTime2 = new DateTime(2017, 06, 15, 0, 0, 0, DateTimeKind.Unspecified);
+        public static readonly DateTime DateTime3 = new DateTime(2019, 07, 15, 0, 0, 0, DateTimeKind.Unspecified);
+        public static readonly DateTime DateTimeN = new DateTime(DateTime.Now.Year, 08, 15, 0, 0, 0, DateTimeKind.Unspecified);
         public static readonly string DateTimeString1 = DateTime1.ToString("yyyy-MM-dd");
         public static readonly string DateTimeString2 = DateTime2.ToString("yyyy-MM-dd");
         public static readonly string DateTimeString3 = DateTime3.ToString("yyyy-MM-dd");
@@ -73,30 +73,6 @@ namespace Kkts.Expressions.UnitTest
 
                     context.Add(p);
                 }
-
-                //var random = new Random();
-                //for(var i = 1; i <= 999; ++i)
-                //{
-                //    var e = new TestEntity
-                //    {
-                //        DateTime = new DateTime(2015 + i % 6, i % 12 + 1, i % 28 + 1),
-                //        DateTimeNullable = i % 3 < 2 ? (DateTime?)null : new DateTime(2015 + i % 6, i % 12 + 1, i % 12 + 12),
-                //        DateTimeOffset = new DateTime(2015 + i % 6, i % 8 + 1, i % 14 + 1),
-                //        DateTimeOffsetNullable = i % 5 < 4 ? (DateTimeOffset?)null : new DateTimeOffset(2019, i % 12 + 1, i % 12 + 12, i % 24, i % 60, 0, new TimeSpan(0, 0, 0)),
-                //        Double = i % 10 == 0 ? i : random.NextDouble(),
-                //        DoubleNullable = i % 10 < 9 ? (double?)null : i % 10 < 5 ? i : random.NextDouble(),
-                //        Guid = Guid.NewGuid(),
-                //        GuidNullable = i % 10 == 0 ? (Guid?)null : Guid.NewGuid(),
-                //        Integer = i % 200,
-                //        IntegerNullable = i % 10 < 5 ? i % 100 : (int?)null,
-                //        Option = (TestOptions)(i % 2),
-                //        OptionNullable = i % 10 < 5 ? (TestOptions)(i % 2) : (TestOptions?)null,
-                //        ParentId = i % 4 + 1,
-                //        String = "Name " + i.ToString("0000")
-                //    };
-
-                //    context.Add(e);
-                //}
 
                 var e1 = new TestEntity
                 {

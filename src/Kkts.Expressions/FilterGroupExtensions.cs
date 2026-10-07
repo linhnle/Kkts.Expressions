@@ -62,7 +62,7 @@ namespace Kkts.Expressions
 
 		public static EvaluationResult<T, bool> TryBuildPredicate<T>(this FilterGroup filterGroup, VariableResolver variableResolver = null, IEnumerable<string> validProperties = null, IDictionary<string, string> propertyMapping = null)
 		{
-			if (filterGroup == null) throw new ArgumentNullException(nameof(filterGroup)); ;
+			if (filterGroup == null) throw new ArgumentNullException(nameof(filterGroup));
 			var arg = new BuildArgument
 			{
 				ValidProperties = validProperties,

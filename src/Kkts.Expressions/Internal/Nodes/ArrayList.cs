@@ -95,34 +95,9 @@ namespace Kkts.Expressions.Internal.Nodes
 			for (var index = 0; index < drawValue.Length; ++index, ++StartIndex)
 			{
 				var c = drawValue[index];
-				if (value == null) value = new StringBuilder();
-				if (!started)
-				{
-					dotCount = 0;
-					started = true;
-					if (c == '"' || c == '\'')
-					{
-						openChar = c;
-						continue;
-					}
-					else
-					{
-						openChar = char.MinValue;
-					}
-				}
-				
-				if (!isSpecialChar && c == '\\')
-				{
-					isSpecialChar = true;
-					continue;
-				}
-
-				if (isSpecialChar)
-				{
-					isSpecialChar = false;
-					value.Append(c == '"' || c == '\'' ? c : '\\');
-					continue;
-				}
+				value = value ?? new StringBuilder();
+				if (StartValue(c, ref started, ref openChar, ref dotCount)) continue;
+				if (AppendEscapedCharacter(c, value, ref isSpecialChar)) continue;
 
 				if (c == openChar)
 				{
@@ -136,42 +111,13 @@ namespace Kkts.Expressions.Internal.Nodes
 
 				if (c == ',')
 				{
-					if (openChar != char.MinValue)
-					{
-						value.Append(c);
-					}
-					else
-					{
-						started = false;
-						StringValues.Add(value.ToString().Trim());
-						value = null;
-						isVariable = false;
-                        IgnoreWhiteSpaceAndComma(drawValue, ref index);
-					}
-
+					FinishComma(drawValue, openChar, ref index, ref value, ref started, ref isVariable);
 					continue;
 				}
 
 				if (openChar == char.MinValue)
 				{
-					if (isVariable)
-					{
-                        value.Append(c);
-                        continue;
-					}
-					if (c == '.')
-					{
-						++dotCount;
-						if (dotCount > 1) throw new FormatException(GetErrorMessage());
-					}
-                    else if (c == VariableResolver.VariablePrefix)
-                    {
-						isVariable = true;
-                        value.Append(c);
-                        continue;
-                    }
-                    else if (!char.IsDigit(c)) throw new FormatException(GetErrorMessage());
-					
+					ValidateUnquotedCharacter(c, ref isVariable, ref dotCount);
 				}
 
 				value.Append(c);
@@ -181,6 +127,55 @@ namespace Kkts.Expressions.Internal.Nodes
 			{
 				StringValues.Add(value.ToString().Trim());
 			}
+		}
+
+		private static bool StartValue(char c, ref bool started, ref char openChar, ref int dotCount)
+		{
+			if (started) return false;
+			dotCount = 0;
+			started = true;
+			var quoted = c == '"' || c == '\'';
+			openChar = quoted ? c : char.MinValue;
+			return quoted;
+		}
+
+		private static bool AppendEscapedCharacter(char c, StringBuilder value, ref bool isSpecialChar)
+		{
+			if (!isSpecialChar && c == '\\')
+			{
+				isSpecialChar = true;
+				return true;
+			}
+			if (!isSpecialChar) return false;
+			isSpecialChar = false;
+			value.Append(c == '"' || c == '\'' ? c : '\\');
+			return true;
+		}
+
+		private void FinishComma(string drawValue, char openChar, ref int index, ref StringBuilder value, ref bool started, ref bool isVariable)
+		{
+			if (openChar != char.MinValue)
+			{
+				value.Append(',');
+				return;
+			}
+			started = false;
+			StringValues.Add(value.ToString().Trim());
+			value = null;
+			isVariable = false;
+			IgnoreWhiteSpaceAndComma(drawValue, ref index);
+		}
+
+		private void ValidateUnquotedCharacter(char c, ref bool isVariable, ref int dotCount)
+		{
+			if (isVariable) return;
+			if (c == '.')
+			{
+				++dotCount;
+				if (dotCount > 1) throw new FormatException(GetErrorMessage());
+			}
+			else if (c == VariableResolver.VariablePrefix) isVariable = true;
+			else if (!char.IsDigit(c)) throw new FormatException(GetErrorMessage());
 		}
 
 		private void IgnoreWhiteSpaceAndComma(string str, ref int index)

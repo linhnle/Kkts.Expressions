@@ -3,6 +3,16 @@ Build string expression to lambda expression to support dynamic query from UI
 
 get via nuget **[Kkts.Expressions](https://www.nuget.org/packages/Kkts.Expressions)** 
 
+### Running tests
+The unit test project targets .NET 10 and requires the .NET 10 SDK:
+
+```sh
+dotnet test src/Kkts.Expressions.UnitTest/Kkts.Expressions.UnitTest.csproj
+```
+
+The library continues to target `netstandard2.0`; the example projects are
+unchanged.
+
 ### Parser performance
 Synchronous and asynchronous predicate parsing reuse per-call candidate buffers
 and build token chains directly in lists. Each precedence pass uses read/write
@@ -34,6 +44,21 @@ resolved variable values are not cached by the parser across calls; a supplied
 - Nested variable paths can traverse properties and fields at multiple levels.
   A missing member or null intermediate value is unresolved; exceptions thrown
   by getters are surfaced rather than silently treated as missing variables.
+- Async filter collections forward the caller's cancellation token through the
+  generic and runtime-type overloads.
+
+### Code quality and compatibility
+SonarQube cleanup preserves the existing public API. `Pagination.DefaultLimit`
+and `Pagination.MaxLimit` remain mutable public fields because replacing them
+with properties or constants breaks existing consumers. The deprecated virtual
+`VariableResolver.IsVariable` method is retained for compatibility; use
+`TryResolve` or `TryResolveAsync` instead. The public-field and deprecated-code
+findings require a future breaking release to resolve.
+
+Parity regression tests intentionally exercise synchronous APIs from async
+tests, and reflected test fixtures require instance getters. Only those
+specific analyzer rules are suppressed, with justifications in the test code;
+production findings are not hidden or excluded.
 
 ### Sample class
 ``` csharp
@@ -296,4 +321,3 @@ var condition = new ConditionOptions { Where = "Id + 1 = 5" }.BuildCondition<Dat
 
 ## Contacts
 **[LinkedIn](https://www.linkedin.com/in/linh-le-258417105/)**
-**Skype: linh.nhat.le**

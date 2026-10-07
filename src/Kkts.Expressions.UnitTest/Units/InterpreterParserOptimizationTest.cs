@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Threading.Tasks;
 using Xunit;
@@ -6,6 +7,7 @@ using Xunit.Abstractions;
 
 namespace Kkts.Expressions.UnitTest.Units
 {
+    [SuppressMessage("SonarAnalyzer.CSharp", "S6966", Justification = "Regression tests compare synchronous and asynchronous parser behavior and allocations.")]
     public class InterpreterParserOptimizationTest
     {
         private readonly ITestOutputHelper _output;

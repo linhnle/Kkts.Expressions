@@ -34,6 +34,7 @@ namespace Kkts.Expressions
 
         public IEnumerable<string> ValidProperties
         {
+            get => _lookup?.Keys;
             set
             {
                 var lookup = value?.ToDictionary(k => k, StringComparer.OrdinalIgnoreCase);
@@ -75,6 +76,7 @@ namespace Kkts.Expressions
 
         public IDictionary<string, string> PropertyMapping
         {
+            get => _mapping;
             set
             {
                 if (value is null || value.Count == 0)
@@ -133,45 +135,45 @@ namespace Kkts.Expressions
 
             if (value.Contains('.') && _evaluationType != null)
             {
-                _nestedProperties = _nestedProperties ?? new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                var segments = value.Split('.');
-                Type type = null;
-                var parentProp = string.Empty;
-                var hasException = false;
-                var param = Expression.Parameter(_evaluationType);
-                MemberExpression propertyExpression = null;
-                foreach (var segment in segments)
+                return TryEvaluateNestedProperty(value);
+            }
+
+            return false;
+        }
+
+        private bool TryEvaluateNestedProperty(string value)
+        {
+            _nestedProperties = _nestedProperties ?? new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var segments = value.Split('.');
+            Type type = null;
+            var parentProp = string.Empty;
+            var param = Expression.Parameter(_evaluationType);
+            MemberExpression propertyExpression = null;
+            foreach (var segment in segments)
+            {
+                try
                 {
-                    try
+                    if (type is null)
                     {
-                        if (type is null)
-                        {
-                            propertyExpression = Expression.PropertyOrField(param, segment);
-                            type = GetMemberType(propertyExpression.Member);
-                            parentProp = segment;
-                        }
-                        else
-                        {
-                            propertyExpression = Expression.PropertyOrField(propertyExpression, segment);
-                            type = GetMemberType(propertyExpression.Member);
-                            parentProp = $"{parentProp}.{segment}";
-                            _nestedProperties.Add(parentProp);
-                        }
+                        propertyExpression = Expression.PropertyOrField(param, segment);
+                        type = GetMemberType(propertyExpression.Member);
+                        parentProp = segment;
                     }
-                    catch (ArgumentException)
+                    else
                     {
-                        hasException = true;
-                        break;
+                        propertyExpression = Expression.PropertyOrField(propertyExpression, segment);
+                        type = GetMemberType(propertyExpression.Member);
+                        parentProp = $"{parentProp}.{segment}";
+                        _nestedProperties.Add(parentProp);
                     }
                 }
-
-                if (!hasException)
+                catch (ArgumentException)
                 {
-                    isValid = _nestedProperties.Contains(value);
+                    return false;
                 }
             }
 
-            return isValid;
+            return _nestedProperties.Contains(value);
         }
 
         private void ImportValidProperties()
@@ -179,7 +181,7 @@ namespace Kkts.Expressions
             _lookup = PropertyMetadata.GetPropertyNames(_evaluationType);
         }
 
-        private Type GetMemberType(MemberInfo memberInfo)
+        private static Type GetMemberType(MemberInfo memberInfo)
         {
             switch (memberInfo)
             {
@@ -192,7 +194,7 @@ namespace Kkts.Expressions
             }
         }
 
-        private string EmptyMap(string prop)
+        private static string EmptyMap(string prop)
         {
             return prop;
         }

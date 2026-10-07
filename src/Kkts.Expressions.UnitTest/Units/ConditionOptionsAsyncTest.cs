@@ -75,7 +75,7 @@ namespace Kkts.Expressions.UnitTest.Units
         }
 
         [Fact]
-        public async void TakeAndTakePage_Success()
+        public async Task TakeAndTakePage_Success()
         {
             var c = await new ConditionOptions().BuildConditionAsync<TestEntity>();
             var p = new Pagination { Offset = 1, Limit = 2 };

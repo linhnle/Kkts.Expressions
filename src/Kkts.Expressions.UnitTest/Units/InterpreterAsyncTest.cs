@@ -61,7 +61,7 @@ namespace Kkts.Expressions.UnitTest.Units
         [Fact]
         public async Task ParsePredicateAsync_Double_Succeed()
         {
-            var query = FormattableString.Invariant($"Double={DF.Double3} and Double != 0.0 and Double<{DF.DoubleN} and Double<={DF.Double3} and Double>={DF.Double1} and Double>0.0 and Double in [{DF.Double1},{DF.Double2},{DF.Double3},{DF.DoubleN}]");
+            var query = string.Create(System.Globalization.CultureInfo.InvariantCulture, $"Double={DF.Double3} and Double != 0.0 and Double<{DF.DoubleN} and Double<={DF.Double3} and Double>={DF.Double1} and Double>0.0 and Double in [{DF.Double1},{DF.Double2},{DF.Double3},{DF.DoubleN}]");
             var and1 = await Interpreter.ParsePredicateAsync<TestEntity>(query);
             var and2 = await Interpreter.ParsePredicateAsync<TestEntity>(query.Replace("and", "&&"));
             var and3 = await Interpreter.ParsePredicateAsync<TestEntity>(query.Replace("and", "&"));
@@ -456,7 +456,7 @@ namespace Kkts.Expressions.UnitTest.Units
         [Fact]
         public async Task ParsePredicateAsync_ComplicatedGroup_Success()
         {
-            var result = await Interpreter.ParsePredicateAsync<TestEntity>(FormattableString.Invariant($"(Integer={DF.Integer1} or Double={DF.Double3}) and (Guid=='{DF.Guid1}' or DateTime='{DF.DateTimeString3}')"));
+            var result = await Interpreter.ParsePredicateAsync<TestEntity>(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"(Integer={DF.Integer1} or Double={DF.Double3}) and (Guid=='{DF.Guid1}' or DateTime='{DF.DateTimeString3}')"));
             Assert.True(result.Succeeded);
             using (var context = DF.GetContext())
             {
@@ -573,139 +573,138 @@ namespace Kkts.Expressions.UnitTest.Units
         public async Task BuildPredicate_AllOperators_Success_WithoutExceptions()
         {
             // integer
-            var exp = await Interpreter.BuildPredicateAsync<TestEntity>("Integer", ComparisonOperator.Equal, "1");
-            exp = await Interpreter.BuildPredicateAsync<TestEntity>("Integer", ComparisonOperator.NotEqual, "1");
-            exp = await Interpreter.BuildPredicateAsync<TestEntity>("Integer", ComparisonOperator.LessThan, "1");
-            exp = await Interpreter.BuildPredicateAsync<TestEntity>("Integer", ComparisonOperator.LessThanOrEqual, "1");
-            exp = await Interpreter.BuildPredicateAsync<TestEntity>("Integer", ComparisonOperator.GreaterThan, "1");
-            exp = await Interpreter.BuildPredicateAsync<TestEntity>("Integer", ComparisonOperator.GreaterThanOrEqual, "1");
-            exp = await Interpreter.BuildPredicateAsync<TestEntity>("Integer", ComparisonOperator.In, "1, 2, 4");
-            exp = await Interpreter.BuildPredicateAsync<TestEntity>("Integer", ComparisonOperator.In, "$now.month, 2, 4");
+            Assert.NotNull(await Interpreter.BuildPredicateAsync<TestEntity>("Integer", ComparisonOperator.Equal, "1"));
+            Assert.NotNull(await Interpreter.BuildPredicateAsync<TestEntity>("Integer", ComparisonOperator.NotEqual, "1"));
+            Assert.NotNull(await Interpreter.BuildPredicateAsync<TestEntity>("Integer", ComparisonOperator.LessThan, "1"));
+            Assert.NotNull(await Interpreter.BuildPredicateAsync<TestEntity>("Integer", ComparisonOperator.LessThanOrEqual, "1"));
+            Assert.NotNull(await Interpreter.BuildPredicateAsync<TestEntity>("Integer", ComparisonOperator.GreaterThan, "1"));
+            Assert.NotNull(await Interpreter.BuildPredicateAsync<TestEntity>("Integer", ComparisonOperator.GreaterThanOrEqual, "1"));
+            Assert.NotNull(await Interpreter.BuildPredicateAsync<TestEntity>("Integer", ComparisonOperator.In, "1, 2, 4"));
+            Assert.NotNull(await Interpreter.BuildPredicateAsync<TestEntity>("Integer", ComparisonOperator.In, "$now.month, 2, 4"));
             // integer nullable
-            exp = await Interpreter.BuildPredicateAsync<TestEntity>("IntegerNullable", ComparisonOperator.Equal, "1");
-            exp = await Interpreter.BuildPredicateAsync<TestEntity>("IntegerNullable", ComparisonOperator.Equal, "");
-            exp = await Interpreter.BuildPredicateAsync<TestEntity>("IntegerNullable", ComparisonOperator.Equal, null);
-            exp = await Interpreter.BuildPredicateAsync<TestEntity>("IntegerNullable", ComparisonOperator.NotEqual, "1");
-            exp = await Interpreter.BuildPredicateAsync<TestEntity>("IntegerNullable", ComparisonOperator.LessThan, "1");
-            exp = await Interpreter.BuildPredicateAsync<TestEntity>("IntegerNullable", ComparisonOperator.LessThanOrEqual, "1");
-            exp = await Interpreter.BuildPredicateAsync<TestEntity>("IntegerNullable", ComparisonOperator.GreaterThan, "1");
-            exp = await Interpreter.BuildPredicateAsync<TestEntity>("IntegerNullable", ComparisonOperator.GreaterThanOrEqual, "1");
-            exp = await Interpreter.BuildPredicateAsync<TestEntity>("IntegerNullable", ComparisonOperator.In, "1, 2, 4");
-            exp = await Interpreter.BuildPredicateAsync<TestEntity>("IntegerNullable", ComparisonOperator.In, "$now.year, 2, 4");
+            Assert.NotNull(await Interpreter.BuildPredicateAsync<TestEntity>("IntegerNullable", ComparisonOperator.Equal, "1"));
+            Assert.NotNull(await Interpreter.BuildPredicateAsync<TestEntity>("IntegerNullable", ComparisonOperator.Equal, ""));
+            Assert.NotNull(await Interpreter.BuildPredicateAsync<TestEntity>("IntegerNullable", ComparisonOperator.Equal, null));
+            Assert.NotNull(await Interpreter.BuildPredicateAsync<TestEntity>("IntegerNullable", ComparisonOperator.NotEqual, "1"));
+            Assert.NotNull(await Interpreter.BuildPredicateAsync<TestEntity>("IntegerNullable", ComparisonOperator.LessThan, "1"));
+            Assert.NotNull(await Interpreter.BuildPredicateAsync<TestEntity>("IntegerNullable", ComparisonOperator.LessThanOrEqual, "1"));
+            Assert.NotNull(await Interpreter.BuildPredicateAsync<TestEntity>("IntegerNullable", ComparisonOperator.GreaterThan, "1"));
+            Assert.NotNull(await Interpreter.BuildPredicateAsync<TestEntity>("IntegerNullable", ComparisonOperator.GreaterThanOrEqual, "1"));
+            Assert.NotNull(await Interpreter.BuildPredicateAsync<TestEntity>("IntegerNullable", ComparisonOperator.In, "1, 2, 4"));
+            Assert.NotNull(await Interpreter.BuildPredicateAsync<TestEntity>("IntegerNullable", ComparisonOperator.In, "$now.year, 2, 4"));
 
             // double
-            exp = await Interpreter.BuildPredicateAsync<TestEntity>("Double", ComparisonOperator.Equal, "1.0");
-            exp = await Interpreter.BuildPredicateAsync<TestEntity>("Double", ComparisonOperator.NotEqual, "1");
-            exp = await Interpreter.BuildPredicateAsync<TestEntity>("Double", ComparisonOperator.LessThan, "1");
-            exp = await Interpreter.BuildPredicateAsync<TestEntity>("Double", ComparisonOperator.LessThanOrEqual, "1");
-            exp = await Interpreter.BuildPredicateAsync<TestEntity>("Double", ComparisonOperator.GreaterThan, "1");
-            exp = await Interpreter.BuildPredicateAsync<TestEntity>("Double", ComparisonOperator.GreaterThanOrEqual, "1");
-            exp = await Interpreter.BuildPredicateAsync<TestEntity>("Double", ComparisonOperator.In, "1.2, 2, 4");
-            exp = await Interpreter.BuildPredicateAsync<TestEntity>("Double", ComparisonOperator.In, "1.2, 2, $now.day");
+            Assert.NotNull(await Interpreter.BuildPredicateAsync<TestEntity>("Double", ComparisonOperator.Equal, "1.0"));
+            Assert.NotNull(await Interpreter.BuildPredicateAsync<TestEntity>("Double", ComparisonOperator.NotEqual, "1"));
+            Assert.NotNull(await Interpreter.BuildPredicateAsync<TestEntity>("Double", ComparisonOperator.LessThan, "1"));
+            Assert.NotNull(await Interpreter.BuildPredicateAsync<TestEntity>("Double", ComparisonOperator.LessThanOrEqual, "1"));
+            Assert.NotNull(await Interpreter.BuildPredicateAsync<TestEntity>("Double", ComparisonOperator.GreaterThan, "1"));
+            Assert.NotNull(await Interpreter.BuildPredicateAsync<TestEntity>("Double", ComparisonOperator.GreaterThanOrEqual, "1"));
+            Assert.NotNull(await Interpreter.BuildPredicateAsync<TestEntity>("Double", ComparisonOperator.In, "1.2, 2, 4"));
+            Assert.NotNull(await Interpreter.BuildPredicateAsync<TestEntity>("Double", ComparisonOperator.In, "1.2, 2, $now.day"));
             // double nullable
-            exp = await Interpreter.BuildPredicateAsync<TestEntity>("DoubleNullable", ComparisonOperator.Equal, "1.0");
-            exp = await Interpreter.BuildPredicateAsync<TestEntity>("DoubleNullable", ComparisonOperator.Equal, "");
-            exp = await Interpreter.BuildPredicateAsync<TestEntity>("DoubleNullable", ComparisonOperator.Equal, null);
-            exp = await Interpreter.BuildPredicateAsync<TestEntity>("DoubleNullable", ComparisonOperator.NotEqual, "1");
-            exp = await Interpreter.BuildPredicateAsync<TestEntity>("DoubleNullable", ComparisonOperator.LessThan, "1");
-            exp = await Interpreter.BuildPredicateAsync<TestEntity>("DoubleNullable", ComparisonOperator.LessThanOrEqual, "1");
-            exp = await Interpreter.BuildPredicateAsync<TestEntity>("DoubleNullable", ComparisonOperator.GreaterThan, "1");
-            exp = await Interpreter.BuildPredicateAsync<TestEntity>("DoubleNullable", ComparisonOperator.GreaterThanOrEqual, "1");
-            exp = await Interpreter.BuildPredicateAsync<TestEntity>("DoubleNullable", ComparisonOperator.In, "1.2, 2, 4");
+            Assert.NotNull(await Interpreter.BuildPredicateAsync<TestEntity>("DoubleNullable", ComparisonOperator.Equal, "1.0"));
+            Assert.NotNull(await Interpreter.BuildPredicateAsync<TestEntity>("DoubleNullable", ComparisonOperator.Equal, ""));
+            Assert.NotNull(await Interpreter.BuildPredicateAsync<TestEntity>("DoubleNullable", ComparisonOperator.Equal, null));
+            Assert.NotNull(await Interpreter.BuildPredicateAsync<TestEntity>("DoubleNullable", ComparisonOperator.NotEqual, "1"));
+            Assert.NotNull(await Interpreter.BuildPredicateAsync<TestEntity>("DoubleNullable", ComparisonOperator.LessThan, "1"));
+            Assert.NotNull(await Interpreter.BuildPredicateAsync<TestEntity>("DoubleNullable", ComparisonOperator.LessThanOrEqual, "1"));
+            Assert.NotNull(await Interpreter.BuildPredicateAsync<TestEntity>("DoubleNullable", ComparisonOperator.GreaterThan, "1"));
+            Assert.NotNull(await Interpreter.BuildPredicateAsync<TestEntity>("DoubleNullable", ComparisonOperator.GreaterThanOrEqual, "1"));
+            Assert.NotNull(await Interpreter.BuildPredicateAsync<TestEntity>("DoubleNullable", ComparisonOperator.In, "1.2, 2, 4"));
 
             // boolean
-            exp = await Interpreter.BuildPredicateAsync<TestEntity>("Boolean", ComparisonOperator.Equal, "true");
-            exp = await Interpreter.BuildPredicateAsync<TestEntity>("Boolean", ComparisonOperator.NotEqual, "false");
+            Assert.NotNull(await Interpreter.BuildPredicateAsync<TestEntity>("Boolean", ComparisonOperator.Equal, "true"));
+            Assert.NotNull(await Interpreter.BuildPredicateAsync<TestEntity>("Boolean", ComparisonOperator.NotEqual, "false"));
             // boolean nullable
-            exp = await Interpreter.BuildPredicateAsync<TestEntity>("BooleanNullable", ComparisonOperator.Equal, "true");
-            exp = await Interpreter.BuildPredicateAsync<TestEntity>("BooleanNullable", ComparisonOperator.Equal, null);
-            exp = await Interpreter.BuildPredicateAsync<TestEntity>("BooleanNullable", ComparisonOperator.Equal, "");
-            exp = await Interpreter.BuildPredicateAsync<TestEntity>("BooleanNullable", ComparisonOperator.NotEqual, "false");
+            Assert.NotNull(await Interpreter.BuildPredicateAsync<TestEntity>("BooleanNullable", ComparisonOperator.Equal, "true"));
+            Assert.NotNull(await Interpreter.BuildPredicateAsync<TestEntity>("BooleanNullable", ComparisonOperator.Equal, null));
+            Assert.NotNull(await Interpreter.BuildPredicateAsync<TestEntity>("BooleanNullable", ComparisonOperator.Equal, ""));
+            Assert.NotNull(await Interpreter.BuildPredicateAsync<TestEntity>("BooleanNullable", ComparisonOperator.NotEqual, "false"));
 
 
             // string
-            exp = await Interpreter.BuildPredicateAsync<TestEntity>("String", ComparisonOperator.Equal, "1.0");
-            exp = await Interpreter.BuildPredicateAsync<TestEntity>("String", ComparisonOperator.NotEqual, "1");
-            exp = await Interpreter.BuildPredicateAsync<TestEntity>("String", ComparisonOperator.StartsWith, "1");
-            exp = await Interpreter.BuildPredicateAsync<TestEntity>("String", ComparisonOperator.EndsWith, "1");
-            exp = await Interpreter.BuildPredicateAsync<TestEntity>("String", ComparisonOperator.Contains, "1");
-            exp = await Interpreter.BuildPredicateAsync<TestEntity>("String", ComparisonOperator.In, "'1.0','lsdf'");
+            Assert.NotNull(await Interpreter.BuildPredicateAsync<TestEntity>("String", ComparisonOperator.Equal, "1.0"));
+            Assert.NotNull(await Interpreter.BuildPredicateAsync<TestEntity>("String", ComparisonOperator.NotEqual, "1"));
+            Assert.NotNull(await Interpreter.BuildPredicateAsync<TestEntity>("String", ComparisonOperator.StartsWith, "1"));
+            Assert.NotNull(await Interpreter.BuildPredicateAsync<TestEntity>("String", ComparisonOperator.EndsWith, "1"));
+            Assert.NotNull(await Interpreter.BuildPredicateAsync<TestEntity>("String", ComparisonOperator.Contains, "1"));
+            Assert.NotNull(await Interpreter.BuildPredicateAsync<TestEntity>("String", ComparisonOperator.In, "'1.0','lsdf'"));
 
             // Guid
-            exp = await Interpreter.BuildPredicateAsync<TestEntity>("Guid", ComparisonOperator.Equal, "32F281EB-9973-4E78-86C0-3D7AEB791E6F");
-            exp = await Interpreter.BuildPredicateAsync<TestEntity>("Guid", ComparisonOperator.NotEqual, "32F281EB-9973-4E78-86C0-3D7AEB791E6F");
-            exp = await Interpreter.BuildPredicateAsync<TestEntity>("Guid", ComparisonOperator.In, "'32F281EB-9973-4E78-86C0-3D7AEB791E6F', '32F281EB-9973-4E78-86C0-3D7AEE791E6F', '32F281EB-9973-4E78-86C0-3D7AEB791E65'");
+            Assert.NotNull(await Interpreter.BuildPredicateAsync<TestEntity>("Guid", ComparisonOperator.Equal, "32F281EB-9973-4E78-86C0-3D7AEB791E6F"));
+            Assert.NotNull(await Interpreter.BuildPredicateAsync<TestEntity>("Guid", ComparisonOperator.NotEqual, "32F281EB-9973-4E78-86C0-3D7AEB791E6F"));
+            Assert.NotNull(await Interpreter.BuildPredicateAsync<TestEntity>("Guid", ComparisonOperator.In, "'32F281EB-9973-4E78-86C0-3D7AEB791E6F', '32F281EB-9973-4E78-86C0-3D7AEE791E6F', '32F281EB-9973-4E78-86C0-3D7AEB791E65'"));
             // Guid nullable
-            exp = await Interpreter.BuildPredicateAsync<TestEntity>("GuidNullable", ComparisonOperator.Equal, "32F281EB-9973-4E78-86C0-3D7AEB791E6F");
-            exp = await Interpreter.BuildPredicateAsync<TestEntity>("GuidNullable", ComparisonOperator.Equal, "");
-            exp = await Interpreter.BuildPredicateAsync<TestEntity>("GuidNullable", ComparisonOperator.Equal, null);
-            exp = await Interpreter.BuildPredicateAsync<TestEntity>("GuidNullable", ComparisonOperator.NotEqual, "32F281EB-9973-4E78-86C0-3D7AEB791E6F");
-            exp = await Interpreter.BuildPredicateAsync<TestEntity>("GuidNullable", ComparisonOperator.In, "'32F281EB-9973-4E78-86C0-3D7AEB791E6F', '32F281EB-9973-4E78-86C0-3D7AEE791E6F', '32F281EB-9973-4E78-86C0-3D7AEB791E65'");
+            Assert.NotNull(await Interpreter.BuildPredicateAsync<TestEntity>("GuidNullable", ComparisonOperator.Equal, "32F281EB-9973-4E78-86C0-3D7AEB791E6F"));
+            Assert.NotNull(await Interpreter.BuildPredicateAsync<TestEntity>("GuidNullable", ComparisonOperator.Equal, ""));
+            Assert.NotNull(await Interpreter.BuildPredicateAsync<TestEntity>("GuidNullable", ComparisonOperator.Equal, null));
+            Assert.NotNull(await Interpreter.BuildPredicateAsync<TestEntity>("GuidNullable", ComparisonOperator.NotEqual, "32F281EB-9973-4E78-86C0-3D7AEB791E6F"));
+            Assert.NotNull(await Interpreter.BuildPredicateAsync<TestEntity>("GuidNullable", ComparisonOperator.In, "'32F281EB-9973-4E78-86C0-3D7AEB791E6F', '32F281EB-9973-4E78-86C0-3D7AEE791E6F', '32F281EB-9973-4E78-86C0-3D7AEB791E65'"));
 
             // Enum
-            exp = await Interpreter.BuildPredicateAsync<TestEntity>("Option", ComparisonOperator.Equal, "1");
-            exp = await Interpreter.BuildPredicateAsync<TestEntity>("Option", ComparisonOperator.Equal, "Option1");
-            exp = await Interpreter.BuildPredicateAsync<TestEntity>("Option", ComparisonOperator.NotEqual, "1");
-            exp = await Interpreter.BuildPredicateAsync<TestEntity>("Option", ComparisonOperator.NotEqual, "Option1");
-            exp = await Interpreter.BuildPredicateAsync<TestEntity>("Option", ComparisonOperator.In, "1, 2, 0");
-            exp = await Interpreter.BuildPredicateAsync<TestEntity>("Option", ComparisonOperator.In, "'Option1', 'Option2', 'Option3'");
+            Assert.NotNull(await Interpreter.BuildPredicateAsync<TestEntity>("Option", ComparisonOperator.Equal, "1"));
+            Assert.NotNull(await Interpreter.BuildPredicateAsync<TestEntity>("Option", ComparisonOperator.Equal, "Option1"));
+            Assert.NotNull(await Interpreter.BuildPredicateAsync<TestEntity>("Option", ComparisonOperator.NotEqual, "1"));
+            Assert.NotNull(await Interpreter.BuildPredicateAsync<TestEntity>("Option", ComparisonOperator.NotEqual, "Option1"));
+            Assert.NotNull(await Interpreter.BuildPredicateAsync<TestEntity>("Option", ComparisonOperator.In, "1, 2, 0"));
+            Assert.NotNull(await Interpreter.BuildPredicateAsync<TestEntity>("Option", ComparisonOperator.In, "'Option1', 'Option2', 'Option3'"));
             // Enum Nullable
-            exp = await Interpreter.BuildPredicateAsync<TestEntity>("OptionNullable", ComparisonOperator.Equal, "1");
-            exp = await Interpreter.BuildPredicateAsync<TestEntity>("OptionNullable", ComparisonOperator.Equal, "Option1");
-            exp = await Interpreter.BuildPredicateAsync<TestEntity>("OptionNullable", ComparisonOperator.Equal, "");
-            exp = await Interpreter.BuildPredicateAsync<TestEntity>("OptionNullable", ComparisonOperator.Equal, null);
-            exp = await Interpreter.BuildPredicateAsync<TestEntity>("OptionNullable", ComparisonOperator.NotEqual, "1");
-            exp = await Interpreter.BuildPredicateAsync<TestEntity>("OptionNullable", ComparisonOperator.NotEqual, "Option1");
-            exp = await Interpreter.BuildPredicateAsync<TestEntity>("OptionNullable", ComparisonOperator.In, "1, 2, 0");
-            exp = await Interpreter.BuildPredicateAsync<TestEntity>("OptionNullable", ComparisonOperator.In, "'Option1', 'Option2', 'Option3'");
+            Assert.NotNull(await Interpreter.BuildPredicateAsync<TestEntity>("OptionNullable", ComparisonOperator.Equal, "1"));
+            Assert.NotNull(await Interpreter.BuildPredicateAsync<TestEntity>("OptionNullable", ComparisonOperator.Equal, "Option1"));
+            Assert.NotNull(await Interpreter.BuildPredicateAsync<TestEntity>("OptionNullable", ComparisonOperator.Equal, ""));
+            Assert.NotNull(await Interpreter.BuildPredicateAsync<TestEntity>("OptionNullable", ComparisonOperator.Equal, null));
+            Assert.NotNull(await Interpreter.BuildPredicateAsync<TestEntity>("OptionNullable", ComparisonOperator.NotEqual, "1"));
+            Assert.NotNull(await Interpreter.BuildPredicateAsync<TestEntity>("OptionNullable", ComparisonOperator.NotEqual, "Option1"));
+            Assert.NotNull(await Interpreter.BuildPredicateAsync<TestEntity>("OptionNullable", ComparisonOperator.In, "1, 2, 0"));
+            Assert.NotNull(await Interpreter.BuildPredicateAsync<TestEntity>("OptionNullable", ComparisonOperator.In, "'Option1', 'Option2', 'Option3'"));
 
             // DateTime
-            exp = await Interpreter.BuildPredicateAsync<TestEntity>("DateTime", ComparisonOperator.Equal, DF.DateTimeString1);
-            exp = await Interpreter.BuildPredicateAsync<TestEntity>("DateTime", ComparisonOperator.NotEqual, DF.DateTimeString1);
-            exp = await Interpreter.BuildPredicateAsync<TestEntity>("DateTime", ComparisonOperator.LessThan, DF.DateTimeString1);
-            exp = await Interpreter.BuildPredicateAsync<TestEntity>("DateTime", ComparisonOperator.LessThanOrEqual, DF.DateTimeString1);
-            exp = await Interpreter.BuildPredicateAsync<TestEntity>("DateTime", ComparisonOperator.GreaterThan, DF.DateTimeString1);
-            exp = await Interpreter.BuildPredicateAsync<TestEntity>("DateTime", ComparisonOperator.GreaterThanOrEqual, DF.DateTimeString1);
-            exp = await Interpreter.BuildPredicateAsync<TestEntity>("DateTime", ComparisonOperator.In, $"'{DF.DateTimeString1}', '{DF.DateTimeString2}', '{DF.DateTimeString3}'");
+            Assert.NotNull(await Interpreter.BuildPredicateAsync<TestEntity>("DateTime", ComparisonOperator.Equal, DF.DateTimeString1));
+            Assert.NotNull(await Interpreter.BuildPredicateAsync<TestEntity>("DateTime", ComparisonOperator.NotEqual, DF.DateTimeString1));
+            Assert.NotNull(await Interpreter.BuildPredicateAsync<TestEntity>("DateTime", ComparisonOperator.LessThan, DF.DateTimeString1));
+            Assert.NotNull(await Interpreter.BuildPredicateAsync<TestEntity>("DateTime", ComparisonOperator.LessThanOrEqual, DF.DateTimeString1));
+            Assert.NotNull(await Interpreter.BuildPredicateAsync<TestEntity>("DateTime", ComparisonOperator.GreaterThan, DF.DateTimeString1));
+            Assert.NotNull(await Interpreter.BuildPredicateAsync<TestEntity>("DateTime", ComparisonOperator.GreaterThanOrEqual, DF.DateTimeString1));
+            Assert.NotNull(await Interpreter.BuildPredicateAsync<TestEntity>("DateTime", ComparisonOperator.In, $"'{DF.DateTimeString1}', '{DF.DateTimeString2}', '{DF.DateTimeString3}'"));
             // DateTime nullable
-            exp = await Interpreter.BuildPredicateAsync<TestEntity>("DateTimeNullable", ComparisonOperator.Equal, DF.DateTimeString1);
-            exp = await Interpreter.BuildPredicateAsync<TestEntity>("DateTimeNullable", ComparisonOperator.Equal, "");
-            exp = await Interpreter.BuildPredicateAsync<TestEntity>("DateTimeNullable", ComparisonOperator.Equal, null);
-            exp = await Interpreter.BuildPredicateAsync<TestEntity>("DateTimeNullable", ComparisonOperator.NotEqual, DF.DateTimeString1);
-            exp = await Interpreter.BuildPredicateAsync<TestEntity>("DateTimeNullable", ComparisonOperator.LessThan, DF.DateTimeString1);
-            exp = await Interpreter.BuildPredicateAsync<TestEntity>("DateTimeNullable", ComparisonOperator.LessThanOrEqual, DF.DateTimeString1);
-            exp = await Interpreter.BuildPredicateAsync<TestEntity>("DateTimeNullable", ComparisonOperator.GreaterThan, DF.DateTimeString1);
-            exp = await Interpreter.BuildPredicateAsync<TestEntity>("DateTimeNullable", ComparisonOperator.GreaterThanOrEqual, DF.DateTimeString1);
-            exp = await Interpreter.BuildPredicateAsync<TestEntity>("DateTimeNullable", ComparisonOperator.In, $"'{DF.DateTimeString1}', '{DF.DateTimeString2}', '{DF.DateTimeString3}'");
+            Assert.NotNull(await Interpreter.BuildPredicateAsync<TestEntity>("DateTimeNullable", ComparisonOperator.Equal, DF.DateTimeString1));
+            Assert.NotNull(await Interpreter.BuildPredicateAsync<TestEntity>("DateTimeNullable", ComparisonOperator.Equal, ""));
+            Assert.NotNull(await Interpreter.BuildPredicateAsync<TestEntity>("DateTimeNullable", ComparisonOperator.Equal, null));
+            Assert.NotNull(await Interpreter.BuildPredicateAsync<TestEntity>("DateTimeNullable", ComparisonOperator.NotEqual, DF.DateTimeString1));
+            Assert.NotNull(await Interpreter.BuildPredicateAsync<TestEntity>("DateTimeNullable", ComparisonOperator.LessThan, DF.DateTimeString1));
+            Assert.NotNull(await Interpreter.BuildPredicateAsync<TestEntity>("DateTimeNullable", ComparisonOperator.LessThanOrEqual, DF.DateTimeString1));
+            Assert.NotNull(await Interpreter.BuildPredicateAsync<TestEntity>("DateTimeNullable", ComparisonOperator.GreaterThan, DF.DateTimeString1));
+            Assert.NotNull(await Interpreter.BuildPredicateAsync<TestEntity>("DateTimeNullable", ComparisonOperator.GreaterThanOrEqual, DF.DateTimeString1));
+            Assert.NotNull(await Interpreter.BuildPredicateAsync<TestEntity>("DateTimeNullable", ComparisonOperator.In, $"'{DF.DateTimeString1}', '{DF.DateTimeString2}', '{DF.DateTimeString3}'"));
 
             // DateTimeOffset
-            exp = await Interpreter.BuildPredicateAsync<TestEntity>("DateTimeOffset", ComparisonOperator.Equal, DF.DateTimeOffsetString1);
-            exp = await Interpreter.BuildPredicateAsync<TestEntity>("DateTimeOffset", ComparisonOperator.NotEqual, DF.DateTimeOffsetString1);
-            exp = await Interpreter.BuildPredicateAsync<TestEntity>("DateTimeOffset", ComparisonOperator.LessThan, DF.DateTimeOffsetString1);
-            exp = await Interpreter.BuildPredicateAsync<TestEntity>("DateTimeOffset", ComparisonOperator.LessThanOrEqual, DF.DateTimeOffsetString1);
-            exp = await Interpreter.BuildPredicateAsync<TestEntity>("DateTimeOffset", ComparisonOperator.GreaterThan, DF.DateTimeOffsetString1);
-            exp = await Interpreter.BuildPredicateAsync<TestEntity>("DateTimeOffset", ComparisonOperator.GreaterThanOrEqual, DF.DateTimeOffsetString1);
-            exp = await Interpreter.BuildPredicateAsync<TestEntity>("DateTimeOffset", ComparisonOperator.In, $"'{DF.DateTimeOffsetString1}', '{DF.DateTimeOffsetString2}', '{DF.DateTimeOffsetString3}'");
+            Assert.NotNull(await Interpreter.BuildPredicateAsync<TestEntity>("DateTimeOffset", ComparisonOperator.Equal, DF.DateTimeOffsetString1));
+            Assert.NotNull(await Interpreter.BuildPredicateAsync<TestEntity>("DateTimeOffset", ComparisonOperator.NotEqual, DF.DateTimeOffsetString1));
+            Assert.NotNull(await Interpreter.BuildPredicateAsync<TestEntity>("DateTimeOffset", ComparisonOperator.LessThan, DF.DateTimeOffsetString1));
+            Assert.NotNull(await Interpreter.BuildPredicateAsync<TestEntity>("DateTimeOffset", ComparisonOperator.LessThanOrEqual, DF.DateTimeOffsetString1));
+            Assert.NotNull(await Interpreter.BuildPredicateAsync<TestEntity>("DateTimeOffset", ComparisonOperator.GreaterThan, DF.DateTimeOffsetString1));
+            Assert.NotNull(await Interpreter.BuildPredicateAsync<TestEntity>("DateTimeOffset", ComparisonOperator.GreaterThanOrEqual, DF.DateTimeOffsetString1));
+            Assert.NotNull(await Interpreter.BuildPredicateAsync<TestEntity>("DateTimeOffset", ComparisonOperator.In, $"'{DF.DateTimeOffsetString1}', '{DF.DateTimeOffsetString2}', '{DF.DateTimeOffsetString3}'"));
             // DateTimeOffset nullable
-            exp = await Interpreter.BuildPredicateAsync<TestEntity>("DateTimeOffsetNullable", ComparisonOperator.Equal, DF.DateTimeOffsetString1);
-            exp = await Interpreter.BuildPredicateAsync<TestEntity>("DateTimeOffsetNullable", ComparisonOperator.Equal, "");
-            exp = await Interpreter.BuildPredicateAsync<TestEntity>("DateTimeOffsetNullable", ComparisonOperator.Equal, null);
-            exp = await Interpreter.BuildPredicateAsync<TestEntity>("DateTimeOffsetNullable", ComparisonOperator.NotEqual, DF.DateTimeOffsetString1);
-            exp = await Interpreter.BuildPredicateAsync<TestEntity>("DateTimeOffsetNullable", ComparisonOperator.LessThan, DF.DateTimeOffsetString1);
-            exp = await Interpreter.BuildPredicateAsync<TestEntity>("DateTimeOffsetNullable", ComparisonOperator.LessThanOrEqual, DF.DateTimeOffsetString1);
-            exp = await Interpreter.BuildPredicateAsync<TestEntity>("DateTimeOffsetNullable", ComparisonOperator.GreaterThan, DF.DateTimeOffsetString1);
-            exp = await Interpreter.BuildPredicateAsync<TestEntity>("DateTimeOffsetNullable", ComparisonOperator.GreaterThanOrEqual, DF.DateTimeOffsetString1);
-            exp = await Interpreter.BuildPredicateAsync<TestEntity>("DateTimeOffsetNullable", ComparisonOperator.In, $"'{DF.DateTimeOffsetString1}', '{DF.DateTimeOffsetString2}', '{DF.DateTimeOffsetString3}'");
+            Assert.NotNull(await Interpreter.BuildPredicateAsync<TestEntity>("DateTimeOffsetNullable", ComparisonOperator.Equal, DF.DateTimeOffsetString1));
+            Assert.NotNull(await Interpreter.BuildPredicateAsync<TestEntity>("DateTimeOffsetNullable", ComparisonOperator.Equal, ""));
+            Assert.NotNull(await Interpreter.BuildPredicateAsync<TestEntity>("DateTimeOffsetNullable", ComparisonOperator.Equal, null));
+            Assert.NotNull(await Interpreter.BuildPredicateAsync<TestEntity>("DateTimeOffsetNullable", ComparisonOperator.NotEqual, DF.DateTimeOffsetString1));
+            Assert.NotNull(await Interpreter.BuildPredicateAsync<TestEntity>("DateTimeOffsetNullable", ComparisonOperator.LessThan, DF.DateTimeOffsetString1));
+            Assert.NotNull(await Interpreter.BuildPredicateAsync<TestEntity>("DateTimeOffsetNullable", ComparisonOperator.LessThanOrEqual, DF.DateTimeOffsetString1));
+            Assert.NotNull(await Interpreter.BuildPredicateAsync<TestEntity>("DateTimeOffsetNullable", ComparisonOperator.GreaterThan, DF.DateTimeOffsetString1));
+            Assert.NotNull(await Interpreter.BuildPredicateAsync<TestEntity>("DateTimeOffsetNullable", ComparisonOperator.GreaterThanOrEqual, DF.DateTimeOffsetString1));
+            Assert.NotNull(await Interpreter.BuildPredicateAsync<TestEntity>("DateTimeOffsetNullable", ComparisonOperator.In, $"'{DF.DateTimeOffsetString1}', '{DF.DateTimeOffsetString2}', '{DF.DateTimeOffsetString3}'"));
 
             // nested property
-            exp = await Interpreter.BuildPredicateAsync<TestEntity>("Parent.Id", ComparisonOperator.Equal, "1");
+            Assert.NotNull(await Interpreter.BuildPredicateAsync<TestEntity>("Parent.Id", ComparisonOperator.Equal, "1"));
 
             // variable resolver
-            exp = await Interpreter.BuildPredicateAsync<TestEntity>("DateTime", ComparisonOperator.Equal, "now");
-            exp = await Interpreter.BuildPredicateAsync<TestEntity>("DateTime.Year", ComparisonOperator.Equal, "now.year");
+            Assert.NotNull(await Interpreter.BuildPredicateAsync<TestEntity>("DateTime", ComparisonOperator.Equal, "now"));
+            Assert.NotNull(await Interpreter.BuildPredicateAsync<TestEntity>("DateTime.Year", ComparisonOperator.Equal, "now.year"));
 
             // actually just test without exceptions
-            Assert.NotNull(exp);
         }
 
         [Fact]

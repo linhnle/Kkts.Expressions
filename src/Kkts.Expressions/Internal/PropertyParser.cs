@@ -22,42 +22,16 @@ namespace Kkts.Expressions.Internal
 		public override bool Accept(char @char, int noOfWhiteSpaceIgnored, int index, ref bool keepTrack, ref bool isStartGroup)
 		{
 			if (Done) return false;
-			var prevChar = PreviousChar;
 			if (IsNestedProperty)
 			{
-				if (@char == '.')
-				{
-					if (_nestedParser != null)
-					{
-						Append('.');
-						Append(_nestedParser);
-					}
-					_nestedParser = new PropertyParser();
-					return true;
-				}
-				else
-				{
-					var accepted = _nestedParser.Accept(@char, noOfWhiteSpaceIgnored, index, ref keepTrack, ref isStartGroup);
-					if (!accepted)
-					{
-						if (@char != '(' && _nestedParser.Done)
-						{
-							Append('.');
-							Append(_nestedParser);
-						}
-
-						Done = _nestedParser.Done;
-						if (Done) EndIndex = index - 1;
-					}
-
-					return accepted;
-				}
+				return AcceptNestedProperty(@char, noOfWhiteSpaceIgnored, index, ref keepTrack, ref isStartGroup);
 			}
 
+			var prevChar = PreviousChar;
 			if (noOfWhiteSpaceIgnored > 0 && Length > 0)
 			{
-				Done = Length > 0;
-				if (Done) EndIndex = index - noOfWhiteSpaceIgnored;
+				Done = true;
+				EndIndex = index - noOfWhiteSpaceIgnored;
 				return false;
 			}
 
@@ -86,6 +60,32 @@ namespace Kkts.Expressions.Internal
 			Done = Length > 0;
 			if (Done) EndIndex = index - 1;
 
+			return false;
+		}
+
+		private bool AcceptNestedProperty(char value, int whitespace, int index, ref bool keepTrack, ref bool isStartGroup)
+		{
+			if (value == '.')
+			{
+				if (_nestedParser != null)
+				{
+					Append('.');
+					Append(_nestedParser);
+				}
+				_nestedParser = new PropertyParser();
+				return true;
+			}
+
+			var accepted = _nestedParser.Accept(value, whitespace, index, ref keepTrack, ref isStartGroup);
+			if (accepted) return true;
+			if (value != '(' && _nestedParser.Done)
+			{
+				Append('.');
+				Append(_nestedParser);
+			}
+
+			Done = _nestedParser.Done;
+			if (Done) EndIndex = index - 1;
 			return false;
 		}
 

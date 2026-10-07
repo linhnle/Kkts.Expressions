@@ -46,7 +46,7 @@ namespace Kkts.Expressions
                   TaskScheduler.Default);
 
 
-        [Obsolete]
+        [Obsolete("Use TryResolve or TryResolveAsync to determine whether a variable can be resolved.")]
         public virtual bool IsVariable(string name)
         {
             if (name == null) return false;
@@ -131,43 +131,7 @@ namespace Kkts.Expressions
             var segmentName = segments[0];
             if (lookup.TryGetValue(segmentName, out var prop))
             {
-                var tmp = prop.GetValue(this);
-                var currentType = prop.PropertyType;
-                for (var i = 1; i < segments.Length; ++i)
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    if (tmp is null)
-                    {
-                        return new VariableInfo { Name = name };
-                    }
-
-                    MemberInfo member;
-                    try
-                    {
-                        member = Expression.PropertyOrField(Expression.Parameter(currentType), segments[i]).Member;
-                    }
-                    catch (ArgumentException)
-                    {
-                        return new VariableInfo { Name = name };
-                    }
-
-                    switch (member)
-                    {
-                        case PropertyInfo p:
-                            tmp = p.GetValue(tmp);
-                            currentType = p.PropertyType;
-                            break;
-                        case FieldInfo f:
-                            tmp = f.GetValue(tmp);
-                            currentType = f.FieldType;
-                            break;
-                    }
-                }
-
-                value = tmp;
-                _cache.TryAdd(name, value);
-
-                return new VariableInfo { Name = name, Resolved = true, Value = value };
+                return ResolvePropertyPath(name, segments, prop, cancellationToken);
             }
 
             var varInfo = await TryResolveCore(name, cancellationToken);
@@ -179,14 +143,53 @@ namespace Kkts.Expressions
             return varInfo;
         }
 
+        private VariableInfo ResolvePropertyPath(string name, string[] segments, PropertyInfo property, CancellationToken cancellationToken)
+        {
+            var value = property.GetValue(this);
+            var currentType = property.PropertyType;
+            for (var i = 1; i < segments.Length; ++i)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (value is null) return new VariableInfo { Name = name };
+
+                MemberInfo member;
+                try
+                {
+                    member = Expression.PropertyOrField(Expression.Parameter(currentType), segments[i]).Member;
+                }
+                catch (ArgumentException)
+                {
+                    return new VariableInfo { Name = name };
+                }
+
+                switch (member)
+                {
+                    case PropertyInfo p:
+                        value = p.GetValue(value);
+                        currentType = p.PropertyType;
+                        break;
+                    case FieldInfo f:
+                        value = f.GetValue(value);
+                        currentType = f.FieldType;
+                        break;
+                }
+            }
+
+            _cache.TryAdd(name, value);
+            return new VariableInfo { Name = name, Resolved = true, Value = value };
+        }
+
         private IDictionary<string, PropertyInfo> GetVariables()
         {
-            return _dictionary is null ?
+            if (_dictionary is null)
+            {
                 _dictionary = GetType()
                 .GetProperties(BindingFlags.Public | BindingFlags.Instance)
                 .Where(p => p.CanRead)
-                .ToDictionary(k => k.Name, StringComparer.OrdinalIgnoreCase)
-                : _dictionary;
+                .ToDictionary(k => k.Name, StringComparer.OrdinalIgnoreCase);
+            }
+
+            return _dictionary;
         }
 
         /// <summary>
@@ -195,7 +198,7 @@ namespace Kkts.Expressions
         private static TResult RunSync<TResult>(Func<Task<TResult>> func)
         {
             return _syncTaskFactory
-              .StartNew(func)
+              .StartNew(func, CancellationToken.None)
               .Unwrap()
               .GetAwaiter()
               .GetResult();

@@ -92,26 +92,45 @@ namespace Kkts.Expressions.Internal
 		{
 			if (left == typeof(decimal) || right == typeof(decimal))
 			{
-				if (left == typeof(float) || right == typeof(float) || left == typeof(double) || right == typeof(double))
-					throw new InvalidOperationException("Decimal cannot be added to float or double.");
-				return typeof(decimal);
+				return PromoteDecimal(left, right);
 			}
 			if (left == typeof(double) || right == typeof(double)) return typeof(double);
 			if (left == typeof(float) || right == typeof(float)) return typeof(float);
+			return PromoteIntegral(left, right);
+		}
+
+		private static Type PromoteIntegral(Type left, Type right)
+		{
 			if (left == typeof(ulong) || right == typeof(ulong))
 			{
-				var other = left == typeof(ulong) ? right : left;
-				if (other == typeof(sbyte) || other == typeof(short) || other == typeof(int) || other == typeof(long))
-					throw new InvalidOperationException("UInt64 cannot be added to a signed integral operand.");
-				return typeof(ulong);
+				return PromoteUnsignedLong(left == typeof(ulong) ? right : left);
 			}
 			if (left == typeof(long) || right == typeof(long)) return typeof(long);
 			if (left == typeof(uint) || right == typeof(uint))
 			{
 				var other = left == typeof(uint) ? right : left;
-				return other == typeof(sbyte) || other == typeof(short) || other == typeof(int) ? typeof(long) : typeof(uint);
+				return IsSignedSmallIntegral(other) ? typeof(long) : typeof(uint);
 			}
 			return typeof(int);
+		}
+
+		private static bool IsSignedSmallIntegral(Type type)
+		{
+			return type == typeof(sbyte) || type == typeof(short) || type == typeof(int);
+		}
+
+		private static Type PromoteDecimal(Type left, Type right)
+		{
+			if (left == typeof(float) || right == typeof(float) || left == typeof(double) || right == typeof(double))
+				throw new InvalidOperationException("Decimal cannot be added to float or double.");
+			return typeof(decimal);
+		}
+
+		private static Type PromoteUnsignedLong(Type other)
+		{
+			if (IsSignedSmallIntegral(other) || other == typeof(long))
+				throw new InvalidOperationException("UInt64 cannot be added to a signed integral operand.");
+			return typeof(ulong);
 		}
 	}
 }

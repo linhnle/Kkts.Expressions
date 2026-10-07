@@ -29,28 +29,11 @@ namespace Kkts.Expressions.Internal
 
 				if (@char == Beginning)
 				{
-					var funcName = NormalizedResult;
-					_startBoby = Interpreter.ComparisonFunctionOperators.Contains(funcName);
-					if (!_startBoby)
-					{
-						return false;
-					}
+					if (!StartBody(ref isStartGroup)) return false;
 				}
 				else
 				{
 					Append(@char);
-				}
-
-				if (_startBoby)
-				{
-					isStartGroup = true;
-					_parsers = new List<Parser>
-					{
-						new PropertyParser { Previous = this, LeftHand = false, EndFunction = true },
-						new StringParser { Previous = this, LeftHand = false, EndFunction = true },
-						new NumberParser { Previous = this, LeftHand = false, EndFunction = true },
-						new GroupParser { Previous = this, LeftHand = false, EndFunction = true }
-					};
 				}
 
 				return true;
@@ -72,6 +55,21 @@ namespace Kkts.Expressions.Internal
 			}
 
 			return false;
+		}
+
+		private bool StartBody(ref bool isStartGroup)
+		{
+			_startBoby = Interpreter.ComparisonFunctionOperators.Contains(NormalizedResult);
+			if (!_startBoby) return false;
+			isStartGroup = true;
+			_parsers = new List<Parser>
+			{
+				new PropertyParser { Previous = this, LeftHand = false, EndFunction = true },
+				new StringParser { Previous = this, LeftHand = false, EndFunction = true },
+				new NumberParser { Previous = this, LeftHand = false, EndFunction = true },
+				new GroupParser { Previous = this, LeftHand = false, EndFunction = true }
+			};
+			return true;
 		}
 
 		public override bool Validate()

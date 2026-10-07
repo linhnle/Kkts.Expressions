@@ -67,7 +67,7 @@ namespace Kkts.Expressions
 
 		public static Task<EvaluationResult<T, bool>> TryBuildPredicateAsync<T>(this FilterGroup filterGroup, VariableResolver variableResolver = null, IEnumerable<string> validProperties = null, IDictionary<string, string> propertyMapping = null, CancellationToken cancellationToken = default)
 		{
-			if (filterGroup == null) throw new ArgumentNullException(nameof(filterGroup)); ;
+			if (filterGroup == null) throw new ArgumentNullException(nameof(filterGroup));
 			var arg = new BuildArgument
 			{
 				ValidProperties = validProperties,
