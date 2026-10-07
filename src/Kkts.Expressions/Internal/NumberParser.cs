@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.Globalization;
 
 namespace Kkts.Expressions.Internal
 {
@@ -48,11 +49,7 @@ namespace Kkts.Expressions.Internal
 
 		public override bool Validate()
 		{
-			var result = Result.ToLower();
-
-			var valid = double.TryParse(result, out var r);
-
-			return valid;
+			return double.TryParse(Result, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out _);
 		}
 	}
 }

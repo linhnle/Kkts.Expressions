@@ -205,6 +205,11 @@ Expression<Func<Data, bool>> predicate = filters.BuildPredicate<Data>(propertyMa
 |Logical or (or or \|\|) | Id = 1 or Name = "Text" | Boolean |
 |Plus| Id + 1 > 5 or Name + '!' = 'Test!' | Number, nullable number, String (including mixed operands) |
 
+Numeric literals in predicates use invariant culture and a period as the decimal
+separator (for example, `8.3`), regardless of the current culture. When building
+queries with interpolated numeric values, use `FormattableString.Invariant`.
+Commas separate elements in `in` arrays; they are not decimal separators.
+
 ### Binary plus in predicates
 
 Binary `+` supports property + property, property + value, and property + variable,

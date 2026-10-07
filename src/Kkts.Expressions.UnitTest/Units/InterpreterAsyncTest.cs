@@ -61,7 +61,7 @@ namespace Kkts.Expressions.UnitTest.Units
         [Fact]
         public async Task ParsePredicateAsync_Double_Succeed()
         {
-            var query = $"Double={DF.Double3} and Double != 0.0 and Double<{DF.DoubleN} and Double<={DF.Double3} and Double>={DF.Double1} and Double>0.0 and Double in [{DF.Double1},{DF.Double2},{DF.Double3},{DF.DoubleN}]";
+            var query = FormattableString.Invariant($"Double={DF.Double3} and Double != 0.0 and Double<{DF.DoubleN} and Double<={DF.Double3} and Double>={DF.Double1} and Double>0.0 and Double in [{DF.Double1},{DF.Double2},{DF.Double3},{DF.DoubleN}]");
             var and1 = await Interpreter.ParsePredicateAsync<TestEntity>(query);
             var and2 = await Interpreter.ParsePredicateAsync<TestEntity>(query.Replace("and", "&&"));
             var and3 = await Interpreter.ParsePredicateAsync<TestEntity>(query.Replace("and", "&"));
@@ -456,7 +456,7 @@ namespace Kkts.Expressions.UnitTest.Units
         [Fact]
         public async Task ParsePredicateAsync_ComplicatedGroup_Success()
         {
-            var result = await Interpreter.ParsePredicateAsync<TestEntity>($"(Integer={DF.Integer1} or Double={DF.Double3}) and (Guid=='{DF.Guid1}' or DateTime='{DF.DateTime3}')");
+            var result = await Interpreter.ParsePredicateAsync<TestEntity>(FormattableString.Invariant($"(Integer={DF.Integer1} or Double={DF.Double3}) and (Guid=='{DF.Guid1}' or DateTime='{DF.DateTimeString3}')"));
             Assert.True(result.Succeeded);
             using (var context = DF.GetContext())
             {
