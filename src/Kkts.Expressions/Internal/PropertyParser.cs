@@ -50,7 +50,7 @@ namespace Kkts.Expressions.Internal
 				}
 			}
 
-			if (char.IsLetter(@char) || @char == '_' || char.IsDigit(@char))
+			if (ExpressionGrammar.IsIdentifierPart(@char))
 			{
 				if (prevChar == char.MinValue) StartIndex = index;
 				Append(@char);
@@ -91,7 +91,7 @@ namespace Kkts.Expressions.Internal
 
 		public override IList<Parser> GetNextParsers(char @char)
 		{
-			if (@char == '+' || @char == '-') return GetAdditiveParsers();
+			if (ExpressionGrammar.IsAdditive(@char)) return GetAdditiveParsers();
 			if (@char == '.')
 			{
 				IsNestedProperty = true;

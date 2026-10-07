@@ -1,11 +1,9 @@
 ﻿using System.Collections.Generic;
-using System.Linq;
 
 namespace Kkts.Expressions.Internal
 {
 	internal class ComparisonOparatorParser : Parser
 	{
-		private static readonly char[] SpecialChars = { '=', '!', '<', '>', '@', '*' };
 		private bool _isSpecialChar = true;
 
 		public override bool Accept(char @char, int noOfWhiteSpaceIgnored, int index, ref bool keepTrack, ref bool isStartGroup)
@@ -16,14 +14,14 @@ namespace Kkts.Expressions.Internal
 				Append(@char);
 				return true;
 			}
-			return AcceptOperator(@char, noOfWhiteSpaceIgnored, index, SpecialChars, ref _isSpecialChar);
+			return AcceptOperator(@char, noOfWhiteSpaceIgnored, index, ExpressionGrammar.ComparisonCharacters, ref _isSpecialChar);
 		}
 
 		public override IList<Parser> GetNextParsers(char @char)
 		{
 			var opa = NormalizedResult;
 
-            if (!Interpreter.ComparisonOperators.Contains(opa))
+            if (!ExpressionGrammar.IsComparison(opa))
 			{
 				return new List<Parser>(0);
 			}
@@ -52,7 +50,7 @@ namespace Kkts.Expressions.Internal
 		{
 			var result = NormalizedResult;
 
-			var valid = Interpreter.ComparisonOperators.Contains(result);
+			var valid = ExpressionGrammar.IsComparison(result);
 
 			return valid;
 		}

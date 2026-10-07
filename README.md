@@ -18,6 +18,7 @@ The library targets `netstandard2.0` and is available on
 - [Conditions and pagination](#conditions-and-pagination)
 - [Supported operators](#supported-operators)
 - [Parsing and validation behavior](#parsing-and-validation-behavior)
+- [Expression editor integration (v3.0 only)](#expression-editor-integration-v30-only)
 - [TimeSpan durations](#timespan-durations)
 - [Binary plus in predicates (v3.0 only)](#binary-plus-in-predicates-v30-only)
 - [Development notes](#development-notes)
@@ -490,6 +491,140 @@ by every relational provider.
   by getters are surfaced rather than silently treated as missing variables.
 - Async filter collections forward the caller's cancellation token through
   generic and runtime-type overloads.
+
+## Expression editor integration (v3.0 only)
+
+**The expression analysis API and the integration examples in this section
+apply only to v3.0.** `Interpreter.AnalyzeExpression` and its token, diagnostic,
+and result types are not available in v2.x.
+
+Use `Interpreter.AnalyzeExpression(text)` on each editor text snapshot to obtain
+syntax highlighting and positioned syntax errors. This is a UI-independent API:
+it needs no entity type, variable resolver, frontend package, or HTTP service.
+It does not build or execute LINQ expressions.
+
+```csharp
+var text = "  Id = $x  ";
+var analysis = Interpreter.AnalyzeExpression(text);
+
+foreach (var token in analysis.Tokens)
+{
+    var tokenText = text.Substring(token.Start, token.Length);
+    Console.WriteLine($"{token.Kind}: {tokenText} at {token.Start}");
+}
+
+foreach (var diagnostic in analysis.Diagnostics)
+{
+    Console.WriteLine(
+        $"{diagnostic.Code}: {diagnostic.Message} " +
+        $"at {diagnostic.Start}, length {diagnostic.Length}");
+}
+```
+
+This example returns property `(2, 2)`, operator `(5, 1)`, and variable `(7, 2)`
+tokens. `Start` and `Length` are zero-based **UTF-16** offsets into the exact
+input, not a trimmed or normalized copy. Ranges are half-open:
+`[Start, Start + Length)`. They match .NET string and JavaScript string offsets,
+not UTF-8 byte offsets or displayed character counts. Tokens do not overlap;
+whitespace outside tokens is preserved as unclassified gaps.
+
+| Kind | Suggested style | Examples |
+| --- | --- | --- |
+| `Property` | `property` | `Customer.Name`, `Id` |
+| `Variable` | `variable` | `$user.name`, `$x` (including `$`) |
+| `Operator` | `operator` | `=`, `and`, `not in`, `-`, `contains` |
+| `Constant` | `constant` | `-5`, `'a+b'`, `true`, `null` |
+| `Punctuation` | `punctuation` | Function dots, parentheses, list delimiters and commas |
+| `Unknown` | `unknown` | Unrecognized text such as `#` outside a literal |
+
+Compound `not in` tokens include the whitespace between their keywords.
+Nested property/variable paths are single tokens. Function names are operators
+separate from their dots and parentheses. Strings include their quotes and
+escapes; operators inside quoted text are not separate tokens. Membership lists
+expose individual items and punctuation, while retaining the existing list
+syntax and leaving value conversion to predicate validation.
+
+### Building editor highlight runs
+
+The following helper produces text/style pairs, including whitespace gaps,
+without generating HTML. It uses `System.Collections.Generic` and
+`Kkts.Expressions`:
+
+```csharp
+public static IReadOnlyList<(string Text, string Style)> BuildHighlightRuns(
+    string text, out ExpressionAnalysisResult analysis)
+{
+    analysis = Interpreter.AnalyzeExpression(text);
+    var runs = new List<(string Text, string Style)>();
+    var cursor = 0;
+    foreach (var token in analysis.Tokens)
+    {
+        if (token.Start > cursor)
+            runs.Add((text.Substring(cursor, token.Start - cursor), "plain"));
+
+        string style;
+        switch (token.Kind)
+        {
+            case ExpressionTokenKind.Property: style = "property"; break;
+            case ExpressionTokenKind.Variable: style = "variable"; break;
+            case ExpressionTokenKind.Operator: style = "operator"; break;
+            case ExpressionTokenKind.Constant: style = "constant"; break;
+            case ExpressionTokenKind.Punctuation: style = "punctuation"; break;
+            default: style = "unknown"; break;
+        }
+        runs.Add((text.Substring(token.Start, token.Length), style));
+        cursor = token.Start + token.Length;
+    }
+    if (cursor < text.Length)
+        runs.Add((text.Substring(cursor), "plain"));
+    return runs.AsReadOnly();
+}
+```
+
+Call this helper from your text-change handler and render each run as text with
+the corresponding client-defined style. Use text nodes or your framework's
+escaped text rendering; **never insert user expression text as raw HTML**.
+Preserve whitespace and the original text rather than replacing the editor's
+value with reconstructed or normalized tokens.
+
+### Displaying syntax diagnostics while typing
+
+Analysis continues highlighting after recoverable errors and reports multiple
+independent errors. For example,
+`Id = ) and Name = ] and IsEnabled = true` reports errors at `(5, 1)` and
+`(18, 1)` while keeping all subsequent tokens highlighted. Recovery does not
+attempt to fix the expression or guarantee one diagnostic per arbitrary mistake.
+
+An unfinished `Name = 'abc` retains constant token `(7, 4)` and reports an
+`unterminated-string` error at `(11, 0)`. Missing operands, quotes, and scope
+delimiters at end of input use `(text.Length, 0)`: draw a caret marker there,
+not an out-of-range character underline. Other diagnostics identify the
+offending source range. Display `Message` to the user; use `Code` for programmatic
+handling:
+
+| Code | Meaning |
+| --- | --- |
+| `unknown-text` | Unrecognized source character |
+| `unexpected-token` | Token is not accepted in this syntax position |
+| `missing-operand` | An operand or completed expression is required |
+| `unmatched-delimiter` | A closing scope delimiter is required |
+| `unterminated-string` | A closing quote is required |
+| `incomplete-identifier` | A property/variable path needs an identifier |
+
+Results and their collections are read-only snapshots. Empty/whitespace-only
+input produces no tokens or diagnostics and `IsComplete == false`; null input
+throws `ArgumentNullException`. Expected syntax errors return diagnostics
+rather than throw.
+
+`IsComplete` means **nonblank input with valid syntax only**. Unknown properties
+and unresolved variables can be syntactically complete; so can a non-Boolean
+expression such as `1 + 2`. Continue using `ParsePredicate` or
+`ParsePredicateAsync` and checking `Succeeded` before executing a query.
+
+The library does not debounce or retain editor state. Consumers may debounce
+or schedule analysis for long inputs. If work is scheduled asynchronously, apply
+the result only if its input snapshot is still the current editor text, so an
+older result cannot overwrite newer highlighting or diagnostics.
 
 ## TimeSpan durations
 

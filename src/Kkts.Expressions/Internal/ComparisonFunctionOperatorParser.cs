@@ -1,5 +1,4 @@
 ﻿using System.Collections.Generic;
-using System.Linq;
 
 namespace Kkts.Expressions.Internal
 {
@@ -59,7 +58,7 @@ namespace Kkts.Expressions.Internal
 
 		private bool StartBody(ref bool isStartGroup)
 		{
-			_startBoby = Interpreter.ComparisonFunctionOperators.Contains(NormalizedResult);
+			_startBoby = ExpressionGrammar.IsFunction(NormalizedResult);
 			if (!_startBoby) return false;
 			isStartGroup = true;
 			_parsers = new List<Parser>

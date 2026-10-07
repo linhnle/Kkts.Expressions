@@ -1,11 +1,9 @@
 ﻿using System.Collections.Generic;
-using System.Linq;
 
 namespace Kkts.Expressions.Internal
 {
 	internal class StringParser : Parser
 	{
-		private readonly char[] Quotes = { '\'', '"' };
 		private bool _endString = false;
 		private bool _startString = false;
 		private bool _isInEntity = false;
@@ -16,7 +14,7 @@ namespace Kkts.Expressions.Internal
 			if (_endString) return false;
 			if(!_startString)
 			{
-				if (Quotes.Contains(@char))
+				if (ExpressionGrammar.IsQuote(@char))
 				{
 					StartIndex = index;
 					keepTrack = true;
@@ -39,11 +37,11 @@ namespace Kkts.Expressions.Internal
 				}
 				else
 				{
-					Append('\\');
+					Append(ExpressionGrammar.Escape);
 				}
 			}
 
-			if (@char == '\\')
+			if (@char == ExpressionGrammar.Escape)
 			{
 				_isInEntity = true;
 				return true;
@@ -65,7 +63,7 @@ namespace Kkts.Expressions.Internal
 
 		public override IList<Parser> GetNextParsers(char @char)
 		{
-			if (@char == '+' || @char == '-') return GetAdditiveParsers();
+			if (ExpressionGrammar.IsAdditive(@char)) return GetAdditiveParsers();
 			if (@char == '.')
 			{
 				return new List<Parser> { new ComparisonFunctionOperatorParser { Previous = this } };

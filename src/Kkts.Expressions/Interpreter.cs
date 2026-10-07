@@ -76,6 +76,19 @@ namespace Kkts.Expressions
 		internal static readonly MethodInfo StringStartsWithMethod = typeof(string).GetMethod(nameof(string.StartsWith), new[] { typeof(string) });
 		internal static readonly MethodInfo StringEndsWithMethod = typeof(string).GetMethod(nameof(string.EndsWith), new[] { typeof(string) });
 
+		/// <summary>
+		/// Analyzes an original text snapshot for highlighting and recoverable syntax errors,
+		/// without resolving variables, binding entity properties, or building a predicate.
+		/// </summary>
+		/// <param name="expression">Unmodified editor text, including whitespace.</param>
+		/// <returns>Read-only UTF-16 token spans, positioned diagnostics, and syntax completeness.</returns>
+		/// <exception cref="ArgumentNullException">The expression is null.</exception>
+		public static ExpressionAnalysisResult AnalyzeExpression(string expression)
+		{
+			if (expression == null) throw new ArgumentNullException(nameof(expression));
+			return new ExpressionAnalyzer(expression).Analyze();
+		}
+
 		public static EvaluationResult<T, bool> ParsePredicate<T>(this string expression, VariableResolver variableResolver = null, IEnumerable<string> validProperties = null, IDictionary<string, string> propertyMapping = null)
 		{
 			if (string.IsNullOrWhiteSpace(expression)) throw new ArgumentException("Invalid expression", nameof(expression));
