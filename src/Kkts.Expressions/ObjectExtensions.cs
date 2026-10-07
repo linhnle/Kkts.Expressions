@@ -17,6 +17,8 @@ namespace Kkts.Expressions
                 return conversionType != null ? null : Convert.ChangeType(value, type);
             }
 
+            if (value is TimeSpan && (conversionType ?? type) == typeof(TimeSpan)) return value;
+
             return Convert.ChangeType(value, conversionType ?? type);
         }
     }

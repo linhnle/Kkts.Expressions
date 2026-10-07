@@ -24,6 +24,21 @@ namespace Kkts.Expressions
     public class EvaluationResult : EvaluationResultBase
     {
         public LambdaExpression Result { get; internal set; }
+
+        internal EvaluationResult<T, TResult> ToGeneric<T, TResult>()
+        {
+            return new EvaluationResult<T, TResult>
+            {
+                Result = (Expression<Func<T, TResult>>)Result,
+                Succeeded = Succeeded,
+                Exception = Exception,
+                InvalidProperties = InvalidProperties,
+                InvalidOperators = InvalidOperators,
+                InvalidVariables = InvalidVariables,
+                InvalidValues = InvalidValues,
+                InvalidOrderByDirections = InvalidOrderByDirections
+            };
+        }
     }
 
     public class EvaluationResult<T> : EvaluationResultBase

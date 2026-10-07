@@ -12,6 +12,8 @@ namespace Kkts.Expressions.Internal.Nodes
 		public Type Type { get; set; }
 
 		public bool IsVariable { get; set; }
+		public bool UseNaturalType { get; set; }
+		public override bool IsConstantValue => !IsVariable;
 
 		public override Expression Build(BuildArgument arg)
 		{
@@ -24,7 +26,7 @@ namespace Kkts.Expressions.Internal.Nodes
 					return GetVariableExpression(value, resolved, arg);
 				}
 
-				return Expression.Constant(Value.Cast(Type), Type);
+				return BuildValue();
 			}
 			catch (Exception ex)
 			{
@@ -35,6 +37,7 @@ namespace Kkts.Expressions.Internal.Nodes
 
 		public override async Task<Expression> BuildAsync(BuildArgument arg)
         {
+			arg.CancellationToken.ThrowIfCancellationRequested();
 			try
 			{
 				if (IsVariable)
@@ -44,7 +47,11 @@ namespace Kkts.Expressions.Internal.Nodes
 					return GetVariableExpression(variableInfo.Value, variableInfo.Resolved, arg);
 				}
 
-				return Expression.Constant(Value.Cast(Type), Type);
+				return BuildValue();
+			}
+			catch (OperationCanceledException)
+			{
+				throw;
 			}
 			catch (Exception ex)
 			{
@@ -57,6 +64,9 @@ namespace Kkts.Expressions.Internal.Nodes
         {
 			if (resolved)
             {
+				if (UseNaturalType) return Expression.Constant(value);
+				if (Type != null && (Nullable.GetUnderlyingType(Type) ?? Type) == typeof(TimeSpan))
+					return Expression.Constant(value.Cast(Type), Type);
 				if (value is IEnumerable)
 				{
 					var valueType = value.GetType();
@@ -80,6 +90,13 @@ namespace Kkts.Expressions.Internal.Nodes
 				arg.InvalidProperties.Add(Value);
 				throw new InvalidCastException($"Invalid variable or property, name {Value}");
 			}
+		}
+
+		private Expression BuildValue()
+		{
+			if (UseNaturalType && Type == null)
+				return Value == null ? Expression.Constant(null) : NumericOperands.ParseLiteral(Value);
+			return Expression.Constant(Value.Cast(Type), Type);
 		}
 	}
 }

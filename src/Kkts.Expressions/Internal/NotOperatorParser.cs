@@ -8,13 +8,14 @@ namespace Kkts.Expressions.Internal
 
 		public override bool Accept(char @char, int noOfWhiteSpaceIgnored, int index, ref bool keepTrack, ref bool isStartGroup)
 		{
+			if (Done) return false;
 			if (@char == Operator)
 			{
 				Append(@char);
 				StartIndex = index;
 				EndIndex = index;
 				Done = true;
-				return true;
+				return Length == 1;
 			}
 
 			return false;

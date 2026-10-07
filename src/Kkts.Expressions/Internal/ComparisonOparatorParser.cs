@@ -10,79 +10,25 @@ namespace Kkts.Expressions.Internal
 
 		public override bool Accept(char @char, int noOfWhiteSpaceIgnored, int index, ref bool keepTrack, ref bool isStartGroup)
 		{
-			if (Done || noOfWhiteSpaceIgnored > 0 && Length > 0)
+			if (!Done && noOfWhiteSpaceIgnored > 0 && NormalizedResult == "not")
 			{
-				Done = Length > 0;
-				if (Done) EndIndex = index - noOfWhiteSpaceIgnored;
-				return false;
+				Append(' ');
+				Append(@char);
+				return true;
 			}
-
-			if (PreviousChar == char.MinValue)
-			{
-				StartIndex = index;
-				if (SpecialChars.Contains(@char))
-				{
-					_isSpecialChar = true;
-					Append(@char);
-
-					return true;
-				}
-				else
-				{
-					if (char.IsLetter(@char))
-					{
-						_isSpecialChar = false;
-						Append(@char);
-
-						return true;
-					}
-
-					return false;
-				}
-			}
-
-			if (_isSpecialChar)
-			{
-				if (SpecialChars.Contains(@char))
-				{
-					Append(@char);
-
-					return true;
-				}
-				else
-				{
-					Done = true;
-				}
-			}
-			else
-			{
-				if (char.IsLetter(@char))
-				{
-					Append(@char);
-
-					return true;
-				}
-				else
-				{
-					Done = true;
-				}
-			}
-
-			if (Done) EndIndex = index - 1;
-
-			return false;
+			return AcceptOperator(@char, noOfWhiteSpaceIgnored, index, SpecialChars, ref _isSpecialChar);
 		}
 
 		public override IList<Parser> GetNextParsers(char @char)
 		{
-			var opa = Result.ToLower();
+			var opa = NormalizedResult;
 
             if (!Interpreter.ComparisonOperators.Contains(opa))
 			{
 				return new List<Parser>(0);
 			}
 
-            if (opa == Interpreter.ComparisonIn)
+            if (Interpreter.IsMembership(opa))
 			{
 				return new List<Parser>
 				{
@@ -96,6 +42,7 @@ namespace Kkts.Expressions.Internal
 				new NumberParser { LeftHand = false, Previous = this },
 				new StringParser { LeftHand = false, Previous = this },
 				new PropertyParser { LeftHand = false, Previous = this },
+				new GroupParser { LeftHand = false, Previous = this },
 				new NotOperatorParser { LeftHand = false, Previous = this },
 				new NotFunctionParser { LeftHand = false, Previous = this }
 			};
@@ -103,7 +50,7 @@ namespace Kkts.Expressions.Internal
 
 		public override bool Validate()
 		{
-			var result = Result.ToLower();
+			var result = NormalizedResult;
 
 			var valid = Interpreter.ComparisonOperators.Contains(result);
 

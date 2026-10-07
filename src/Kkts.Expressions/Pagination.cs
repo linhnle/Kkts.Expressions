@@ -31,7 +31,13 @@ namespace Kkts.Expressions
 			get => _limit;
 			set
 			{
-				_limit = value <= 0 ? (int)DefaultLimit : value > MaxLimit ? (int)MaxLimit : value;
+				if (value <= 0)
+				{
+					_limit = (int)DefaultLimit;
+					return;
+				}
+
+				_limit = value > MaxLimit ? (int)MaxLimit : value;
 			}
 		}
 

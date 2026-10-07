@@ -17,7 +17,7 @@ namespace Kkts.Examples.VariableResolver
         protected override async Task<VariableInfo> TryResolveCore(string name, CancellationToken cancellationToken)
         => name.ToLower() switch
         {
-            "userids" => new VariableInfo { Name = name, Resolved = true, Value = await _context.Users.Select(p => p.Id).Take(10).ToListAsync() },
+            "userids" => new VariableInfo { Name = name, Resolved = true, Value = await _context.Users.Select(p => p.Id).Take(10).ToListAsync(cancellationToken) },
             _ => await base.TryResolveCore(name, cancellationToken),
         };
 // ---------------

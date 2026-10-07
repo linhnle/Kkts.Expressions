@@ -15,7 +15,7 @@ namespace Kkts.Expressions.Internal
 
 		public override bool Accept(char @char, int noOfWhiteSpaceIgnored, int index, ref bool keepTrack, ref bool isStartGroup)
 		{
-			@char = char.ToLower(@char);
+			@char = char.ToLowerInvariant(@char);
 
 			if(!_startBoby && @char == Beginning[_charIndex])
 			{

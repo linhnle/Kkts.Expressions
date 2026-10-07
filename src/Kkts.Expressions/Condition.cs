@@ -51,7 +51,7 @@ namespace Kkts.Expressions
                 Error = op.Error,
                 IsValid = op.IsValid,
                 OrderByClause = op.OrderByClause,
-                Predicates = op.Predicates.Cast<Expression<Func<T, bool>>>().ToList()
+                Predicates = op.Predicates?.Cast<Expression<Func<T, bool>>>().ToList()
             };
         }
 
@@ -62,7 +62,7 @@ namespace Kkts.Expressions
                 Error = op.Error,
                 IsValid = op.IsValid,
                 OrderByClause = op.OrderByClause,
-                Predicates = op.Predicates.Cast<LambdaExpression>().ToList()
+                Predicates = op.Predicates?.Cast<LambdaExpression>().ToList()
             };
         }
     }

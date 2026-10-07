@@ -34,7 +34,7 @@ namespace Kkts.Expressions
 
 		public static async Task<Expression<Func<T, bool>>> BuildPredicateAsync<T>(this IEnumerable<Filter> filters, VariableResolver variableResolver = null, IEnumerable<string> validProperties = null, IDictionary<string, string> propertyMapping = null, CancellationToken cancellationToken = default)
 		{
-			return (Expression<Func<T, bool>>)(await BuildPredicateAsync(filters, typeof(T), variableResolver, validProperties, propertyMapping));
+			return (Expression<Func<T, bool>>)(await BuildPredicateAsync(filters, typeof(T), variableResolver, validProperties, propertyMapping, cancellationToken));
 		}
 
 		public static Task<LambdaExpression> BuildPredicateAsync(this IEnumerable<Filter> filters, Type type, VariableResolver variableResolver = null, IEnumerable<string> validProperties = null, IDictionary<string, string> propertyMapping = null, CancellationToken cancellationToken = default)

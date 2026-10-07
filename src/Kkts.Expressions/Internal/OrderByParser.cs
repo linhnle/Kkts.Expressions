@@ -76,7 +76,7 @@ namespace Kkts.Expressions.Internal
 				if (!parser.IsValid)
 				{
 					arg.IsValidProperty(parts[0]);
-					var isValid = parts.Length == 2 && !arg.IsValidOrderByDirection(parts[1]);
+					if (parts.Length == 2) arg.IsValidOrderByDirection(parts[1]);
 					continue;
 				}
 
@@ -112,7 +112,7 @@ namespace Kkts.Expressions.Internal
 				};
 
 			bool IsDescending(string[] parts)
-				=> parts.Length >= 2 && DescendingOptions.Contains(parts[1].ToLower());
+				=> parts.Length >= 2 && DescendingOptions.Contains(parts[1], StringComparer.OrdinalIgnoreCase);
 		}
 
 	}

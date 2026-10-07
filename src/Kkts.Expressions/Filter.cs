@@ -7,7 +7,7 @@
 
 		public string Property { get => _property; set => _property = value?.Trim(); }
 
-		public string Operator { get => _operator; set => _operator = value?.Trim().ToLower(); }
+		public string Operator { get => _operator; set => _operator = value?.Trim().ToLowerInvariant(); }
 
 		public string Value { get; set; }
 	}

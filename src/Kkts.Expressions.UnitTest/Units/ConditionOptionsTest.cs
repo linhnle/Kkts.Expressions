@@ -4,7 +4,7 @@ using Xunit;
 
 namespace Kkts.Expressions.UnitTest.Units
 {
-    public class ConditionOptionsTest
+    public partial class ConditionOptionsTest
     {
         [Fact]
         public void BuildCondition_Success()

@@ -1,4 +1,5 @@
 ﻿using System.Collections.Generic;
+using System.Globalization;
 
 namespace Kkts.Expressions.Internal
 {
@@ -14,7 +15,7 @@ namespace Kkts.Expressions.Internal
 				return false;
 			}
 
-			if (char.IsDigit(@char) || @char == '.')
+			if (char.IsDigit(@char) || @char == '.' || (@char == '-' && Length == 0))
 			{
 				if (PreviousChar == char.MinValue) StartIndex = index;
 				Append(@char);
@@ -30,6 +31,8 @@ namespace Kkts.Expressions.Internal
 
 		public override IList<Parser> GetNextParsers(char @char)
 		{
+			if (@char == '+' || @char == '-') return GetAdditiveParsers();
+			if (EndFunction) return new List<Parser>(0);
 			if (LeftHand)
 			{
 				return new List<Parser>
@@ -46,11 +49,7 @@ namespace Kkts.Expressions.Internal
 
 		public override bool Validate()
 		{
-			var result = Result.ToLower();
-
-			var valid = double.TryParse(result, out var r);
-
-			return valid;
+			return double.TryParse(Result, NumberStyles.AllowLeadingSign | NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out _);
 		}
 	}
 }

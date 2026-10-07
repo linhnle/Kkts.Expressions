@@ -10,7 +10,8 @@ namespace Kkts.Expressions
 {
     internal class BuildArgument
     {
-        private IDictionary<string, string> _lookup;
+        private IReadOnlyDictionary<string, string> _lookup;
+        private HashSet<string> _nestedProperties;
         private Type _evaluationType;
         private IDictionary<string, string> _mapping;
         private Func<string, string> _evaluateMapping;
@@ -33,15 +34,17 @@ namespace Kkts.Expressions
 
         public IEnumerable<string> ValidProperties
         {
+            get => _lookup?.Keys;
             set
             {
-                if (value == null || !value.Any())
+                var lookup = value?.ToDictionary(k => k, StringComparer.OrdinalIgnoreCase);
+                if (lookup == null || lookup.Count == 0)
                 {
                     _evaluateValidProperty = TryEvaluateValidProperty;
                 }
                 else
                 {
-                    _lookup = value?.ToDictionary(k => k, StringComparer.OrdinalIgnoreCase);
+                    _lookup = lookup;
                     _evaluateValidProperty = IsExactValidProperty;
                 }
             }
@@ -53,7 +56,7 @@ namespace Kkts.Expressions
             set
             {
                 _evaluationType = value;
-                if (_lookup?.Any() == true) return;
+                if (_lookup?.Count > 0) return;
                 ImportValidProperties();
                 _evaluateValidProperty = TryEvaluateValidProperty;
             }
@@ -73,6 +76,7 @@ namespace Kkts.Expressions
 
         public IDictionary<string, string> PropertyMapping
         {
+            get => _mapping;
             set
             {
                 if (value is null || value.Count == 0)
@@ -100,7 +104,7 @@ namespace Kkts.Expressions
 
         public bool IsValidOperator(string value)
         {
-            var isValid = value != null && Interpreter.ComparisonOperators.Contains(value.ToLower());
+            var isValid = value != null && Interpreter.ComparisonOperators.Contains(Interpreter.NormalizeComparisonOperator(value), StringComparer.OrdinalIgnoreCase);
             if (!isValid) InvalidOperators.Add(value ?? "null");
 
             return isValid;
@@ -108,7 +112,7 @@ namespace Kkts.Expressions
 
         public bool IsValidOrderByDirection(string value)
         {
-            var isValid = value != null && OrderByParser.Options.Contains(value.ToLower());
+            var isValid = value != null && OrderByParser.Options.Contains(value, StringComparer.OrdinalIgnoreCase);
             if (!isValid) InvalidOrderByDirections.Add(value ?? "null");
 
             return isValid;
@@ -126,61 +130,58 @@ namespace Kkts.Expressions
         {
             if (value == null) return false;
             value = MapProperty(value);
-            var isValid = _lookup.ContainsKey(value);
+            var isValid = _lookup.ContainsKey(value) || _nestedProperties?.Contains(value) == true;
             if (isValid) return true;
 
             if (value.Contains('.') && _evaluationType != null)
             {
-                _lookup = _lookup ?? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-                var segments = value.Split('.');
-                Type type = null;
-                var parentProp = string.Empty;
-                var hasException = false;
-                var param = Expression.Parameter(_evaluationType);
-                MemberExpression propertyExpression = null;
-                foreach (var segment in segments)
+                return TryEvaluateNestedProperty(value);
+            }
+
+            return false;
+        }
+
+        private bool TryEvaluateNestedProperty(string value)
+        {
+            _nestedProperties = _nestedProperties ?? new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var segments = value.Split('.');
+            Type type = null;
+            var parentProp = string.Empty;
+            var param = Expression.Parameter(_evaluationType);
+            MemberExpression propertyExpression = null;
+            foreach (var segment in segments)
+            {
+                try
                 {
-                    try
+                    if (type is null)
                     {
-                        if (type is null)
-                        {
-                            propertyExpression = Expression.PropertyOrField(param, segment);
-                            type = GetMemberType(propertyExpression.Member);
-                            parentProp = segment;
-                        }
-                        else
-                        {
-                            propertyExpression = Expression.PropertyOrField(propertyExpression, segment);
-                            type = GetMemberType(propertyExpression.Member);
-                            parentProp = $"{parentProp}.{segment}";
-                            if (_lookup.ContainsKey(parentProp)) continue;
-                            _lookup[parentProp] = parentProp;
-                        }
+                        propertyExpression = Expression.PropertyOrField(param, segment);
+                        type = GetMemberType(propertyExpression.Member);
+                        parentProp = segment;
                     }
-                    catch (Exception)
+                    else
                     {
-                        hasException = true;
-                        break;
+                        propertyExpression = Expression.PropertyOrField(propertyExpression, segment);
+                        type = GetMemberType(propertyExpression.Member);
+                        parentProp = $"{parentProp}.{segment}";
+                        _nestedProperties.Add(parentProp);
                     }
                 }
-
-                if (!hasException)
+                catch (ArgumentException)
                 {
-                    isValid = _lookup?.ContainsKey(value.ToLower()) == true;
+                    return false;
                 }
             }
 
-            return isValid;
+            return _nestedProperties.Contains(value);
         }
 
         private void ImportValidProperties()
         {
-            _lookup = _evaluationType.GetMembers(BindingFlags.Public | BindingFlags.Instance)
-                .Where(p => p is PropertyInfo pi && pi.CanRead || p is FieldInfo)
-                .ToDictionary(k => k.Name, v => v.Name, StringComparer.OrdinalIgnoreCase);
+            _lookup = PropertyMetadata.GetPropertyNames(_evaluationType);
         }
 
-        private Type GetMemberType(MemberInfo memberInfo)
+        private static Type GetMemberType(MemberInfo memberInfo)
         {
             switch (memberInfo)
             {
@@ -193,16 +194,16 @@ namespace Kkts.Expressions
             }
         }
 
-        private string EmptyMap(string prop)
+        private static string EmptyMap(string prop)
         {
             return prop;
         }
 
         private string PartialMap(string prop)
         {
-            if (_mapping.ContainsKey(prop))
+            if (_mapping.TryGetValue(prop, out var mapped))
             {
-                return _mapping[prop];
+                return mapped;
             }
 
             return prop;

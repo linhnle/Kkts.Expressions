@@ -84,7 +84,7 @@ namespace Kkts.Expressions.Internal
 			return _endArray;
 		}
 
-		private char GetEndScope(char startScope)
+		private static char GetEndScope(char startScope)
 		{
 			switch (startScope)
 			{

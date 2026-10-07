@@ -115,6 +115,8 @@ namespace Kkts.Expressions.UnitTest.Units
                     new Filter{ Property = "NumberNullable", Operator = "=", Value = DF.Integer2.ToString() }
                 }
             }.BuildPredicate<TestEntity>(validProperties: validProperties, propertyMapping: propertyMapping);
+            Assert.True(query.Compile()(new TestEntity { Integer = DF.Integer1, IntegerNullable = DF.Integer2 }));
+            Assert.False(query.Compile()(new TestEntity { Integer = DF.Integer1, IntegerNullable = DF.Integer3 }));
         }
     }
 }
