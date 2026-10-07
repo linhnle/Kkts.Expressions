@@ -1,293 +1,473 @@
 # Kkts.Expressions
-Build string expression to lambda expression to support dynamic query from UI
 
-get via nuget **[Kkts.Expressions](https://www.nuget.org/packages/Kkts.Expressions)** 
+Convert string expressions and structured filters into strongly typed LINQ
+expression trees. Kkts.Expressions helps you build dynamic queries from UI
+filters, including predicates, sorting, variables, and pagination.
 
-### Running tests
-The unit test project targets .NET 10 and requires the .NET 10 SDK:
+The library targets `netstandard2.0` and is available on
+[NuGet](https://www.nuget.org/packages/Kkts.Expressions).
+
+## Contents
+
+- [Installation](#installation)
+- [Quick start](#quick-start)
+- [Structured filters](#structured-filters)
+- [Sorting](#sorting)
+- [Variables](#variables)
+- [Property validation and mapping](#property-validation-and-mapping)
+- [Conditions and pagination](#conditions-and-pagination)
+- [Supported operators](#supported-operators)
+- [Parsing and validation behavior](#parsing-and-validation-behavior)
+- [TimeSpan durations](#timespan-durations)
+- [Binary plus in predicates (v3.0 only)](#binary-plus-in-predicates-v30-only)
+- [Development notes](#development-notes)
+- [Contact](#contact)
+
+## Installation
 
 ```sh
-dotnet test src/Kkts.Expressions.UnitTest/Kkts.Expressions.UnitTest.csproj
+dotnet add package Kkts.Expressions
 ```
 
-The library continues to target `netstandard2.0`; the example projects are
-unchanged.
+Import the library namespace:
 
-### Parser performance
-Synchronous and asynchronous predicate parsing reuse per-call candidate buffers
-and build token chains directly in lists. Each precedence pass uses read/write
-cursors to replace consumed operands with their operator's built node, then
-trims the unused tail once. Parser entries are never marked as consumed with
-`null`, and long operator chains do not require repeated list shifts. This
-avoids per-character candidate-list allocations and intermediate collections
-without changing operator precedence, validation, or variable resolution.
-Buffers and token-text caches are local to each parse. Read-only property-name
-metadata is shared by entity type, while property mappings, whitelists, nested
-path validation, and diagnostics remain local to the call. Expressions and
-resolved variable values are not cached by the parser across calls; a supplied
-`VariableResolver` retains its own value cache.
+```csharp
+using Kkts.Expressions;
+```
 
-### Parsing behavior
-- Every predicate must return `bool`. Numeric or string-only expressions return
-  an unsuccessful evaluation result with a `FormatException`, including through
-  generic overloads.
+Examples below also use types from `System`, `System.Collections.Generic`,
+`System.Linq`, and `System.Linq.Expressions`. Database examples assume an
+Entity Framework Core context with an `Entities` property of type `DbSet<Data>`.
+Configure that context and its provider in your application.
+
+## Quick start
+
+The examples use this entity:
+
+```csharp
+public class Data
+{
+    public int Id { get; set; }
+    public string Name { get; set; } = "";
+    public bool IsEnabled { get; set; }
+    public DateTime CreationDate { get; set; }
+}
+```
+
+Parse a predicate and check the result before applying it to a query:
+
+```csharp
+var evaluation = Interpreter.ParsePredicate<Data>(
+    "id = 1 and name = 'Test'");
+
+if (!evaluation.Succeeded)
+{
+    throw new InvalidOperationException(
+        "Invalid predicate. Inspect the evaluation diagnostics.",
+        evaluation.Exception);
+}
+
+Expression<Func<Data, bool>> predicate = evaluation.Result;
+var records = context.Entities.Where(predicate).ToList();
+```
+
+Property names are case-insensitive: `id` and `Id` refer to the same property.
+The predicate above is equivalent to:
+
+```csharp
+Expression<Func<Data, bool>> predicate =
+    item => item.Id == 1 && item.Name == "Test";
+```
+
+For user-supplied input, report validation diagnostics to the caller rather
+than using `Result` when parsing fails. See
+[Parsing and validation behavior](#parsing-and-validation-behavior).
+
+## Structured filters
+
+Use `Filter` objects when your UI supplies structured data instead of a
+predicate string. Filters in a collection are combined with logical AND:
+
+```csharp
+var filters = new[]
+{
+    new Filter { Property = "Id", Operator = "=", Value = "1" },
+    new Filter { Property = "Name", Operator = "=", Value = "Test" }
+};
+
+Expression<Func<Data, bool>> predicate = filters.BuildPredicate<Data>();
+```
+
+`BuildPredicate` throws if the filters cannot be built. Use
+`filters.TryBuildPredicate<Data>()` to obtain an evaluation result and inspect
+its `Succeeded` flag and diagnostics instead.
+
+### Filter groups
+
+Filters within each group are combined with AND; groups are combined with OR.
+For example:
+
+```text
+(Id = 1 and Name = 'Test1') or (Id = 2 and Name = 'Test2')
+```
+
+The equivalent structured representation is:
+
+```csharp
+var groups = new[]
+{
+    new FilterGroup
+    {
+        Filters = new List<Filter>
+        {
+            new Filter { Property = "Id", Operator = "=", Value = "1" },
+            new Filter { Property = "Name", Operator = "=", Value = "Test1" }
+        }
+    },
+    new FilterGroup
+    {
+        Filters = new List<Filter>
+        {
+            new Filter { Property = "Id", Operator = "=", Value = "2" },
+            new Filter { Property = "Name", Operator = "=", Value = "Test2" }
+        }
+    }
+};
+
+Expression<Func<Data, bool>> predicate = groups.BuildPredicate<Data>();
+```
+
+Use `groups.TryBuildPredicate<Data>()` when you need validation details.
+
+## Sorting
+
+Supply a comma-separated list of properties and optional directions:
+
+```csharp
+var ordered = context.Entities.OrderBy("Id, Name desc");
+```
+
+The default direction is ascending. Both an omitted direction and `asc` mean
+ascending order; `desc` means descending order. Property names are
+case-insensitive.
+
+The equivalent structured form is:
+
+```csharp
+var ordered = context.Entities.OrderBy(new[]
+{
+    new OrderByInfo { Property = "Id" },
+    new OrderByInfo { Property = "Name", Descending = true }
+});
+```
+
+`OrderBy` throws for invalid sorting input. Use `TryOrderBy` to inspect the
+evaluation result:
+
+```csharp
+var evaluation = context.Entities.TryOrderBy("Id, Name desc");
+
+if (!evaluation.Succeeded)
+{
+    throw new InvalidOperationException(
+        "Invalid sorting expression. Inspect the evaluation diagnostics.",
+        evaluation.Exception);
+}
+
+var ordered = evaluation.Result;
+```
+
+## Variables
+
+Version 2 introduced explicit query variables using the `$` prefix, along with
+`ParsePredicateAsync`. Use the prefixed syntax in v2 and later.
+
+### Built-in variables
+
+The default resolver provides two case-insensitive variables:
+
+- `$now`: the resolver's local date and time.
+- `$utcnow`: the resolver's UTC date and time.
+
+```csharp
+var evaluation = Interpreter.ParsePredicate<Data>(
+    "CreationDate = $now or CreationDate = $utcnow");
+
+var sameYear = Interpreter.ParsePredicate<Data>(
+    "CreationDate.year = $now.year");
+```
+
+Earlier versions used unprefixed names such as `now` and `utcnow`. These
+examples use the v2 query-variable syntax.
+
+### Custom variables
+
+Register values directly on a resolver. Names are registered without the `$`
+prefix and referenced with it in predicates:
+
+```csharp
+var resolver = new VariableResolver();
+resolver.TryAdd("user.id", 1);
+resolver.TryAdd("user.username", "linhle");
+
+var evaluation = Interpreter.ParsePredicate<Data>(
+    "Name = $user.username and Id = $user.id",
+    variableResolver: resolver);
+```
+
+You can also expose objects as properties of a custom resolver:
+
+```csharp
+public class UserInfo
+{
+    public string UserName { get; set; } = "";
+    public int Id { get; set; }
+}
+
+public class CustomVariableResolver : VariableResolver
+{
+    public UserInfo User { get; } =
+        new UserInfo { Id = 1, UserName = "linhle" };
+}
+```
+
+Both synchronous and asynchronous parsing accept a resolver:
+
+```csharp
+var resolver = new CustomVariableResolver();
+
+var evaluation = Interpreter.ParsePredicate<Data>(
+    "Name = $user.username and Id = $user.id",
+    variableResolver: resolver);
+
+EvaluationResult<Data, bool> asyncEvaluation =
+    await Interpreter.ParsePredicateAsync<Data>(
+        "Name = $user.username and Id = $user.id",
+        variableResolver: resolver);
+```
+
+For values that require asynchronous work, override `TryResolveCore` in your
+resolver. Use `InitializeVariablesAsync` to initialize application-specific
+state before parsing when needed. The
+[custom resolver example](examples/Kkts.Examples/Kkts.Examples.VariableResolver/CustomVariableResolver.cs)
+demonstrates direct registration, object properties, and asynchronous resolution.
+See also the
+[variable usage example](examples/Kkts.Examples/Kkts.Examples.VariableResolver/Program.cs).
+
+### Variables with the `in` operator (v2)
+
+Use a variable as an array element or as the collection itself:
+
+```csharp
+var resolver = new VariableResolver();
+resolver.TryAdd("user.id", 1);
+resolver.TryAdd("userIds", new[] { 1, 2, 3 });
+
+var singleValue = await Interpreter.ParsePredicateAsync<Data>(
+    "Id in [$user.id]", variableResolver: resolver);
+
+var collection = await Interpreter.ParsePredicateAsync<Data>(
+    "Id in $userIds", variableResolver: resolver);
+```
+
+See the
+[`in` operator example](examples/Kkts.Examples/Kkts.Examples.VariablesAndInOperator/Program.cs)
+for database-backed usage.
+
+## Property validation and mapping
+
+### Restrict allowed properties
+
+Use `validProperties` to limit which entity properties a query may reference:
+
+```csharp
+var evaluation = Interpreter.ParsePredicate<Data>(
+    "Id = 1 and Name = 'Test'",
+    validProperties: new[] { "Id" });
+```
+
+This evaluation fails because `Name` is not allowed. Check `Succeeded`,
+`InvalidProperties`, and `Exception` before using the result.
+
+For UI-driven queries, explicitly allow only properties you intend to expose.
+Property validation does not replace application authorization.
+
+### Map external names to entity properties
+
+Use `propertyMapping` when the UI uses different field names:
+
+```csharp
+var mapping = new Dictionary<string, string>
+{
+    ["entityId"] = "Id"
+};
+
+var evaluation = Interpreter.ParsePredicate<Data>(
+    "(entityId = 1 and Name = 'Test1') or " +
+    "(entityId = 2 and Name = 'Test2')",
+    propertyMapping: mapping);
+```
+
+The same mapping works with structured filters and filter groups:
+
+```csharp
+var filters = new[]
+{
+    new Filter { Property = "entityId", Operator = "=", Value = "1" },
+    new Filter { Property = "Name", Operator = "=", Value = "Test1" }
+};
+
+var predicate = filters.BuildPredicate<Data>(propertyMapping: mapping);
+var groupedPredicate = groups.BuildPredicate<Data>(propertyMapping: mapping);
+```
+
+## Conditions and pagination
+
+`ConditionOptions` combines filtering and sorting in a single object that can
+be deserialized from JSON. It accepts:
+
+- `Where`: a predicate string.
+- `Filters`: a collection of structured filters.
+- `FilterGroups`: a collection of structured filter groups.
+- `OrderBy`: a sorting string.
+- `OrderBys`: a list of structured sorting instructions.
+
+When supplied together, `Where`, `Filters`, and `FilterGroups` contribute
+predicates combined with AND. A nonblank `OrderBy` takes precedence over
+`OrderBys`.
+
+```csharp
+var options = new ConditionOptions
+{
+    Where = "IsEnabled",
+    Filters = new[]
+    {
+        new Filter { Property = "Id", Operator = ">", Value = "0" }
+    },
+    OrderBy = "Id, Name desc"
+};
+
+var condition = options.BuildCondition<Data>();
+
+if (!condition.IsValid)
+{
+    throw new InvalidOperationException(
+        "Invalid condition. Inspect condition.Error for details.");
+}
+
+var records = context.Entities.Where(condition).ToList();
+```
+
+`Where(condition)` applies both the predicates and the condition's sorting.
+Always check `IsValid` first; `Error` contains exceptions and evaluation
+diagnostics for an invalid condition.
+
+### Retrieve a page
+
+Use either offset/limit or page/page-size notation:
+
+```csharp
+var byOffset = context.Entities.Take(
+    condition, new Pagination { Offset = 10, Limit = 10 });
+
+var byPage = context.Entities.Take(
+    condition, new Pagination { Page = 2, PageSize = 10 });
+```
+
+To include the total number of matching records, use `TakePage`:
+
+```csharp
+var pageByOffset = context.Entities.TakePage(
+    condition, new Pagination { Offset = 10, Limit = 10 });
+
+var pageByNumber = context.Entities.TakePage(
+    condition, new Pagination { Page = 2, PageSize = 10 });
+```
+
+`TakePage` returns a paged result containing `Records` and `TotalRecords`.
+Use an explicit, stable sort order for predictable pagination.
+
+## Supported operators
+
+| Operator | Examples | Supported data types |
+| --- | --- | --- |
+| Equal | `Id = 1` or `Id == 1` | Number, string, Guid, Boolean, DateTime, DateTimeOffset, TimeSpan, enum, nullable |
+| Not equal | `Id != 1` or `Id <> 1` | Number, string, Guid, Boolean, DateTime, DateTimeOffset, TimeSpan, enum, nullable |
+| Less than | `Id < 1` | Number, DateTime, DateTimeOffset, TimeSpan, nullable |
+| Less than or equal | `Id <= 1` | Number, DateTime, DateTimeOffset, TimeSpan, nullable |
+| Greater than | `Id > 1` | Number, DateTime, DateTimeOffset, TimeSpan, nullable |
+| Greater than or equal | `Id >= 1` | Number, DateTime, DateTimeOffset, TimeSpan, nullable |
+| In | `Id in [1, 2, 3, 4]` or `Name in ['String1', 'String2']` | Number, string, Guid, DateTime, DateTimeOffset, TimeSpan, enum, nullable |
+| Contains | `Name.contains('Text')` or `Name @ 'Text'` | String |
+| Starts with | `Name.startsWith('Text')` or `Name @* 'Text'` | String |
+| Ends with | `Name.endsWith('Text')` or `Name *@ 'Text'` | String |
+| Not | `!IsEnabled`, `not(IsEnabled)`, `not(Id = 1)`, or `!(Id = 1)` | Boolean |
+| Logical AND (`and` or `&&`) | `Id = 1 and Name = "Text"` | Boolean |
+| Logical OR (`or` or `\|\|`) | `Id = 1 or Name = "Text"` | Boolean |
+| Plus (v3.0 only) | `Id + 1 > 5` or `Name + '!' = 'Test!'` | Number, nullable number, string (including mixed operands) |
+
+Numeric literals use invariant culture and a period as the decimal separator
+(for example, `8.3`), regardless of the current culture. When building queries
+with interpolated numeric values, use `FormattableString.Invariant`. Commas
+separate elements in `in` arrays; they are not decimal separators.
+
+## Parsing and validation behavior
+
+- Every predicate must return `bool`. Numeric or string-only expressions
+  produce an unsuccessful evaluation result with a `FormatException`, including
+  through generic overloads.
 - Operators and keywords are case-insensitive and independent of the current
   culture. String values are not normalized.
 - Each `!` is a separate negation: `!!IsEnabled` is equivalent to
   `!(!IsEnabled)`.
 - Generic and runtime-type parsing results retain the same validation
   diagnostics, including `InvalidValues`.
-- Async parsing awaits variable resolution for all expression shapes, not only
-  expressions containing addition. Cancellation is captured as an unsuccessful
+- Evaluation results expose `Succeeded`, `Exception`, `InvalidProperties`,
+  `InvalidOperators`, `InvalidVariables`, `InvalidValues`, and
+  `InvalidOrderByDirections`. Inspect the relevant diagnostics when an
+  evaluation fails.
+- Argument validation can still throw, for example when a predicate string is
+  empty. An evaluation result is not a guarantee that every API call is
+  exception-free.
+- Async parsing awaits variable resolution for all expression shapes, not
+  only expressions containing addition. Cancellation produces an unsuccessful
   evaluation result whose `Exception` is an `OperationCanceledException` or a
   derived exception; it is not reported as an invalid value.
 - Nested variable paths can traverse properties and fields at multiple levels.
-  A missing member or null intermediate value is unresolved; exceptions thrown
+  A missing member or null intermediate value is unresolved. Exceptions thrown
   by getters are surfaced rather than silently treated as missing variables.
-- Async filter collections forward the caller's cancellation token through the
+- Async filter collections forward the caller's cancellation token through
   generic and runtime-type overloads.
 
-### Code quality and compatibility
-SonarQube cleanup preserves the existing public API. `Pagination.DefaultLimit`
-and `Pagination.MaxLimit` remain mutable public fields because replacing them
-with properties or constants breaks existing consumers. The deprecated virtual
-`VariableResolver.IsVariable` method is retained for compatibility; use
-`TryResolve` or `TryResolveAsync` instead. The public-field and deprecated-code
-findings require a future breaking release to resolve.
-
-Parity regression tests intentionally exercise synchronous APIs from async
-tests, and reflected test fixtures require instance getters. Only those
-specific analyzer rules are suppressed, with justifications in the test code;
-production findings are not hidden or excluded.
-
-### Sample class
-``` csharp
-class Data
-{
-  public int Id { get; set; }
-  public string Name { get; set; }
-  public bool IsEnabled { get; set; }
-  public DateTime CreationDate { get; set; }
-  // ...
-}
-
-public class TestDbContext : DbContext
-{
-    // ...
-    public DbSet<Data> Entities { get; set; }
-    // ...
-}
-```
-### Usage 1
-``` csharp
-// The property name is case insensitive for example id and Id are the same
-EvaluationResult<Data, bool> evaluationResult = Interpreter.ParsePredicate<Data>("id = 1 and name='Test'");
-// Use EvaluationResult to get validation result
-// Should check if evaluationResult.Succeeded
-Expression<Func<Data, bool>> predicate = evaluationResult.Result;
-
-// Equivalent
-var filters = new Filter[]
-            {
-                new Filter{ Property = "id", Operator = "=", Value = "1" },
-                // and
-                new Filter{ Property = "name", Operator = "=", Value = "Test" }
-            };
-
-Expression<Func<Data, bool>> predicate = filters.BuildPredicate<Data>();
-
-// Or use filters.TryBuildPredicate<Data>() to get validation result
-```
-### Usage 2
-``` csharp
-// The property name is case insensitive for example id and Id are the same
-Expression<Func<Data, bool>> predicate = Interpreter.ParsePredicate<Data>("(id = 1 and name='Test1') or (id = 2 and name='Test2')").Result; 
-
-// Equivalent
-var filters = new FilterGroup[]
-            {
-                new FilterGroup
-                {
-                    Filters = new List<Filter>
-                    {
-                        new Filter{ Property = "id", Operator = "=", Value = "1" },
-                        // and
-                        new Filter{ Property = "name", Operator = "=", Value = "Test1" }
-                    }
-                },
-                // or 
-                new FilterGroup
-                {
-                    Filters = new List<Filter>
-                    {
-                        new Filter{ Property = "id", Operator = "=", Value = "2" },
-                        // and
-                        new Filter{ Property = "name", Operator = "=", Value = "Test2" }
-                    }
-                }
-            }
-
-Expression<Func<Data, bool>> predicate = filters.BuildPredicate<Data>();
-// Or use filters.TryBuildPredicate<Data>() to get validation result
-```
-
-### Usage 3 (Order By)
-``` csharp
-// The property name is case insensitive for example id and Id are the same
-var context = new TestDbContext();
-// Order by Id then by Name descending (the direction is empty or asc or desc, the empty is the same asc)
-var ordered = context.Entities.OrderBy("Id, Name desc"); 
-
-// Equivalent
-var ordered = context.Entities.OrderBy(new[] 
-            {
-              { new OrderByInfo { Property = "Id" },
-              { new OrderByInfo { Property = "Name", Descending = true }
-            }
-
-// or
-var evaluationResult = context.Entities.TryOrderBy(...);
-if (evaluationResult.Succeeded) var ordered = evaluationResult.Result;
-```
-### Usage 4 (Variables) - V2 introduces Query Variables [Examples](https://github.com/linhnle/Kkts.Expressions/blob/main/examples/Kkts.Examples/Kkts.Examples.VariableResolver/Program.cs)
-``` csharp
-// It has 2 default variables: now, utcnow (they are case insensitive)
-Expression<Func<Data, bool>> predicate = Interpreter.ParsePredicate<Data>("CreationDate = now or CreationDate = utcnow").Result; 
-// Equivalent in c#
-Expression<Func<Data, bool>> predicate = p => p.CreationDate == DateTime.Now || p.CreationDate == DateTime.UtcNow;
-
-// We can compare the year, month, day, ... like 
-Expression<Func<Data, bool>> predicate = Interpreter.ParsePredicate<Data>("CreationDate.year = now.year").Result;
-// From V2 It is applied Query Variables by adding prefix $ before a variable 
-Expression<Func<Data, bool>> predicate = Interpreter.ParsePredicate<Data>("CreationDate.year = $now.year").Result;
-```
-### Usage 5 (Custom Variables) - V2 introduces 2 new ways to declare variables [Examples](https://github.com/linhnle/Kkts.Expressions/blob/main/examples/Kkts.Examples/Kkts.Examples.VariableResolver/CustomVariableResolver.cs)
-#### V2 introduces ParsePredicateAsync
-``` csharp
-class UserInfo
-{
-    public string UserName { get; set; }
-    public int Id { get; set; }
-}
-
-class CustomVariableResolver : VariableResolver
-{
-    public UserInfo User { get; } = new UserInfo { Id = 1, UserName = "linhle" };
-}
-
-// Now it has new variables user.id and user.username
-Expression<Func<Data, bool>> predicate = Interpreter.ParsePredicate<Data>("name = user.username and id = user.id", variableResolver: new CustomVariableResolver()).Result;
-
-// V2 introduces Async
-EvaluationResult<T, bool> result = await Interpreter.ParsePredicateAsync<Data>("name = user.username and id = user.id", variableResolver: new CustomVariableResolver()); 
-```
-### Usage 5 (Valid Properties)
-``` csharp
-// Only accept Id in predicate, if other properties occurs in predicate, an exception will be thrown
-Expression<Func<Data, bool>> predicate = Interpreter.ParsePredicate<Data>("id = 1 and name='Test'", validProperties: new[] { "Id" }).Result; // throw an exception
-```
-### Usage 6 (Condition)
-``` csharp
-// The options can be deserialized from JSON
-var options = new ConditionOptions 
-{ 
-  OrderBy = "...",
-  OrderBys = new[] { new OrderByInfo { ... } },
-  Filters = new[] { new Filter { ... } },
-  FilterGroups = new[] { new FilterGroup { Filters = new[] { ... } } },
-  Where = "..."
-}
-var condition = options.BuildCondition<Data>();
-var context = new TestDbContext();
-// Should check if condition.IsValid before calling where
-var result = context.Entities.Where(condition).ToList();
-// or paging
-var result = context.Entities.Take(condition, new Pagination { Offset = 10, Limit = 10 });
-var result = context.Entities.Take(condition, new Pagination { Page = 2, PageSize = 10 });
-// or paging with total records count
-var result = context.Entities.TakePage(condition, new Pagination { Offset = 10, Limit = 10 });
-var result = context.Entities.TakePage(condition, new Pagination { Page = 2, PageSize = 10 });
-```
-### Usage 7 (Property Mapping)
-``` csharp
-// map entityId as Id
-var mapping = new Dictionary<string, string>
-            {
-                ["entityId"] = "Id"
-            };
-Expression<Func<Data, bool>> predicate = Interpreter.ParsePredicate<Data>("(entityId = 1 and name='Test1') or (entityId = 2 and name='Test2')", propertyMapping: mapping).Result; 
-
-// Equivalent
-var filters = new FilterGroup[]
-            {
-                new FilterGroup
-                {
-                    Filters = new List<Filter>
-                    {
-                        new Filter{ Property = "entityId", Operator = "=", Value = "1" },
-                        // and
-                        new Filter{ Property = "name", Operator = "=", Value = "Test1" }
-                    }
-                },
-                // or 
-                new FilterGroup
-                {
-                    Filters = new List<Filter>
-                    {
-                        new Filter{ Property = "entityId", Operator = "=", Value = "2" },
-                        // and
-                        new Filter{ Property = "name", Operator = "=", Value = "Test2" }
-                    }
-                }
-            }
-Expression<Func<Data, bool>> predicate = filters.BuildPredicate<Data>(propertyMapping: mapping);
-```
-### Usage 8 (Applies to V2 - Query Variables in In Operator) [Examples](https://github.com/linhnle/Kkts.Expressions/blob/main/examples/Kkts.Examples/Kkts.Examples.VariablesAndInOperator/Program.cs)
-
-
-### Support operators
-| Operator             | Usage|Support data types|
-|--------------------|--------------------------------------------|-------------------------------------------------------------------|
-|Equals| Id = 1 or Id == 1 | Number, String, Guid, Boolean, DateTime, DateTimeOffset, TimeSpan, Enum, Nullable |
-|Not Equals| Id != 1 or Id <> 1 | Number, String, Guid, Boolean, DateTime, DateTimeOffset, TimeSpan, Enum, Nullable |
-|Less than| Id < 1 | Number, DateTime, DateTimeOffset, TimeSpan, Nullable|
-|Less than or Equal| Id <= 1 | Number, DateTime, DateTimeOffset, TimeSpan, Nullable |
-|Greater than| Id > 1 | Number, DateTime, DateTimeOffset, TimeSpan, Nullable |
-|Greater than or Equal| Id >= 1 | Number, DateTime, DateTimeOffset, TimeSpan, Nullable |
-|In| Id in [1, 2, 3, 4] or Name in ['String1', 'String2'] | Number, String, Guid, DateTime, DateTimeOffset, TimeSpan, Enum, Nullable |
-|Contains | Name.contains('Text') or Name @ 'Text' | String |
-|Starts with | Name.startsWith('Text') or Name @* 'Text' | String |
-|Ends with | Name.endsWith('Text') or Name \*@ 'Text' | String |
-|Not | !IsEnabled or not(IsEnabled) or not(Id = 1) or !(Id = 1) | Boolean |
-|Logical and (and or &&) | Id = 1 and Name = "Text" | Boolean |
-|Logical or (or or \|\|) | Id = 1 or Name = "Text" | Boolean |
-|Plus| Id + 1 > 5 or Name + '!' = 'Test!' | Number, nullable number, String (including mixed operands) |
-
-Numeric literals in predicates use invariant culture and a period as the decimal
-separator (for example, `8.3`), regardless of the current culture. When building
-queries with interpolated numeric values, use `FormattableString.Invariant`.
-Commas separate elements in `in` arrays; they are not decimal separators.
-
-### TimeSpan durations
+## TimeSpan durations
 
 `TimeSpan` and `TimeSpan?` properties support equality, inequality, ordering,
-and `in`. Quote duration literals in predicates and `in` lists, for example
-`Duration > '02:30:00'` or `Duration in ['02:30:00', '1.02:30:00']`.
-Filter values use the same duration text (without outer quotes except in `in`
-lists). Variables may contain duration strings or typed `TimeSpan` values.
+and `in`. Quote duration literals in predicates and `in` lists:
 
-`StringExtensions.Cast` parses durations with `TimeSpan.Parse`, using the supplied
-format provider or invariant culture by default. Negative durations and fractional
-seconds are supported. Empty or whitespace input becomes null for `TimeSpan?`;
-invalid input throws through `Cast` and returns false through `TryCast`.
+```text
+Duration > '02:30:00'
+Duration in ['02:30:00', '1.02:30:00']
+```
+
+Filter values use the same duration text, without outer quotes except in `in`
+lists. Variables may contain duration strings or typed `TimeSpan` values.
+
+`StringExtensions.Cast` parses durations with `TimeSpan.Parse`, using the
+supplied format provider or invariant culture by default. Negative durations
+and fractional seconds are supported. Empty or whitespace input becomes null
+for `TimeSpan?`; invalid input throws through `Cast` and returns false through
+`TryCast`.
+
 Duration arithmetic with `+` is not supported.
 
-### Binary plus in predicates
+## Binary plus in predicates (v3.0 only)
 
-Binary `+` supports property + property, property + value, and property + variable,
-as well as literal expressions and parenthesized values:
+**The Plus (`+`) operator applies only to v3.0.**
 
-``` csharp
+Binary `+` supports property + property, property + value, and property +
+variable, as well as literal expressions and parenthesized values:
+
+```csharp
 var numeric = Interpreter.ParsePredicate<Data>("Id + 1 = 5");
 var grouped = Interpreter.ParsePredicate<Data>("(Id + 1) = (2 + 3)");
 var concatenated = Interpreter.ParsePredicate<Data>("Name + '!' = 'Test!'");
@@ -300,16 +480,20 @@ variables.TryAdd("target", 6);
 var variableSum = await Interpreter.ParsePredicateAsync<Data>(
     "Id + $increment = $target", variableResolver: variables);
 
-var condition = new ConditionOptions { Where = "Id + 1 = 5" }.BuildCondition<Data>();
+var condition = new ConditionOptions { Where = "Id + 1 = 5" }
+    .BuildCondition<Data>();
 ```
+
+### Addition and concatenation rules
 
 - Additions associate left to right, before comparisons and logical operators.
   Parentheses override grouping: `1 + 2 + 'x'` produces `"3x"`, while
   `1 + (2 + 'x')` produces `"12x"`.
-- Numeric operands follow C# numeric promotion, including small integer promotion
-  to `int` and mixed integer/floating-point sums. Whole-number addition literals
-  use the first fitting `int`, `uint`, `long`, or `ulong`; fractional literals use
-  `double`. Decimal operands cannot be mixed with `float` or `double`.
+- Numeric operands follow C# numeric promotion, including small integer
+  promotion to `int` and mixed integer/floating-point sums. Whole-number
+  addition literals use the first fitting `int`, `uint`, `long`, or `ulong`;
+  fractional literals use `double`. Decimal operands cannot be mixed with
+  `float` or `double`.
 - Nullable numeric addition propagates null rather than replacing it with zero.
   For example, `NullableId + 1 = null` is true when `NullableId` is null.
   Integral overflow wraps as in unchecked C# addition; decimal overflow still
@@ -322,16 +506,69 @@ var condition = new ConditionOptions { Where = "Id + 1 = 5" }.BuildCondition<Dat
   arguments, such as `Name + '!' contains 'Test!'` and
   `Name.contains('Te' + 'st')`.
 - Both synchronous and asynchronous predicate APIs, including runtime-type
-  overloads and condition `Where`, support plus. Existing property mappings,
-  allowlists, and variable diagnostics still apply to both operands.
-- A predicate must return Boolean: `Id + 1` alone is not a predicate. Always
-  check `Succeeded` and `Exception`, or `IsValid` and `Error` for a condition.
+  overloads and condition `Where`, support plus in v3.0. Property mappings,
+  allowlists, and variable diagnostics apply to both operands.
+- A predicate must return Boolean: `Id + 1` alone is not a predicate. Check
+  `Succeeded` and `Exception`, or `IsValid` and `Error` for a condition.
   Missing operands and unsupported operand pairs fail explicitly.
-- Unary plus, other arithmetic operators, date/time arithmetic, user-defined
-  addition, additions inside `in` array literals, and computed ordering are not
-  supported. No new numeric signs, exponent notation, or suffix syntax is added.
-  Native expression trees are emitted, but relational query translation,
-  especially mixed string concatenation, depends on the provider.
 
-## Contacts
-**[LinkedIn](https://www.linkedin.com/in/linh-le-258417105/)**
+### Limitations
+
+Unary plus, other arithmetic operators, date/time arithmetic, user-defined
+addition, additions inside `in` array literals, and computed ordering are not
+supported. No new numeric signs, exponent notation, or suffix syntax is added.
+
+The library emits native expression trees. Relational query translation,
+especially mixed string concatenation, depends on the query provider.
+
+## Development notes
+
+### Running tests
+
+The unit test project targets .NET 10 and requires the .NET 10 SDK:
+
+```sh
+dotnet test src/Kkts.Expressions.UnitTest/Kkts.Expressions.UnitTest.csproj
+```
+
+The library continues to target `netstandard2.0`; the example projects retain
+their existing target frameworks.
+
+### Parser performance
+
+Synchronous and asynchronous predicate parsing reuse per-call candidate
+buffers and build token chains directly in lists. Each precedence pass uses
+read/write cursors to replace consumed operands with the operator's built node,
+then trims the unused tail once. Parser entries are never marked as consumed
+with `null`, and long operator chains do not require repeated list shifts.
+
+This avoids per-character candidate-list allocations and intermediate
+collections without changing operator precedence, validation, or variable
+resolution.
+
+Buffers and token-text caches are local to each parse. Read-only property-name
+metadata is shared by entity type, while property mappings, allowlists, nested
+path validation, and diagnostics remain local to the call. The parser does not
+cache expressions or resolved variable values across calls; a supplied
+`VariableResolver` retains its own value cache.
+
+### Code quality and compatibility
+
+SonarQube cleanup preserves the existing public API:
+
+- `Pagination.DefaultLimit` and `Pagination.MaxLimit` remain mutable public
+  fields. Replacing them with properties or constants would break existing
+  consumers.
+- The deprecated virtual `VariableResolver.IsVariable` method is retained for
+  compatibility. Use `TryResolve` or `TryResolveAsync` instead.
+- Resolving the public-field and deprecated-code findings requires a future
+  breaking release.
+
+Parity regression tests intentionally exercise synchronous APIs from async
+tests, and reflected test fixtures require instance getters. Only those
+specific analyzer rules are suppressed, with justifications in the test code.
+Production findings are not hidden or excluded.
+
+## Contact
+
+[Linh Le on LinkedIn](https://www.linkedin.com/in/linh-le-258417105/)
