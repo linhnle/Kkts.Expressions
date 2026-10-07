@@ -186,7 +186,8 @@ namespace Kkts.Expressions
 
 		internal static Expression BuildBody(ComparisonOperator @operator, MemberExpression prop, object value, VariableResolver variableResolver)
 		{
-			if (value is string && prop.Type != typeof(string))
+			if (value is string && prop.Type != typeof(string) &&
+				(@operator != ComparisonOperator.In || (Nullable.GetUnderlyingType(prop.Type) ?? prop.Type) != typeof(TimeSpan)))
 			{
 				var varName = (string)value;
 				if (variableResolver.TryResolve(varName, out var result))
@@ -204,7 +205,8 @@ namespace Kkts.Expressions
 
 		internal static async Task<Expression> BuildBodyAsync(ComparisonOperator @operator, MemberExpression prop, object value, VariableResolver variableResolver, CancellationToken cancellationToken)
 		{
-			if (value is string && prop.Type != typeof(string))
+			if (value is string && prop.Type != typeof(string) &&
+				(@operator != ComparisonOperator.In || (Nullable.GetUnderlyingType(prop.Type) ?? prop.Type) != typeof(TimeSpan)))
 			{
 				var varName = (string)value;
                 var variableInfo = await variableResolver.TryResolveAsync(varName, cancellationToken);
@@ -334,7 +336,8 @@ namespace Kkts.Expressions
 			}
 
 			if (!requireType.IsPrimitive && requireType != typeof(decimal) &&
-				requireType != typeof(DateTime) && requireType != typeof(DateTimeOffset)) return ComparisonOperator.Equal;
+				requireType != typeof(DateTime) && requireType != typeof(DateTimeOffset) &&
+				requireType != typeof(TimeSpan)) return ComparisonOperator.Equal;
 			switch (@operator)
 			{
 				case ComparisonOperator.In:

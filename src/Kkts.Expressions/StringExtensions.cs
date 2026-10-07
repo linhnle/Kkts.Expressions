@@ -34,6 +34,8 @@ namespace Kkts.Expressions
 
 			if (conversionType == typeof(Guid)) return Guid.Parse(value);
 
+			if (conversionType == typeof(TimeSpan)) return TimeSpan.Parse(value, provider);
+
 			return Convert.ChangeType(value, conversionType, provider);
 		}
 

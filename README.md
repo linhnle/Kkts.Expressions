@@ -248,13 +248,13 @@ Expression<Func<Data, bool>> predicate = filters.BuildPredicate<Data>(propertyMa
 ### Support operators
 | Operator             | Usage|Support data types|
 |--------------------|--------------------------------------------|-------------------------------------------------------------------|
-|Equals| Id = 1 or Id == 1 | Number, String, Guid, Boolean, DateTime, DateTimeOffset, Enum, Nullable |
-|Not Equals| Id != 1 or Id <> 1 | Number, String, Guid, Boolean, DateTime, DateTimeOffset, Enum, Nullable |
-|Less than| Id < 1 | Number, DateTime, DateTimeOffset, Nullable|
-|Less than or Equal| Id <= 1 | Number, DateTime, DateTimeOffset, Nullable |
-|Greater than| Id > 1 | Number, DateTime, DateTimeOffset, Nullable |
-|Greater than or Equal| Id >= 1 | Number, DateTime, DateTimeOffset, Nullable |
-|In| Id in [1, 2, 3, 4] or Name in ['String1', 'String2'] | Number, String, Guid, DateTime, DateTimeOffset, Enum, Nullable |
+|Equals| Id = 1 or Id == 1 | Number, String, Guid, Boolean, DateTime, DateTimeOffset, TimeSpan, Enum, Nullable |
+|Not Equals| Id != 1 or Id <> 1 | Number, String, Guid, Boolean, DateTime, DateTimeOffset, TimeSpan, Enum, Nullable |
+|Less than| Id < 1 | Number, DateTime, DateTimeOffset, TimeSpan, Nullable|
+|Less than or Equal| Id <= 1 | Number, DateTime, DateTimeOffset, TimeSpan, Nullable |
+|Greater than| Id > 1 | Number, DateTime, DateTimeOffset, TimeSpan, Nullable |
+|Greater than or Equal| Id >= 1 | Number, DateTime, DateTimeOffset, TimeSpan, Nullable |
+|In| Id in [1, 2, 3, 4] or Name in ['String1', 'String2'] | Number, String, Guid, DateTime, DateTimeOffset, TimeSpan, Enum, Nullable |
 |Contains | Name.contains('Text') or Name @ 'Text' | String |
 |Starts with | Name.startsWith('Text') or Name @* 'Text' | String |
 |Ends with | Name.endsWith('Text') or Name \*@ 'Text' | String |
@@ -267,6 +267,20 @@ Numeric literals in predicates use invariant culture and a period as the decimal
 separator (for example, `8.3`), regardless of the current culture. When building
 queries with interpolated numeric values, use `FormattableString.Invariant`.
 Commas separate elements in `in` arrays; they are not decimal separators.
+
+### TimeSpan durations
+
+`TimeSpan` and `TimeSpan?` properties support equality, inequality, ordering,
+and `in`. Quote duration literals in predicates and `in` lists, for example
+`Duration > '02:30:00'` or `Duration in ['02:30:00', '1.02:30:00']`.
+Filter values use the same duration text (without outer quotes except in `in`
+lists). Variables may contain duration strings or typed `TimeSpan` values.
+
+`StringExtensions.Cast` parses durations with `TimeSpan.Parse`, using the supplied
+format provider or invariant culture by default. Negative durations and fractional
+seconds are supported. Empty or whitespace input becomes null for `TimeSpan?`;
+invalid input throws through `Cast` and returns false through `TryCast`.
+Duration arithmetic with `+` is not supported.
 
 ### Binary plus in predicates
 

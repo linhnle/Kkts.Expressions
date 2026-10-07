@@ -65,6 +65,8 @@ namespace Kkts.Expressions.Internal.Nodes
 			if (resolved)
             {
 				if (UseNaturalType) return Expression.Constant(value);
+				if (Type != null && (Nullable.GetUnderlyingType(Type) ?? Type) == typeof(TimeSpan))
+					return Expression.Constant(value.Cast(Type), Type);
 				if (value is IEnumerable)
 				{
 					var valueType = value.GetType();
