@@ -203,7 +203,58 @@ Expression<Func<Data, bool>> predicate = filters.BuildPredicate<Data>(propertyMa
 |Not | !IsEnabled or not(IsEnabled) or not(Id = 1) or !(Id = 1) | Boolean |
 |Logical and (and or &&) | Id = 1 and Name = "Text" | Boolean |
 |Logical or (or or \|\|) | Id = 1 or Name = "Text" | Boolean |
+|Plus| Id + 1 > 5 or Name + '!' = 'Test!' | Number, nullable number, String (including mixed operands) |
 
+### Binary plus in predicates
+
+Binary `+` supports property + property, property + value, and property + variable,
+as well as literal expressions and parenthesized values:
+
+``` csharp
+var numeric = Interpreter.ParsePredicate<Data>("Id + 1 = 5");
+var grouped = Interpreter.ParsePredicate<Data>("(Id + 1) = (2 + 3)");
+var concatenated = Interpreter.ParsePredicate<Data>("Name + '!' = 'Test!'");
+var mixed = Interpreter.ParsePredicate<Data>("'ID: ' + Id = 'ID: 7'");
+var propertyPair = Interpreter.ParsePredicate<Data>("Id + Id = 8");
+
+var variables = new VariableResolver();
+variables.TryAdd("increment", 2);
+variables.TryAdd("target", 6);
+var variableSum = await Interpreter.ParsePredicateAsync<Data>(
+    "Id + $increment = $target", variableResolver: variables);
+
+var condition = new ConditionOptions { Where = "Id + 1 = 5" }.BuildCondition<Data>();
+```
+
+- Additions associate left to right, before comparisons and logical operators.
+  Parentheses override grouping: `1 + 2 + 'x'` produces `"3x"`, while
+  `1 + (2 + 'x')` produces `"12x"`.
+- Numeric operands follow C# numeric promotion, including small integer promotion
+  to `int` and mixed integer/floating-point sums. Whole-number addition literals
+  use the first fitting `int`, `uint`, `long`, or `ulong`; fractional literals use
+  `double`. Decimal operands cannot be mixed with `float` or `double`.
+- Nullable numeric addition propagates null rather than replacing it with zero.
+  For example, `NullableId + 1 = null` is true when `NullableId` is null.
+  Integral overflow wraps as in unchecked C# addition; decimal overflow still
+  throws when the predicate is evaluated.
+- If either operand is a string, `+` concatenates, converting other operands
+  using ordinary .NET/current-culture formatting. Null contributes an empty
+  string. Quoted numeric text stays a string: `'1' + 2` produces `"12"`.
+  Plus characters inside quoted strings are literal text.
+- Computed strings work in infix comparisons and existing string-function
+  arguments, such as `Name + '!' contains 'Test!'` and
+  `Name.contains('Te' + 'st')`.
+- Both synchronous and asynchronous predicate APIs, including runtime-type
+  overloads and condition `Where`, support plus. Existing property mappings,
+  allowlists, and variable diagnostics still apply to both operands.
+- A predicate must return Boolean: `Id + 1` alone is not a predicate. Always
+  check `Succeeded` and `Exception`, or `IsValid` and `Error` for a condition.
+  Missing operands and unsupported operand pairs fail explicitly.
+- Unary plus, other arithmetic operators, date/time arithmetic, user-defined
+  addition, additions inside `in` array literals, and computed ordering are not
+  supported. No new numeric signs, exponent notation, or suffix syntax is added.
+  Native expression trees are emitted, but relational query translation,
+  especially mixed string concatenation, depends on the provider.
 
 ## Contacts
 **[LinkedIn](https://www.linkedin.com/in/linh-le-258417105/)**

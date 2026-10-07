@@ -70,6 +70,7 @@ namespace Kkts.Expressions
         public readonly ICollection<string> InvalidOrderByDirections = new List<string>();
 
         public CancellationToken CancellationToken { get; set; } = CancellationToken.None;
+        public bool BuildAdditionAsync { get; set; }
 
         public IDictionary<string, string> PropertyMapping
         {

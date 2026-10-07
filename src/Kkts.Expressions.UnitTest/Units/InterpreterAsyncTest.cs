@@ -6,7 +6,7 @@ using Xunit;
 
 namespace Kkts.Expressions.UnitTest.Units
 {
-    public class InterpreterAsyncTest
+    public partial class InterpreterAsyncTest
     {
         #region Expression Parser
         [Fact]

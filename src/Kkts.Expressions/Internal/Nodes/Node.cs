@@ -7,6 +7,8 @@ namespace Kkts.Expressions.Internal.Nodes
 	{
 		public int StartIndex { get; set; }
 		public char StartChar { get; set; }
+		public virtual bool ContainsAddition => false;
+		public virtual bool IsConstantValue => false;
 		public abstract Expression Build(BuildArgument arg);
 
 		public virtual Task<Expression> BuildAsync(BuildArgument arg) => Task.FromResult(Build(arg));

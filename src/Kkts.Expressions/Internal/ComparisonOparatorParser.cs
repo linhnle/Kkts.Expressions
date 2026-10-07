@@ -96,6 +96,7 @@ namespace Kkts.Expressions.Internal
 				new NumberParser { LeftHand = false, Previous = this },
 				new StringParser { LeftHand = false, Previous = this },
 				new PropertyParser { LeftHand = false, Previous = this },
+				new GroupParser { LeftHand = false, Previous = this },
 				new NotOperatorParser { LeftHand = false, Previous = this },
 				new NotFunctionParser { LeftHand = false, Previous = this }
 			};

@@ -86,6 +86,7 @@ namespace Kkts.Expressions.Internal
 
 		public override IList<Parser> GetNextParsers(char @char)
 		{
+			if (@char == '+') return GetAdditionParsers();
 			if (@char == '.')
 			{
 				IsNestedProperty = true;

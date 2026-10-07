@@ -47,7 +47,9 @@ namespace Kkts.Expressions.Internal
 					_parsers = new List<Parser>
 					{
 						new PropertyParser { Previous = this, LeftHand = false, EndFunction = true },
-						new StringParser { Previous = this, LeftHand = false, EndFunction = true }
+						new StringParser { Previous = this, LeftHand = false, EndFunction = true },
+						new NumberParser { Previous = this, LeftHand = false, EndFunction = true },
+						new GroupParser { Previous = this, LeftHand = false, EndFunction = true }
 					};
 				}
 

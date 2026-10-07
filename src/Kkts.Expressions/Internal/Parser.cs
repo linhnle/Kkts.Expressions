@@ -44,6 +44,14 @@ namespace Kkts.Expressions.Internal
 
 		public virtual void EndExpression() { }
 
+		protected IList<Parser> GetAdditionParsers()
+		{
+			return new List<Parser>
+			{
+				new AdditionOperatorParser { Previous = this, LeftHand = LeftHand, EndFunction = EndFunction }
+			};
+		}
+
 		protected void Append(char @char)
 		{
 			_chars.Add(@char);

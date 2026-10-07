@@ -5,7 +5,7 @@ using Xunit;
 
 namespace Kkts.Expressions.UnitTest.Units
 {
-    public class ConditionOptionsAsyncTest
+    public partial class ConditionOptionsAsyncTest
     {
         [Fact]
         public async Task BuildConditionAsync_Success()

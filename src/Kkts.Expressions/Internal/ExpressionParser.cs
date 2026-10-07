@@ -14,6 +14,7 @@ namespace Kkts.Expressions.Internal
 			{
 				 (t, p) => t == typeof(ArrayParser) || t == typeof(NumberParser) || t == typeof(PropertyParser) || t == typeof(StringParser),
 				 (t, p) => t == typeof(NotOperatorParser) || t == typeof(NotFunctionParser) || t == typeof(GroupParser) || t == typeof(ComparisonFunctionOperatorParser),
+				 (t, p) => t == typeof(AdditionOperatorParser),
 				 (t, p) => t == typeof(ComparisonOparatorParser),
 				 (t, p) => t == typeof(LogicalOperatorParser) && GetStandardOperator(p.Result) == Interpreter.LogicalAnd,
 				 (t, p) => t == typeof(LogicalOperatorParser)
@@ -37,6 +38,8 @@ namespace Kkts.Expressions.Internal
 				}
 
 				var body = rootNode.Build(arg);
+				if (rootNode.ContainsAddition && body.Type != typeof(bool))
+					throw new FormatException("A predicate must have a Boolean result.");
 
 				return new EvaluationResult
 				{
@@ -74,7 +77,10 @@ namespace Kkts.Expressions.Internal
 					};
 				}
 
+				arg.BuildAdditionAsync = rootNode.ContainsAddition;
 				var body = await rootNode.BuildAsync(arg);
+				if (rootNode.ContainsAddition && body.Type != typeof(bool))
+					throw new FormatException("A predicate must have a Boolean result.");
 
 				return new EvaluationResult
 				{
@@ -174,6 +180,7 @@ namespace Kkts.Expressions.Internal
 						}
 
 						group.Body = BuildChain(group, group.LastSuccess);
+						if (groups.Count > 0) groups.Peek().LastSuccess = group;
 					}
 					else
 					{
@@ -242,6 +249,11 @@ namespace Kkts.Expressions.Internal
 					if (parsers[index] != null && step(parser.GetType(), parser))
 					{
 						BuildNode(param, parser, parsers, ref index, arg);
+						if (parser is AdditionOperatorParser)
+						{
+							parsers = parsers.Where(p => p != null).ToList();
+							index = parsers.IndexOf(parser);
+						}
 					}
 				}
 
@@ -275,8 +287,26 @@ namespace Kkts.Expressions.Internal
 					return BuildNode(param, cfop, list, ref currentIndex, arg);
 				case ArrayParser ap:
 					return BuildNode(ap);
+				case AdditionOperatorParser addition:
+					return BuildNode(addition, list, currentIndex);
 				default: return null;
 			}
+
+		}
+
+		private static Node BuildNode(AdditionOperatorParser parser, List<Parser> list, int index)
+		{
+			if (parser.BuiltNode != null) return parser.BuiltNode;
+			var left = list[index - 1].BuiltNode;
+			var right = list[index + 1].BuiltNode;
+			if (left == null || right == null) throw new FormatException($"Incorrect syntax near '+', index {parser.StartIndex}");
+			parser.BuiltNode = new Addition
+			{
+				Left = left, Right = right, StartIndex = parser.StartIndex, StartChar = '+'
+			};
+			list[index - 1] = null;
+			list[index + 1] = null;
+			return parser.BuiltNode;
 		}
 
 		private static Node BuildNode(ParameterExpression param, NotOperatorParser parser, List<Parser> list, ref int currentIndex, BuildArgument arg)
@@ -352,7 +382,7 @@ namespace Kkts.Expressions.Internal
 			{
 				builtNode = new Constant { Value = result.ToLower(), Type = typeof(bool), StartIndex = parser.StartIndex, StartChar = parser.StartChar };
 			}
-			else if (parser.IsVariable && !parser.ForInOperator)
+			else if (parser.IsVariable)
 			{
                 builtNode = new Constant { Value = result, StartIndex = parser.StartIndex, StartChar = parser.StartChar, IsVariable = true };
             }
