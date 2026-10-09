@@ -442,6 +442,57 @@ namespace Kkts.Expressions.UnitTest.Units
             Assert.Equal("incompatible-operand", Assert.Single(invalidDate.SemanticDiagnostics).Code);
         }
 
+        [Theory]
+        [MemberData(nameof(MachineSemanticCases))]
+        public void AnalyzeExpression_AcceptsMachineTemporalLiterals(
+            string culture, string text, TimeSpan? offset)
+        {
+            var originalCulture = CultureInfo.CurrentCulture;
+            var schema = ExpressionSchema.FromType<Product>(
+                conversionContext: new ExpressionConversionContext(CultureInfo.InvariantCulture, Array.Empty<string>()));
+            try
+            {
+                CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo(culture);
+                var date = Interpreter.AnalyzeExpression<Product>($"Created = '{text}'", schema);
+                Assert.True(date.IsSemanticallyValid);
+                Assert.Empty(date.SemanticDiagnostics);
+
+                var zoned = Interpreter.AnalyzeExpression<Product>($"CreatedOffset = '{text}'", schema);
+                if (offset.HasValue)
+                {
+                    Assert.True(zoned.IsSemanticallyValid);
+                    Assert.Empty(zoned.SemanticDiagnostics);
+                }
+                else
+                {
+                    Assert.Equal("context-dependent-conversion", Assert.Single(zoned.SemanticDiagnostics).Code);
+                }
+            }
+            finally
+            {
+                CultureInfo.CurrentCulture = originalCulture;
+            }
+        }
+
+        public static IEnumerable<object[]> MachineSemanticCases() =>
+            TemporalStringParsingTest.MachineCases().Select(row => new[] { row[0], row[1], row[3] });
+
+        [Theory]
+        [InlineData("Created", "20260230")]
+        [InlineData("Created", "20261009T256146Z")]
+        [InlineData("Created", "20261009T152646+1500")]
+        [InlineData("Created", "20261009T152646.12345678Z")]
+        [InlineData("CreatedOffset", "20261009T152646+1500")]
+        [InlineData("CreatedOffset", "20261009T152646+1401")]
+        [InlineData("CreatedOffset", "20261009T152646-1401")]
+        [InlineData("CreatedOffset", "20261009T152646+0760")]
+        [InlineData("CreatedOffset", "20260230T152646Z")]
+        public void AnalyzeExpression_ReportsInvalidFullCompactDatesAsIncompatible(string property, string text)
+        {
+            var result = Analyze($"{property} = '{text}'");
+            Assert.Equal("incompatible-operand", Assert.Single(result.SemanticDiagnostics).Code);
+        }
+
         [Fact]
         public void AnalyzeExpression_ProvidesOnlyUniquePermittedPropertyCorrections()
         {

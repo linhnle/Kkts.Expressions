@@ -156,6 +156,17 @@ offset. The analysis conversion context is not a guarantee that runtime
 construction will use the same ambient defaults unless the application
 configures them accordingly.
 
+Common extended ISO and compact calendar forms are also validated using
+invariant machine formats, independently of the custom-format snapshot.
+For example, `Created = '20261009'` is a complete date, not a value requiring
+today's date; `CreatedOffset = '20261009T152646+0700'` includes a complete date
+and an explicit offset. `CreatedOffset = '20261009T152646'` still receives
+`context-dependent-conversion`. Zoned machine-format validation does not
+convert the instant to local `DateTime`. See the
+[runtime format and timezone rules](../README.md#datetime-and-datetimeoffset-strings)
+for supported precision and suffixes; runtime culture precedence remains
+different from the fixed schema context.
+
 ## Analyze an expression
 
 The generic and runtime-type overloads are:

@@ -36,6 +36,7 @@ The library targets `netstandard2.0` and is available on
     - [Building editor highlight runs](#building-editor-highlight-runs)
     - [Displaying syntax diagnostics while typing](#displaying-syntax-diagnostics-while-typing)
   - [TimeSpan durations](#timespan-durations)
+  - [DateTime and DateTimeOffset strings](#datetime-and-datetimeoffset-strings)
   - [Binary addition and subtraction in predicates (v3.0 only)](#binary-addition-and-subtraction-in-predicates-v30-only)
     - [Arithmetic and concatenation rules](#arithmetic-and-concatenation-rules)
     - [Limitations](#limitations)
@@ -683,6 +684,62 @@ getters, and semantic validity does not guarantee EF Core SQL translation.
 For query permissions, aliases, nested paths, stable diagnostic codes,
 correction suggestions, and incomplete-input behavior, see the
 [semantic analysis guide](docs/semantic-analysis.md).
+
+Temporal editor validation recognizes compact literals such as
+`Created = '20261009'` and `CreatedOffset = '20261009T152646+0700'`
+as well as extended ISO forms. It uses an immutable schema conversion context
+and invariant machine formats, not ambient culture or the mutable runtime
+format list. `CreatedOffset = '20261009T152646'` still reports
+`context-dependent-conversion` because no offset was supplied. Semantic
+acceptance does not guarantee identical runtime values across machine timezones
+or EF Core SQL translation.
+
+## DateTime and DateTimeOffset strings
+
+`ToDateTime`, `ToDateTimeOffset`, their try counterparts, and temporal `Cast`
+operations accept the following machine-readable calendar forms. Predicate
+values use the same forms inside quoted literals.
+
+| Form | Example |
+|---|---|
+| Extended calendar date | `2026-10-09` |
+| Compact calendar date | `20261009` |
+| Extended full timestamp | `2026-10-09T15:26:46` |
+| Compact full timestamp | `20261009T152646` |
+| UTC timestamp | `2026-10-09T08:26:46.427Z` or `20261009T082646Z` |
+| Timestamp with numeric offset | `2026-10-09T15:26:46.1234567+07:00` or `20261009T152646.427+0700` |
+
+Full timestamps allow no fraction or 1-7 fractional-second digits. Use uppercase
+`T` and `Z`, four-digit years, zero-padded components, and numeric offsets within
++/-14 hours. Extended offsets use `+HH:mm` / `-HH:mm`; compact offsets use
+`+HHmm` / `-HHmm`. Date-only values represent midnight.
+
+Parsing preserves legacy precedence: current-culture .NET parsing first, then
+the mutable `StringExtensions.DateTimeFormats` list using the supplied provider
+(or invariant culture), then the invariant machine-format fallback. The provider
+does not override the first attempt. Existing accepted inputs retain their
+interpretation, including culture/calendar-specific interpretations; the new
+fallback uses the Gregorian calendar.
+
+`ToDateTime` converts timestamps with `Z` or a numeric offset to machine-local
+time with `DateTimeKind.Local`. Without a suffix, the kind is `Unspecified`.
+It does not preserve UTC kind. Choose `ToDateTimeOffset` to retain an explicit
+offset (`Z` becomes zero offset); without a suffix it uses the local timezone
+for the represented date.
+
+For JSON, pass the extracted string value, not the JSON quotes or document:
+
+```csharp
+var local = "20261009T082646Z".ToDateTime();
+var withOffset = "20261009T152646.427+0700".ToDateTimeOffset();
+```
+
+This is a bounded supported subset, not a strict all-ISO-8601 parser. Legacy .NET
+parsing may also accept other representations. No Unix epoch, ISO week/ordinal
+date, raw JSON, or legacy Microsoft JSON `/Date(milliseconds)/` parser is added.
+Invalid temporal text throws `FormatException`; temporal try methods return
+false with the respective minimum value. Blank strings cast to nullable temporal
+types remain null.
 
 ## TimeSpan durations
 

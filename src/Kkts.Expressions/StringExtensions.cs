@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using Kkts.Expressions.Internal;
 
 namespace Kkts.Expressions
 {
@@ -72,9 +73,13 @@ namespace Kkts.Expressions
 			}
 		}
 
+		/// <summary>Parses legacy culture-specific values, then extended or compact ISO calendar values.</summary>
+		/// <remarks>Current culture takes precedence over the provider. Zoned values become local time.</remarks>
 		public static DateTime ToDateTime(this string value, IFormatProvider provider = null)
 		{
-			var succeeded = DateTime.TryParse(value, CultureInfo.CurrentCulture, DateTimeStyles.None, out var result) || DateTime.TryParseExact(value, DateTimeFormats.ToArray(), provider ?? CultureInfo.InvariantCulture, DateTimeStyles.None, out result);
+			var succeeded = DateTime.TryParse(value, CultureInfo.CurrentCulture, DateTimeStyles.None, out var result) ||
+				DateTime.TryParseExact(value, DateTimeFormats.ToArray(), provider ?? CultureInfo.InvariantCulture, DateTimeStyles.None, out result) ||
+				MachineDateTimeParser.TryParseDateTime(value, out result);
 
 			if (succeeded) return result;
 			throw new FormatException(value == null ? "Can not parse null value to DateTime" : $"String '{value}' was not recognized as a valid DateTime.");
@@ -94,9 +99,13 @@ namespace Kkts.Expressions
 			}
 		}
 
+		/// <summary>Parses legacy culture-specific values, then extended or compact ISO calendar values.</summary>
+		/// <remarks>Explicit offsets are retained. Values without an offset use the local timezone.</remarks>
 		public static DateTimeOffset ToDateTimeOffset(this string value, IFormatProvider provider = null)
 		{
-			var succeeded = DateTimeOffset.TryParse(value, CultureInfo.CurrentCulture, DateTimeStyles.None, out var result) || DateTimeOffset.TryParseExact(value, DateTimeFormats.ToArray(), provider ?? CultureInfo.InvariantCulture, DateTimeStyles.None, out result);
+			var succeeded = DateTimeOffset.TryParse(value, CultureInfo.CurrentCulture, DateTimeStyles.None, out var result) ||
+				DateTimeOffset.TryParseExact(value, DateTimeFormats.ToArray(), provider ?? CultureInfo.InvariantCulture, DateTimeStyles.None, out result) ||
+				MachineDateTimeParser.TryParseDateTimeOffset(value, out result);
 
 			if (succeeded) return result;
 			throw new FormatException(value == null ? "Can not parse null value to DateTimeOffset" : $"String '{value}' was not recognized as a valid DateTimeOffset.");

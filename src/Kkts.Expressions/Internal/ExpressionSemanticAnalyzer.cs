@@ -439,14 +439,16 @@ namespace Kkts.Expressions.Internal
                 if (targetType == typeof(DateTime))
                 {
                     if (RequiresDateDefaults(text)) return false;
-                    return DateTime.TryParse(text, _schema.ConversionContext.Culture, DateTimeStyles.None, out _) ||
+                    return MachineDateTimeParser.IsValid(text) ||
+                        DateTime.TryParse(text, _schema.ConversionContext.Culture, DateTimeStyles.None, out _) ||
                         DateTime.TryParseExact(text, _schema.ConversionContext.DateTimeFormats.ToArray(),
                             _schema.ConversionContext.Culture, DateTimeStyles.None, out _);
                 }
                 if (targetType == typeof(DateTimeOffset))
                 {
                     if (!HasExplicitOffset(text)) return false;
-                    return DateTimeOffset.TryParse(text, _schema.ConversionContext.Culture, DateTimeStyles.None, out _) ||
+                    return MachineDateTimeParser.IsValid(text) ||
+                        DateTimeOffset.TryParse(text, _schema.ConversionContext.Culture, DateTimeStyles.None, out _) ||
                         DateTimeOffset.TryParseExact(text, _schema.ConversionContext.DateTimeFormats.ToArray(),
                             _schema.ConversionContext.Culture, DateTimeStyles.None, out _);
                 }
@@ -641,6 +643,7 @@ namespace Kkts.Expressions.Internal
 
         private static bool RequiresDateDefaults(string value)
         {
+            if (MachineDateTimeParser.HasCompactCalendarDate(value)) return false;
             if (value.IndexOfAny(new[] { '-', '/' }) < 0) return true;
             var parts = value.Split(new[] { '/', '-' }, StringSplitOptions.RemoveEmptyEntries);
             return parts.Length == 2 && !parts.Any(part => part.Length == 4);
