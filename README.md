@@ -784,6 +784,9 @@ guarantee translation for every expression, provider, database version,
 collation, or provider configuration. Translation gaps discovered by these
 tests are compatibility findings, not silently worked-around behavior.
 
+See the [EF Core relational provider test report (2026-10-09)](./EFCORE-RELATIONAL-TEST-REPORT-2026-10-09.md)
+for the latest SQL Server and MySQL run results.
+
 The library continues to target `netstandard2.0`; the example projects retain
 their existing target frameworks.
 
