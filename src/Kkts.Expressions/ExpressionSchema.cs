@@ -205,6 +205,50 @@ namespace Kkts.Expressions
             return true;
         }
 
+        internal bool TryGetPolicyPathInfo(
+            string sourcePath,
+            out string clrPath,
+            out int navigationDepth,
+            out bool hasCollectionAccess)
+        {
+            navigationDepth = 0;
+            hasCollectionAccess = false;
+            if (!TryMapProperty(sourcePath, out var mappedPath))
+            {
+                clrPath = null;
+                return false;
+            }
+
+            var type = EntityType;
+            var canonicalSegments = new List<string>();
+            foreach (var segment in NormalizePath(mappedPath).Split('.'))
+            {
+                var members = PropertyMetadata.GetMemberTypes(type);
+                var member = members.FirstOrDefault(pair =>
+                    string.Equals(pair.Key, segment, StringComparison.OrdinalIgnoreCase));
+                if (member.Key == null)
+                {
+                    clrPath = null;
+                    return false;
+                }
+
+                type = member.Value;
+                canonicalSegments.Add(member.Key);
+                if (QueryPolicyFieldMetadata.IsCollection(type))
+                {
+                    hasCollectionAccess = true;
+                    ++navigationDepth;
+                }
+                else if (!QueryPolicyFieldMetadata.IsScalar(type))
+                {
+                    ++navigationDepth;
+                }
+            }
+
+            clrPath = string.Join(".", canonicalSegments);
+            return canonicalSegments.Count > 0;
+        }
+
         internal static string NormalizePath(string path)
         {
             return string.Concat((path ?? string.Empty).Where(character => !char.IsWhiteSpace(character)));

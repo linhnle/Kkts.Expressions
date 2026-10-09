@@ -93,16 +93,26 @@ namespace Kkts.Expressions
             int length,
             IEnumerable<ExpressionTypeInfo> expectedTypes = null,
             IEnumerable<ExpressionTypeInfo> actualTypes = null,
-            IEnumerable<ExpressionCorrectionSuggestion> suggestions = null)
+            IEnumerable<ExpressionCorrectionSuggestion> suggestions = null,
+            long? configuredLimit = null,
+            long? observedValue = null,
+            bool observedValueIsLowerBound = false,
+            string inputPath = null)
         {
             Kind = kind;
             Code = code ?? throw new ArgumentNullException(nameof(code));
             Message = message ?? throw new ArgumentNullException(nameof(message));
+            if (configuredLimit < 0) throw new ArgumentOutOfRangeException(nameof(configuredLimit));
+            if (observedValue < 0) throw new ArgumentOutOfRangeException(nameof(observedValue));
             Start = start;
             Length = length;
             ExpectedTypes = Array.AsReadOnly((expectedTypes ?? Enumerable.Empty<ExpressionTypeInfo>()).ToArray());
             ActualTypes = Array.AsReadOnly((actualTypes ?? Enumerable.Empty<ExpressionTypeInfo>()).ToArray());
             Suggestions = Array.AsReadOnly((suggestions ?? Enumerable.Empty<ExpressionCorrectionSuggestion>()).ToArray());
+            ConfiguredLimit = configuredLimit;
+            ObservedValue = observedValue;
+            ObservedValueIsLowerBound = observedValueIsLowerBound;
+            InputPath = inputPath;
         }
 
         /// <summary>Whether this diagnostic was produced by syntax or semantic analysis.</summary>
@@ -129,6 +139,18 @@ namespace Kkts.Expressions
         /// <summary>Conservative, permission-safe source replacements, when available.</summary>
         public IReadOnlyList<ExpressionCorrectionSuggestion> Suggestions { get; }
 
+        /// <summary>The configured policy limit associated with this diagnostic, when applicable.</summary>
+        public long? ConfiguredLimit { get; }
+
+        /// <summary>The observed value associated with this diagnostic, when applicable.</summary>
+        public long? ObservedValue { get; }
+
+        /// <summary>Whether <see cref="ObservedValue"/> is only a lower bound.</summary>
+        public bool ObservedValueIsLowerBound { get; }
+
+        /// <summary>The structured input location when the diagnostic is not in source text.</summary>
+        public string InputPath { get; }
+
         internal static ExpressionDiagnostic FromSyntax(ExpressionSyntaxDiagnostic diagnostic)
         {
             return new ExpressionDiagnostic(
@@ -143,25 +165,47 @@ namespace Kkts.Expressions
     /// <summary>An immutable syntax and metadata-based semantic analysis snapshot.</summary>
     public sealed class ExpressionSemanticAnalysisResult
     {
+        private const int MaximumPolicyDiagnostics = 32;
+
         internal ExpressionSemanticAnalysisResult(
             ExpressionAnalysisResult syntaxAnalysis,
             IEnumerable<ExpressionDiagnostic> semanticDiagnostics,
-            bool isSemanticallyValid)
+            bool isSemanticallyValid,
+            bool isTruncated = false,
+            bool capDiagnostics = false,
+            long atomicConditionCount = 0)
         {
             SyntaxAnalysis = syntaxAnalysis ?? throw new ArgumentNullException(nameof(syntaxAnalysis));
             SemanticDiagnostics = Array.AsReadOnly((semanticDiagnostics ?? Enumerable.Empty<ExpressionDiagnostic>()).ToArray());
-            Diagnostics = Array.AsReadOnly(
-                syntaxAnalysis.Diagnostics.Select(ExpressionDiagnostic.FromSyntax)
-                    .Concat(SemanticDiagnostics)
-                    .OrderBy(diagnostic => diagnostic.Start)
-                    .ThenBy(diagnostic => diagnostic.Length)
-                    .ThenBy(diagnostic => diagnostic.Code, StringComparer.Ordinal)
-                    .GroupBy(diagnostic => (diagnostic.Code, diagnostic.Start, diagnostic.Length))
-                    .Select(group => group.First())
-                    .ToArray());
+            var diagnostics = syntaxAnalysis.Diagnostics.Select(ExpressionDiagnostic.FromSyntax)
+                .Concat(SemanticDiagnostics)
+                .OrderBy(diagnostic => diagnostic.Start)
+                .ThenBy(diagnostic => diagnostic.Length)
+                .ThenBy(diagnostic => diagnostic.Code, StringComparer.Ordinal)
+                .GroupBy(diagnostic => (diagnostic.Code, diagnostic.Start, diagnostic.Length))
+                .Select(group => group.First())
+                .ToArray();
+            var combinedTruncated = capDiagnostics && diagnostics.Length > MaximumPolicyDiagnostics;
+            if (combinedTruncated)
+            {
+                diagnostics = diagnostics.Take(MaximumPolicyDiagnostics - 1)
+                    .Concat(new[]
+                    {
+                        new ExpressionDiagnostic(
+                            ExpressionDiagnosticKind.Semantic,
+                            "query-policy-diagnostics-truncated",
+                            "Additional diagnostics were omitted; fix the reported issues before retrying.",
+                            diagnostics[MaximumPolicyDiagnostics - 1].Start,
+                            0)
+                    })
+                    .ToArray();
+            }
+            Diagnostics = Array.AsReadOnly(diagnostics);
             IsSemanticallyValid = isSemanticallyValid &&
                 syntaxAnalysis.IsComplete &&
                 SemanticDiagnostics.Count == 0;
+            IsTruncated = isTruncated || combinedTruncated;
+            AtomicConditionCount = atomicConditionCount;
         }
 
         /// <summary>The existing immutable syntax-analysis snapshot.</summary>
@@ -184,5 +228,10 @@ namespace Kkts.Expressions
 
         /// <summary>Whether complete syntax has no semantic errors and a Boolean predicate result.</summary>
         public bool IsSemanticallyValid { get; }
+
+        /// <summary>Whether resource limits intentionally stopped analysis before the full input.</summary>
+        public bool IsTruncated { get; }
+
+        internal long AtomicConditionCount { get; }
     }
 }

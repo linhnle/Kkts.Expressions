@@ -51,6 +51,7 @@ namespace Kkts.Expressions.Internal
 				return new EvaluationResult
 				{
 					Exception = ex,
+					Diagnostics = (ex as QueryPolicyException)?.Diagnostics,
 					InvalidProperties = arg.InvalidProperties,
 					InvalidVariables = arg.InvalidVariables,
 					InvalidOperators = arg.InvalidOperators,
@@ -88,11 +89,16 @@ namespace Kkts.Expressions.Internal
 					Succeeded = true
 				};
 			}
+			catch (OperationCanceledException) when (arg.QueryContext != null)
+			{
+				throw;
+			}
 			catch (Exception ex)
 			{
 				return new EvaluationResult
 				{
 					Exception = ex,
+					Diagnostics = (ex as QueryPolicyException)?.Diagnostics,
 					InvalidProperties = arg.InvalidProperties,
 					InvalidVariables = arg.InvalidVariables,
 					InvalidOperators = arg.InvalidOperators,

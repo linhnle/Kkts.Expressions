@@ -230,7 +230,16 @@ namespace Kkts.Expressions
         internal static Task<Expression> BuildConditionAsync(ParameterExpression param, Filter filter, BuildArgument arg, CancellationToken cancellationToken)
         {
             var prop = param.CreatePropertyExpression(arg.MapProperty(filter.Property));
-            return Interpreter.BuildBodyAsync(filter.Operator.GetComparisonOperator(), prop, filter.Value, arg.VariableResolver, cancellationToken);
+            if (arg.QueryContext == null)
+                return Interpreter.BuildBodyAsync(
+                    filter.Operator.GetComparisonOperator(),
+                    prop,
+                    filter.Value,
+                    arg.VariableResolver,
+                    cancellationToken);
+
+            arg.CancellationToken = cancellationToken;
+            return Interpreter.BuildBodyAsync(filter.Operator.GetComparisonOperator(), prop, filter.Value, arg);
         }
 
         #endregion private

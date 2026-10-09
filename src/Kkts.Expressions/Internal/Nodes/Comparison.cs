@@ -16,23 +16,39 @@ namespace Kkts.Expressions.Internal.Nodes
 
 		public override Expression Build(BuildArgument arg)
 		{
-			return BuildCore(node => Task.FromResult(node.Build(arg))).GetAwaiter().GetResult();
+			return BuildCore(node => Task.FromResult(node.Build(arg)), arg, asyncBuild: false)
+				.GetAwaiter().GetResult();
 		}
 
 		public override Task<Expression> BuildAsync(BuildArgument arg)
 		{
 			arg.CancellationToken.ThrowIfCancellationRequested();
-			return BuildCore(node => node.BuildAsync(arg));
+			return BuildCore(node => node.BuildAsync(arg), arg, asyncBuild: true);
 		}
 
-		private async Task<Expression> BuildCore(Func<Node, Task<Expression>> build)
+		private async Task<Expression> BuildCore(
+			Func<Node, Task<Expression>> build,
+			BuildArgument arg,
+			bool asyncBuild)
 		{
 			try
 			{
+				arg.ValidateComparison(Operator, Left, Right, StartIndex);
+				if (Interpreter.IsMembership(Operator) && Unwrap(Right) is Constant constant)
+				{
+					if (asyncBuild)
+						await arg.SnapshotMembershipVariableAsync(constant).ConfigureAwait(false);
+					else
+						arg.SnapshotMembershipVariable(constant);
+				}
 				var operands = await BuildOperands(build);
 				return BuildOperator(operands.Left, operands.Right, operands.InType);
 			}
 			catch (OperationCanceledException)
+			{
+				throw;
+			}
+			catch (QueryPolicyException)
 			{
 				throw;
 			}

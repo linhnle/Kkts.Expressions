@@ -6,16 +6,22 @@ namespace Kkts.Expressions.Internal
 {
 	internal sealed class ExpressionAnalyzer
 	{
+		private const int MaximumPolicyDiagnostics = 32;
 		private readonly string _source;
+		private readonly bool _policyAware;
 		private readonly List<ExpressionToken> _tokens = new List<ExpressionToken>();
 		private readonly List<ExpressionSyntaxDiagnostic> _diagnostics = new List<ExpressionSyntaxDiagnostic>();
 		private readonly HashSet<Tuple<string, int, int>> _reported = new HashSet<Tuple<string, int, int>>();
 		private readonly HashSet<Tuple<int, int>> _errorSpans = new HashSet<Tuple<int, int>>();
+		private bool _isTruncated;
 
-		internal ExpressionAnalyzer(string source)
+		internal ExpressionAnalyzer(string source, bool policyAware = false)
 		{
 			_source = source;
+			_policyAware = policyAware;
 		}
+
+		internal bool IsTruncated => _isTruncated;
 
 		internal ExpressionAnalysisResult Analyze()
 		{
@@ -28,8 +34,21 @@ namespace Kkts.Expressions.Internal
 
 		private void Report(string code, string message, int start, int length)
 		{
+			if (_isTruncated) return;
 			if (_reported.Add(Tuple.Create(code, start, length)))
 			{
+				if (_policyAware && _diagnostics.Count >= MaximumPolicyDiagnostics)
+				{
+					_diagnostics.RemoveAt(MaximumPolicyDiagnostics - 1);
+					_diagnostics.Add(new ExpressionSyntaxDiagnostic(
+						"query-policy-diagnostics-truncated",
+						"Additional diagnostics were omitted; fix the reported issues before retrying.",
+						start,
+						0));
+					_isTruncated = true;
+					return;
+				}
+
 				_diagnostics.Add(new ExpressionSyntaxDiagnostic(code, message, start, length));
 				_errorSpans.Add(Tuple.Create(start, length));
 			}

@@ -13,12 +13,17 @@ namespace Kkts.Expressions.Internal.Nodes
 
 		public bool IsVariable { get; set; }
 		public bool UseNaturalType { get; set; }
+		public bool HasResolvedObjectValue { get; set; }
+		public object ResolvedObjectValue { get; set; }
 		public override bool IsConstantValue => !IsVariable;
 
 		public override Expression Build(BuildArgument arg)
 		{
 			try
 			{
+				if (HasResolvedObjectValue)
+					return Expression.Constant(ResolvedObjectValue);
+
 				if (IsVariable)
 				{
 					var resolved = arg.VariableResolver.TryResolve(Value, out var value);
@@ -40,6 +45,9 @@ namespace Kkts.Expressions.Internal.Nodes
 			arg.CancellationToken.ThrowIfCancellationRequested();
 			try
 			{
+				if (HasResolvedObjectValue)
+					return Expression.Constant(ResolvedObjectValue);
+
 				if (IsVariable)
 				{
 					var variableInfo = await arg.VariableResolver.TryResolveAsync(Value, arg.CancellationToken);

@@ -20,6 +20,10 @@ expression is not guaranteed to have available runtime values, avoid
 value-dependent conversion failures, execute without application exceptions,
 or translate to SQL for a particular EF Core provider.
 
+For reusable expression limits and field operator/collection policies enforced
+both during analysis and runtime construction, see the
+[query policies guide](query-policies.md).
+
 ## Entity schema, query permissions, and mappings
 
 The schema reflects public readable instance properties and fields. Add

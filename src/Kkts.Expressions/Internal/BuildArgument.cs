@@ -1,10 +1,13 @@
 ﻿using Kkts.Expressions.Internal;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
 using System.Threading;
+using System.Threading.Tasks;
+using Kkts.Expressions.Internal.Nodes;
 
 namespace Kkts.Expressions
 {
@@ -74,6 +77,16 @@ namespace Kkts.Expressions
 
         public CancellationToken CancellationToken { get; set; } = CancellationToken.None;
 
+        public ExpressionQueryContext QueryContext { get; set; }
+
+        public QueryPolicyExecution PolicyExecution { get; set; }
+
+        public int SourceOffset { get; set; }
+
+        public string SourceExpression { get; set; }
+
+        public string MembershipInputPath { get; set; }
+
         public IDictionary<string, string> PropertyMapping
         {
             get => _mapping;
@@ -94,6 +107,250 @@ namespace Kkts.Expressions
         public string MapProperty(string name)
         {
             return _evaluateMapping(name);
+        }
+
+        internal void ValidateQueryProperty(string sourcePath, int start, int length)
+        {
+            if (QueryContext == null) return;
+
+            var policyDiagnostics = new List<ExpressionDiagnostic>();
+            if (!QueryContext.Schema.TryGetPolicyPathInfo(sourcePath, out _, out var navigationDepth, out var collectionAccess) ||
+                !QueryContext.IsPropertyQueryable(sourcePath))
+            {
+                policyDiagnostics.Add(new ExpressionDiagnostic(
+                    ExpressionDiagnosticKind.Semantic,
+                    "property-not-queryable",
+                    "The field is not permitted for querying.",
+                    start + SourceOffset,
+                    length));
+            }
+            else
+            {
+                if (!QueryContext.IsNavigationAllowed(sourcePath, out navigationDepth))
+                {
+                    policyDiagnostics.Add(new ExpressionDiagnostic(
+                        ExpressionDiagnosticKind.Semantic,
+                        "query-policy-navigation-depth-exceeded",
+                        "The field exceeds the configured entity navigation depth.",
+                        start + SourceOffset,
+                        length,
+                        configuredLimit: QueryContext.Policy.MaxNavigationDepth,
+                        observedValue: navigationDepth));
+                }
+                if (!QueryContext.Policy.AllowCollectionAccess && collectionAccess)
+                {
+                    policyDiagnostics.Add(new ExpressionDiagnostic(
+                        ExpressionDiagnosticKind.Semantic,
+                        "query-policy-collection-access-denied",
+                        "Traversal through entity collection fields is not permitted.",
+                        start + SourceOffset,
+                        length));
+                }
+            }
+
+            if (policyDiagnostics.Count > 0)
+                throw new QueryPolicyException(policyDiagnostics);
+        }
+
+        internal void ValidateComparison(string operatorName, Node left, Node right, int start)
+        {
+            if (QueryContext == null) return;
+            var normalized = Interpreter.NormalizeComparisonOperator(operatorName);
+            if (!Interpreter.ComparisonOperators.Contains(
+                    normalized,
+                    StringComparer.OrdinalIgnoreCase))
+                return;
+
+            var comparisonOperator = normalized.GetComparisonOperator();
+            var denied = GetEntityPaths(left, right)
+                .Any(path => !QueryContext.IsOperatorAllowed(path, comparisonOperator));
+            if (!denied) return;
+
+            throw new QueryPolicyException(new[]
+            {
+                new ExpressionDiagnostic(
+                    ExpressionDiagnosticKind.Semantic,
+                    "query-policy-operator-denied",
+                    "The comparison operator is not permitted for one or more fields in this predicate.",
+                    start + SourceOffset,
+                    normalized.Length)
+            });
+        }
+
+        internal void SnapshotMembershipVariable(Constant variable)
+        {
+            if (QueryContext == null ||
+                !QueryContext.Policy.MaxInItems.HasValue ||
+                !variable.IsVariable ||
+                variable.HasResolvedObjectValue)
+                return;
+
+            if (!VariableResolver.TryResolve(variable.Value, out var value))
+            {
+                InvalidVariables.Add(variable.Value);
+                InvalidProperties.Add(variable.Value);
+                throw new InvalidCastException($"Invalid variable or property, name {variable.Value}");
+            }
+
+            variable.HasResolvedObjectValue = true;
+            variable.ResolvedObjectValue = SnapshotMembershipValue(value, variable);
+        }
+
+        internal async Task SnapshotMembershipVariableAsync(Constant variable)
+        {
+            if (QueryContext == null ||
+                !QueryContext.Policy.MaxInItems.HasValue ||
+                !variable.IsVariable ||
+                variable.HasResolvedObjectValue)
+                return;
+
+            CancellationToken.ThrowIfCancellationRequested();
+            var variableInfo = await VariableResolver.TryResolveAsync(variable.Value, CancellationToken)
+                .ConfigureAwait(false);
+            if (variableInfo?.Resolved != true)
+            {
+                InvalidVariables.Add(variable.Value);
+                InvalidProperties.Add(variable.Value);
+                throw new InvalidCastException($"Invalid variable or property, name {variable.Value}");
+            }
+
+            variable.HasResolvedObjectValue = true;
+            variable.ResolvedObjectValue = SnapshotMembershipValue(variableInfo.Value, variable);
+        }
+
+        private object SnapshotMembershipValue(object value, Constant variable)
+        {
+            if (value == null || value is string || !(value is IEnumerable enumerable))
+                return value;
+
+            int start;
+            int length;
+            if (MembershipInputPath == null)
+                GetOriginalSourceSpan(variable, out start, out length);
+            else
+            {
+                start = 0;
+                length = 0;
+            }
+            return SnapshotMembershipCollection(value, enumerable, start, length, MembershipInputPath);
+        }
+
+        internal object SnapshotDirectMembershipCollection(object value, Type elementType)
+        {
+            if (QueryContext == null ||
+                !QueryContext.Policy.MaxInItems.HasValue ||
+                value == null ||
+                value is string ||
+                !(value is IEnumerable enumerable))
+                return value;
+
+            return SnapshotMembershipCollection(value, enumerable, 0, 0, "Value", elementType);
+        }
+
+        private object SnapshotMembershipCollection(
+            object value,
+            IEnumerable enumerable,
+            int start,
+            int length,
+            string inputPath,
+            Type targetElementType = null)
+        {
+            var maximum = QueryContext.Policy.MaxInItems.Value;
+            if (value is IQueryable)
+            {
+                throw new QueryPolicyException(new[]
+                {
+                    new ExpressionDiagnostic(
+                        ExpressionDiagnosticKind.Semantic,
+                        "query-policy-in-items-unverifiable",
+                        "The membership collection cannot be safely checked under the configured item limit.",
+                        start,
+                        length,
+                        configuredLimit: maximum,
+                        inputPath: inputPath)
+                });
+            }
+
+            var counter = PolicyExecution.CreateMembershipCounter();
+            var items = new List<object>();
+            var enumerator = enumerable.GetEnumerator();
+            using (enumerator as IDisposable)
+            {
+                while (enumerator.MoveNext())
+                {
+                    if (!PolicyExecution.TryCountMembershipItem(counter, start, length, inputPath))
+                        throw new QueryPolicyException(PolicyExecution.Diagnostics.ToReadOnlyList());
+                    items.Add(enumerator.Current);
+                }
+            }
+
+            var elementType = targetElementType ?? GetEnumerableElementType(value.GetType());
+            var snapshot = Array.CreateInstance(elementType, items.Count);
+            for (var index = 0; index < items.Count; index++)
+                snapshot.SetValue(items[index], index);
+            return snapshot;
+        }
+
+        private void GetOriginalSourceSpan(Constant variable, out int start, out int length)
+        {
+            var sourceToken = variable.Value ?? string.Empty;
+            if (sourceToken.Length == 0 || sourceToken[0] != VariableResolver.VariablePrefix)
+                sourceToken = VariableResolver.VariablePrefix + sourceToken;
+
+            start = variable.StartIndex + SourceOffset;
+            length = sourceToken.Length;
+            if (string.IsNullOrEmpty(SourceExpression)) return;
+
+            var searchStart = Math.Max(0, start - sourceToken.Length);
+            var sourceStart = SourceExpression.IndexOf(sourceToken, searchStart, StringComparison.Ordinal);
+            if (sourceStart >= 0) start = sourceStart;
+        }
+
+        private static Type GetEnumerableElementType(Type type)
+        {
+            if (type.IsArray) return type.GetElementType();
+            foreach (var candidate in type.GetInterfaces())
+            {
+                if (candidate.IsGenericType &&
+                    candidate.GetGenericTypeDefinition() == typeof(IEnumerable<>))
+                    return candidate.GetGenericArguments()[0];
+            }
+            return typeof(object);
+        }
+
+        private static IEnumerable<string> GetEntityPaths(Node left, Node right)
+        {
+            var pending = new Stack<Node>();
+            var paths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            if (left != null) pending.Push(left);
+            if (right != null) pending.Push(right);
+
+            while (pending.Count > 0)
+            {
+                var node = pending.Pop();
+                switch (node)
+                {
+                    case Property property:
+                        paths.Add(property.Name);
+                        break;
+                    case Comparison comparison:
+                        if (comparison.Left != null) pending.Push(comparison.Left);
+                        if (comparison.Right != null) pending.Push(comparison.Right);
+                        break;
+                    case Arithmetic arithmetic:
+                        if (arithmetic.Left != null) pending.Push(arithmetic.Left);
+                        if (arithmetic.Right != null) pending.Push(arithmetic.Right);
+                        break;
+                    case Group group:
+                        if (group.Node != null) pending.Push(group.Node);
+                        break;
+                    case Not not:
+                        if (not.Node != null) pending.Push(not.Node);
+                        break;
+                }
+            }
+
+            return paths;
         }
 
         public bool IsValidProperty(string value)

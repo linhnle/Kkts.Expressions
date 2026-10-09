@@ -12,51 +12,97 @@ namespace Kkts.Expressions.Internal
         private readonly ExpressionSchema _schema;
         private readonly ExpressionVariableSchema _variables;
         private readonly ExpressionAnalysisResult _syntax;
+        private readonly ExpressionQueryContext _queryContext;
+        private readonly QueryPolicyExecution _policyExecution;
+        private readonly bool _syntaxTruncated;
         private readonly List<ExpressionDiagnostic> _diagnostics = new List<ExpressionDiagnostic>();
         private readonly HashSet<Tuple<string, int, int>> _reported = new HashSet<Tuple<string, int, int>>();
+        private bool _isTruncated;
 
         internal ExpressionSemanticAnalyzer(
             string source,
             ExpressionSchema schema,
             ExpressionVariableSchema variables,
-            ExpressionAnalysisResult syntax)
+            ExpressionAnalysisResult syntax,
+            ExpressionQueryContext queryContext = null,
+            QueryPolicyExecution policyExecution = null,
+            bool syntaxTruncated = false)
         {
             _source = source;
             _schema = schema;
             _variables = variables ?? new ExpressionVariableSchema(null);
             _syntax = syntax;
+            _queryContext = queryContext;
+            _policyExecution = policyExecution;
+            _syntaxTruncated = syntaxTruncated;
         }
 
         internal ExpressionSemanticAnalysisResult Analyze()
         {
             if (_syntax.Tokens.Count == 0)
-                return new ExpressionSemanticAnalysisResult(_syntax, _diagnostics, false);
+                return new ExpressionSemanticAnalysisResult(
+                    _syntax,
+                    AllDiagnostics(),
+                    false,
+                    isTruncated: IsTruncated(),
+                    capDiagnostics: _queryContext != null,
+                    atomicConditionCount: _policyExecution?.ConditionCount.Value ?? 0);
 
-            var tokens = _syntax.Tokens;
-            var semanticRoot = false;
-            if (_syntax.IsComplete)
+            try
             {
-                var parser = new Parser(this, tokens, 0, tokens.Count);
-                var expression = parser.Parse();
-                if (expression != null && parser.AtEnd)
-                    semanticRoot = CheckRoot(expression);
-            }
-            else
-            {
-                foreach (var range in GetRecoverableRanges(tokens))
+                var tokens = _syntax.Tokens;
+                var semanticRoot = false;
+                if (_syntax.IsComplete)
                 {
-                    if (HasSyntaxErrorInRange(tokens, range.Start, range.End)) continue;
-                    var parser = new Parser(this, tokens, range.Start, range.End);
+                    var parser = new Parser(this, tokens, 0, tokens.Count);
                     var expression = parser.Parse();
-                    if (expression == null || !parser.AtEnd) continue;
-                    CheckRoot(expression, reportRoot: false);
+                    if (expression != null && parser.AtEnd)
+                        semanticRoot = CheckRoot(expression);
                 }
-            }
+                else
+                {
+                    foreach (var range in GetRecoverableRanges(tokens))
+                    {
+                        if (HasSyntaxErrorInRange(tokens, range.Start, range.End)) continue;
+                        var parser = new Parser(this, tokens, range.Start, range.End);
+                        var expression = parser.Parse();
+                        if (expression == null || !parser.AtEnd) continue;
+                        CheckRoot(expression, reportRoot: false);
+                    }
+                }
 
-            return new ExpressionSemanticAnalysisResult(
-                _syntax,
-                _diagnostics,
-                _syntax.IsComplete && semanticRoot && _diagnostics.Count == 0);
+                return new ExpressionSemanticAnalysisResult(
+                    _syntax,
+                    AllDiagnostics(),
+                    _syntax.IsComplete && semanticRoot && _diagnostics.Count == 0 &&
+                    (_policyExecution == null || _policyExecution.Diagnostics.ToReadOnlyList().Count == 0),
+                    isTruncated: IsTruncated(),
+                    capDiagnostics: _queryContext != null,
+                    atomicConditionCount: _policyExecution?.ConditionCount.Value ?? 0);
+            }
+            catch (PolicyAnalysisStoppedException)
+            {
+                return new ExpressionSemanticAnalysisResult(
+                    _syntax,
+                    AllDiagnostics(),
+                    false,
+                    isTruncated: true,
+                    capDiagnostics: _queryContext != null,
+                    atomicConditionCount: _policyExecution?.ConditionCount.Value ?? 0);
+            }
+        }
+
+        private bool IsTruncated()
+        {
+            return _isTruncated || _syntaxTruncated ||
+                (_policyExecution != null && _policyExecution.Diagnostics.IsTruncated);
+        }
+
+        private IEnumerable<ExpressionDiagnostic> AllDiagnostics()
+        {
+            return _policyExecution == null
+                ? _diagnostics
+                : _diagnostics.Concat(_policyExecution.Diagnostics.ToReadOnlyList());
         }
 
         private bool HasSyntaxErrorInRange(IReadOnlyList<ExpressionToken> tokens, int start, int end)
@@ -76,7 +122,11 @@ namespace Kkts.Expressions.Internal
         private bool CheckRoot(SemanticNode node, bool reportRoot = true)
         {
             if (node.Invalid) return false;
-            if (node.Type == typeof(bool)) return true;
+            if (node.Type == typeof(bool))
+            {
+                if (node.IsBareBooleanPredicate) CheckBareBooleanPredicate(node);
+                return true;
+            }
             if (reportRoot)
             {
                 Report(
@@ -174,7 +224,7 @@ namespace Kkts.Expressions.Internal
             if (_schema.TryMapProperty(text, out var clrPath) &&
                 _schema.TryGetProperty(clrPath, out var type, out var nullability, out _))
             {
-                if (!_schema.IsPropertyQueryable(text))
+                if (!(_queryContext?.IsPropertyQueryable(text) ?? _schema.IsPropertyQueryable(text)))
                 {
                     Report(
                         "property-not-queryable",
@@ -183,7 +233,36 @@ namespace Kkts.Expressions.Internal
                         token.Length);
                     return SemanticNode.Error(token.Start, token.Start + token.Length);
                 }
-                return SemanticNode.Value(type, nullability, token.Start, token.Start + token.Length);
+                if (_queryContext != null)
+                {
+                    if (!_queryContext.IsNavigationAllowed(text, out var navigationDepth))
+                    {
+                        _policyExecution.Diagnostics.Add(
+                            "query-policy-navigation-depth-exceeded",
+                            "The field exceeds the configured entity navigation depth.",
+                            token.Start,
+                            token.Length,
+                            _queryContext.Policy.MaxNavigationDepth,
+                            navigationDepth);
+                    }
+                    if (!_queryContext.IsCollectionAccessAllowed(text))
+                    {
+                        _policyExecution.Diagnostics.Add(
+                            "query-policy-collection-access-denied",
+                            "Traversal through entity collection fields is not permitted.",
+                            token.Start,
+                            token.Length);
+                    }
+                }
+                return SemanticNode.Value(
+                    type,
+                    nullability,
+                    token.Start,
+                    token.Start + token.Length,
+                    entityPaths: new[] { text },
+                    isBareBooleanPredicate: type == typeof(bool),
+                    predicateStart: token.Start,
+                    predicateLength: token.Length);
             }
 
             if (_variables.TryGetVariable(text, out var fallbackType, out var fallbackNullability, out var fallbackElement, out _))
@@ -239,12 +318,18 @@ namespace Kkts.Expressions.Internal
         {
             var nodeStart = Math.Min(left.Start, start);
             var nodeEnd = Math.Max(right.End, end);
+            op = ExpressionGrammar.NormalizeOperator(op);
+            if (_queryContext != null &&
+                (IsComparison(op) || IsStringFunction(op) || IsMembership(op)))
+                CheckAllowedOperator(op, left.EntityPaths.Concat(right.EntityPaths), start, end - start);
+
             if (left.Invalid || right.Invalid)
                 return SemanticNode.Error(nodeStart, nodeEnd);
 
-            op = ExpressionGrammar.NormalizeOperator(op);
             if (IsLogical(op))
             {
+                if (left.IsBareBooleanPredicate) CheckBareBooleanPredicate(left);
+                if (right.IsBareBooleanPredicate) CheckBareBooleanPredicate(right);
                 if (left.Type != typeof(bool))
                     ReportOperator(start, end - start, typeof(bool), left.Type);
                 if (right.Type != typeof(bool))
@@ -257,7 +342,12 @@ namespace Kkts.Expressions.Internal
             if (op == "+" || op == "-")
             {
                 if (op == "+" && (left.Type == typeof(string) || right.Type == typeof(string)))
-                    return SemanticNode.Value(typeof(string), ExpressionNullability.Unknown, nodeStart, nodeEnd);
+                    return SemanticNode.Value(
+                        typeof(string),
+                        ExpressionNullability.Unknown,
+                        nodeStart,
+                        nodeEnd,
+                        entityPaths: MergeEntityPaths(left, right));
                 if (NumericOperands.IsNumeric(left.Type) && NumericOperands.IsNumeric(right.Type))
                 {
                     try
@@ -270,8 +360,13 @@ namespace Kkts.Expressions.Internal
                             leftType,
                             rightType);
                         type = NumericOperands.LiftNullable(type, left.Type, right.Type);
-                        return SemanticNode.Value(type, Nullable.GetUnderlyingType(type) == null
-                            ? ExpressionNullability.NonNullable : ExpressionNullability.Nullable, nodeStart, nodeEnd);
+                        return SemanticNode.Value(
+                            type,
+                            Nullable.GetUnderlyingType(type) == null
+                                ? ExpressionNullability.NonNullable : ExpressionNullability.Nullable,
+                            nodeStart,
+                            nodeEnd,
+                            entityPaths: MergeEntityPaths(left, right));
                     }
                     catch (InvalidOperationException)
                     {
@@ -414,6 +509,51 @@ namespace Kkts.Expressions.Internal
             return SemanticNode.Error(nodeStart, nodeEnd);
         }
 
+        private void CheckAllowedOperator(
+            string op,
+            IEnumerable<string> sourcePaths,
+            int start,
+            int length)
+        {
+            var comparisonOperator = QueryPolicyFieldMetadata.NormalizeComparisonOperator(op);
+            if (_queryContext.AreOperatorsAllowed(sourcePaths.Distinct(StringComparer.OrdinalIgnoreCase), comparisonOperator))
+                return;
+
+            _policyExecution.Diagnostics.Add(
+                "query-policy-operator-denied",
+                "The comparison operator is not permitted for one or more fields in this predicate.",
+                start,
+                length);
+        }
+
+        private void CheckBareBooleanPredicate(SemanticNode node)
+        {
+            if (_policyExecution == null) return;
+
+            if (_queryContext != null &&
+                node.EntityPaths.Count > 0 &&
+                !_queryContext.AreOperatorsAllowed(node.EntityPaths, ComparisonOperator.Equal))
+            {
+                _policyExecution.Diagnostics.Add(
+                    "query-policy-operator-denied",
+                    "The comparison operator is not permitted for one or more fields in this predicate.",
+                    node.PredicateStart,
+                    node.PredicateLength);
+            }
+
+            if (!_policyExecution.TryCountCondition(node.PredicateStart, node.PredicateLength))
+                throw new PolicyAnalysisStoppedException();
+        }
+
+        private sealed class PolicyAnalysisStoppedException : Exception { }
+
+        private static IReadOnlyList<string> MergeEntityPaths(SemanticNode left, SemanticNode right)
+        {
+            return left.EntityPaths.Concat(right.EntityPaths)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+        }
+
         private bool CanConvertLiteral(SemanticNode value, Type targetType)
         {
             if (value.Invalid) return false;
@@ -540,7 +680,22 @@ namespace Kkts.Expressions.Internal
             IEnumerable<ExpressionTypeInfo> actualTypes = null,
             IEnumerable<ExpressionCorrectionSuggestion> suggestions = null)
         {
+            if (_queryContext != null && _isTruncated) return;
             if (_reported.Add(Tuple.Create(code, start, length)))
+            {
+                if (_queryContext != null && _diagnostics.Count >= 32)
+                {
+                    _diagnostics.RemoveAt(31);
+                    _diagnostics.Add(new ExpressionDiagnostic(
+                        ExpressionDiagnosticKind.Semantic,
+                        "query-policy-diagnostics-truncated",
+                        "Additional diagnostics were omitted; fix the reported issues before retrying.",
+                        start,
+                        0));
+                    _isTruncated = true;
+                    return;
+                }
+
                 _diagnostics.Add(new ExpressionDiagnostic(
                     ExpressionDiagnosticKind.Semantic,
                     code,
@@ -550,10 +705,13 @@ namespace Kkts.Expressions.Internal
                     expectedTypes,
                     actualTypes,
                     suggestions));
+            }
         }
 
         private ExpressionCorrectionSuggestion FindPropertySuggestion(string sourceName, ExpressionToken token)
         {
+            if (_queryContext != null) return null;
+
             var normalized = ExpressionSchema.NormalizePath(sourceName);
             var separator = normalized.LastIndexOf('.');
             var sourceParent = separator < 0 ? string.Empty : normalized.Substring(0, separator);
@@ -706,7 +864,11 @@ namespace Kkts.Expressions.Internal
                 bool invalid,
                 object literalValue,
                 Type elementType,
-                IReadOnlyList<SemanticNode> elements)
+                IReadOnlyList<SemanticNode> elements,
+                IReadOnlyList<string> entityPaths,
+                bool isBareBooleanPredicate,
+                int predicateStart,
+                int predicateLength)
             {
                 Type = type;
                 Nullability = nullability;
@@ -719,6 +881,10 @@ namespace Kkts.Expressions.Internal
                 LiteralValue = literalValue;
                 ElementType = elementType;
                 ElementNodes = elements;
+                EntityPaths = entityPaths ?? Array.Empty<string>();
+                IsBareBooleanPredicate = isBareBooleanPredicate;
+                PredicateStart = predicateStart < 0 ? start : predicateStart;
+                PredicateLength = predicateLength < 0 ? Math.Max(0, end - start) : predicateLength;
             }
 
             internal Type Type { get; }
@@ -732,17 +898,63 @@ namespace Kkts.Expressions.Internal
             internal object LiteralValue { get; }
             internal Type ElementType { get; }
             internal IReadOnlyList<SemanticNode> ElementNodes { get; }
+            internal IReadOnlyList<string> EntityPaths { get; }
+            internal bool IsBareBooleanPredicate { get; }
+            internal int PredicateStart { get; }
+            internal int PredicateLength { get; }
 
-            internal static SemanticNode Value(Type type, ExpressionNullability nullability, int start, int end, Type elementType = null) =>
-                new SemanticNode(type, nullability, start, end, false, false, false, type == null, null, elementType, null);
+            internal static SemanticNode Value(
+                Type type,
+                ExpressionNullability nullability,
+                int start,
+                int end,
+                Type elementType = null,
+                IReadOnlyList<string> entityPaths = null,
+                bool isBareBooleanPredicate = false,
+                int predicateStart = -1,
+                int predicateLength = -1) =>
+                new SemanticNode(
+                    type,
+                    nullability,
+                    start,
+                    end,
+                    false,
+                    false,
+                    false,
+                    type == null,
+                    null,
+                    elementType,
+                    null,
+                    entityPaths,
+                    isBareBooleanPredicate,
+                    predicateStart,
+                    predicateLength);
             internal static SemanticNode Literal(Type type, int start, int end, object value) =>
-                new SemanticNode(type, ExpressionNullability.NonNullable, start, end, false, true, false, false, value, null, null);
+                new SemanticNode(
+                    type,
+                    ExpressionNullability.NonNullable,
+                    start,
+                    end,
+                    false,
+                    true,
+                    false,
+                    false,
+                    value,
+                    null,
+                    null,
+                    null,
+                    type == typeof(bool),
+                    start,
+                    end - start);
             internal static SemanticNode NullValue(int start, int end) =>
-                new SemanticNode(null, ExpressionNullability.Nullable, start, end, true, true, false, false, null, null, null);
+                new SemanticNode(null, ExpressionNullability.Nullable, start, end, true, true, false, false, null, null,
+                    null, null, false, start, end - start);
             internal static SemanticNode List(int start, int end, IReadOnlyList<SemanticNode> elements, Type elementType) =>
-                new SemanticNode(typeof(Array), ExpressionNullability.NonNullable, start, end, false, false, true, false, null, elementType, elements);
+                new SemanticNode(typeof(Array), ExpressionNullability.NonNullable, start, end, false, false, true, false, null,
+                    elementType, elements, null, false, start, end - start);
             internal static SemanticNode Error(int start, int end) =>
-                new SemanticNode(null, ExpressionNullability.Unknown, start, end, false, false, false, true, null, null, null);
+                new SemanticNode(null, ExpressionNullability.Unknown, start, end, false, false, false, true, null, null,
+                    null, null, false, start, end - start);
         }
 
         private sealed class Parser
@@ -812,6 +1024,9 @@ namespace Kkts.Expressions.Internal
                 if (_index >= _end) return null;
                 var token = _tokens[_index];
                 var text = _owner.Text(token);
+                if (_owner._queryContext != null && IsUnaryOperator(token, text))
+                    return ParsePolicyUnaryChain();
+
                 if (token.Kind == ExpressionTokenKind.Operator &&
                     (text == "!" || text.Equals("not", StringComparison.OrdinalIgnoreCase)))
                 {
@@ -835,7 +1050,15 @@ namespace Kkts.Expressions.Internal
                     if (operand == null) return SemanticNode.Error(token.Start, end);
                     _owner.CheckUnary(text, operand, token.Start, token.Start + token.Length);
                     return operand.Type == typeof(bool)
-                        ? SemanticNode.Value(typeof(bool), ExpressionNullability.NonNullable, token.Start, Math.Max(end, operand.End))
+                        ? SemanticNode.Value(
+                            typeof(bool),
+                            ExpressionNullability.NonNullable,
+                            token.Start,
+                            Math.Max(end, operand.End),
+                            entityPaths: operand.EntityPaths,
+                            isBareBooleanPredicate: operand.IsBareBooleanPredicate,
+                            predicateStart: operand.PredicateStart,
+                            predicateLength: operand.PredicateLength)
                         : SemanticNode.Error(token.Start, Math.Max(end, operand.End));
                 }
 
@@ -852,6 +1075,67 @@ namespace Kkts.Expressions.Internal
                 ++_index;
                 return _owner.Bind(token);
             }
+
+            private SemanticNode ParsePolicyUnaryChain()
+            {
+                var operators = new List<ExpressionToken>();
+                while (_index < _end)
+                {
+                    var token = _tokens[_index];
+                    var text = _owner.Text(token);
+                    if (!IsUnaryOperator(token, text)) break;
+                    operators.Add(token);
+                    ++_index;
+                }
+
+                var groupEnd = -1;
+                SemanticNode operand;
+                if (IsPunctuation("("))
+                {
+                    ++_index;
+                    operand = ParseExpression(0);
+                    if (IsPunctuation(")"))
+                    {
+                        groupEnd = _tokens[_index].Start + _tokens[_index].Length;
+                        ++_index;
+                    }
+                }
+                else
+                {
+                    operand = ParsePrefix();
+                }
+
+                if (operand == null)
+                {
+                    var last = operators[operators.Count - 1];
+                    return SemanticNode.Error(operators[0].Start, last.Start + last.Length);
+                }
+
+                for (var index = operators.Count - 1; index >= 0; --index)
+                {
+                    var token = operators[index];
+                    var text = _owner.Text(token);
+                    var end = groupEnd >= 0 ? Math.Max(groupEnd, operand.End) : operand.End;
+                    _owner.CheckUnary(text, operand, token.Start, token.Start + token.Length);
+                    operand = operand.Type == typeof(bool)
+                        ? SemanticNode.Value(
+                            typeof(bool),
+                            ExpressionNullability.NonNullable,
+                            token.Start,
+                            end,
+                            entityPaths: operand.EntityPaths,
+                            isBareBooleanPredicate: operand.IsBareBooleanPredicate,
+                            predicateStart: operand.PredicateStart,
+                            predicateLength: operand.PredicateLength)
+                        : SemanticNode.Error(token.Start, end);
+                }
+
+                return operand;
+            }
+
+            private static bool IsUnaryOperator(ExpressionToken token, string text) =>
+                token.Kind == ExpressionTokenKind.Operator &&
+                (text == "!" || text.Equals("not", StringComparison.OrdinalIgnoreCase));
 
             private SemanticNode ParseList()
             {

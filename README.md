@@ -17,6 +17,7 @@ The library targets `netstandard2.0` and is available on
   - [Contents](#contents)
   - [Installation](#installation)
   - [Quick start](#quick-start)
+    - [Query policy quick start](#query-policy-quick-start)
   - [Structured filters](#structured-filters)
     - [Filter groups](#filter-groups)
   - [Sorting](#sorting)
@@ -73,6 +74,7 @@ The examples use this entity:
 public class Data
 {
     public int Id { get; set; }
+    public int TenantId { get; set; }
     public string Name { get; set; } = "";
     public bool IsEnabled { get; set; }
     public DateTime CreationDate { get; set; }
@@ -107,6 +109,35 @@ Expression<Func<Data, bool>> predicate =
 For user-supplied input, report validation diagnostics to the caller rather
 than using `Result` when parsing fails. See
 [Parsing and validation behavior](#parsing-and-validation-behavior).
+
+### Query policy quick start
+
+Opt in to a server-owned context for consistent editor analysis and runtime
+enforcement. The recommended preset is an explicit starting point; adjust its
+limits and field rules to fit the application:
+
+```csharp
+var schema = ExpressionSchema.FromType<Data>(
+    validProperties: new[] { "Id", "Name", "IsEnabled" });
+var queryContext = new ExpressionQueryContext(schema, QueryPolicy.Recommended);
+
+var editorAnalysis = queryContext.AnalyzeExpression(userText);
+var checkedPredicate = queryContext.ParsePredicate<Data>(userText);
+if (!checkedPredicate.Succeeded)
+{
+    throw checkedPredicate.Exception;
+}
+
+var results = context.Entities
+    .Where(item => item.TenantId == currentTenantId)
+    .Where(checkedPredicate.Result);
+```
+
+The tenant predicate is application-owned and must not be derived from user
+input. Query policies control permitted expression construction and
+complexity; they are not authorization, tenant isolation, or database cost
+controls. See the [query policy guide](docs/query-policies.md) for configuration,
+counting rules, structured APIs, diagnostics, and security boundaries.
 
 ## Structured filters
 
