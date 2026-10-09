@@ -3,7 +3,7 @@
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
     <Copyright>Copyright (C) 2016-2026 KKTS Ltd.</Copyright>
-    <Version>3.0.0</Version>
+    <Version>3.0.1</Version>
     <Authors>Linh Le</Authors>
     <Product>Dynamic Expression</Product>
     <Company>KKTS Ltd.</Company>
@@ -12,8 +12,8 @@
     <RepositoryUrl>https://github.com/linhnle/Kkts.Expressions.git</RepositoryUrl>
     <RepositoryType>Git</RepositoryType>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <Description>Build string expression to lambda expression to support dynamic query from UI</Description>
-    <PackageTags>Expression, LambdaExpression, DynamicExpression, StringExpression, Query, StringQuery, JiraFilter</PackageTags>
+    <Description>Build dynamic LINQ filters from strings or structured objects, with sorting and pagination for .NET applications.</Description>
+    <PackageTags>expression;lambda-expression;dynamic-expression;string-expression;query;string-query;jira-filter;linq;expression-tree;dynamic-filter;predicate-builder;query-builder;filtering;sorting;pagination</PackageTags>
     <NeutralLanguage>en</NeutralLanguage>
 		<PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>

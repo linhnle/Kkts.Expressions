@@ -1,28 +1,50 @@
 # Kkts.Expressions
+## Use it to build search screens, data grids, and API filtering.
 
-Convert string expressions and structured filters into strongly typed LINQ
-expression trees. Kkts.Expressions helps you build dynamic queries from UI
-filters, including predicates, sorting, variables, and pagination.
+Build dynamic filters for .NET applications.
+
+Kkts.Expressions converts string expressions and structured filter objects into LINQ expression trees. Use it to build search screens, data grids, and API filtering with filtering, sorting, and pagination.
+
+Map public filter names to model properties and restrict which properties clients can filter.
 
 The library targets `netstandard2.0` and is available on
 [NuGet](https://www.nuget.org/packages/Kkts.Expressions).
 
 ## Contents
 
-- [Installation](#installation)
-- [Quick start](#quick-start)
-- [Structured filters](#structured-filters)
-- [Sorting](#sorting)
-- [Variables](#variables)
-- [Property validation and mapping](#property-validation-and-mapping)
-- [Conditions and pagination](#conditions-and-pagination)
-- [Supported operators](#supported-operators)
-- [Parsing and validation behavior](#parsing-and-validation-behavior)
-- [Expression editor integration (v3.0 only)](#expression-editor-integration-v30-only)
-- [TimeSpan durations](#timespan-durations)
-- [Binary plus in predicates (v3.0 only)](#binary-plus-in-predicates-v30-only)
-- [Development notes](#development-notes)
-- [Contact](#contact)
+- [Kkts.Expressions](#kktsexpressions)
+  - [Use it to build search screens, data grids, and API filtering.](#use-it-to-build-search-screens-data-grids-and-api-filtering)
+  - [Contents](#contents)
+  - [Installation](#installation)
+  - [Quick start](#quick-start)
+  - [Structured filters](#structured-filters)
+    - [Filter groups](#filter-groups)
+  - [Sorting](#sorting)
+  - [Variables](#variables)
+    - [Built-in variables](#built-in-variables)
+    - [Custom variables](#custom-variables)
+    - [Variables with the `in` operator (v2)](#variables-with-the-in-operator-v2)
+  - [Property validation and mapping](#property-validation-and-mapping)
+    - [Restrict allowed properties](#restrict-allowed-properties)
+    - [Map external names to entity properties](#map-external-names-to-entity-properties)
+  - [Conditions and pagination](#conditions-and-pagination)
+    - [Retrieve a page](#retrieve-a-page)
+  - [Supported operators](#supported-operators)
+  - [Parsing and validation behavior](#parsing-and-validation-behavior)
+  - [Expression editor integration (v3.0 only)](#expression-editor-integration-v30-only)
+    - [Building editor highlight runs](#building-editor-highlight-runs)
+    - [Displaying syntax diagnostics while typing](#displaying-syntax-diagnostics-while-typing)
+  - [TimeSpan durations](#timespan-durations)
+  - [Binary addition and subtraction in predicates (v3.0 only)](#binary-addition-and-subtraction-in-predicates-v30-only)
+    - [Arithmetic and concatenation rules](#arithmetic-and-concatenation-rules)
+    - [Limitations](#limitations)
+  - [Development notes](#development-notes)
+    - [Running tests](#running-tests)
+    - [Relational Entity Framework Core tests](#relational-entity-framework-core-tests)
+      - [Character arithmetic limitation](#character-arithmetic-limitation)
+    - [Parser performance](#parser-performance)
+    - [Code quality and compatibility](#code-quality-and-compatibility)
+  - [Contact](#contact)
 
 ## Installation
 
