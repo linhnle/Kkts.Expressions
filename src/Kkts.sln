@@ -7,6 +7,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Kkts.Expressions", "Kkts.Ex
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Kkts.Expressions.UnitTest", "Kkts.Expressions.UnitTest\Kkts.Expressions.UnitTest.csproj", "{A1401B1B-5A9F-46D4-A256-C353BF41881A}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Kkts.Expressions.EntityFrameworkCore.Tests", "Kkts.Expressions.EntityFrameworkCore.Tests\Kkts.Expressions.EntityFrameworkCore.Tests.csproj", "{C1A2D4E6-F8B0-4C2D-9E13-7A5B6C8D9012}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -21,6 +23,10 @@ Global
 		{A1401B1B-5A9F-46D4-A256-C353BF41881A}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{A1401B1B-5A9F-46D4-A256-C353BF41881A}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{A1401B1B-5A9F-46D4-A256-C353BF41881A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C1A2D4E6-F8B0-4C2D-9E13-7A5B6C8D9012}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C1A2D4E6-F8B0-4C2D-9E13-7A5B6C8D9012}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C1A2D4E6-F8B0-4C2D-9E13-7A5B6C8D9012}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C1A2D4E6-F8B0-4C2D-9E13-7A5B6C8D9012}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
