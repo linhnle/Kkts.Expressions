@@ -89,6 +89,38 @@ namespace Kkts.Expressions
 			return new ExpressionAnalyzer(expression).Analyze();
 		}
 
+		/// <summary>
+		/// Analyzes syntax and validates entity members, declared variables, and operand types
+		/// without reading runtime values or constructing a predicate.
+		/// </summary>
+		public static ExpressionSemanticAnalysisResult AnalyzeExpression<T>(
+			string expression,
+			ExpressionSchema schema,
+			ExpressionVariableSchema variables = null)
+		{
+			return AnalyzeExpression(expression, typeof(T), schema, variables);
+		}
+
+		/// <summary>
+		/// Analyzes syntax and validates entity members, declared variables, and operand types
+		/// without reading runtime values or constructing a predicate.
+		/// </summary>
+		public static ExpressionSemanticAnalysisResult AnalyzeExpression(
+			string expression,
+			Type entityType,
+			ExpressionSchema schema,
+			ExpressionVariableSchema variables = null)
+		{
+			if (expression == null) throw new ArgumentNullException(nameof(expression));
+			if (entityType == null) throw new ArgumentNullException(nameof(entityType));
+			if (schema == null) throw new ArgumentNullException(nameof(schema));
+			if (schema.EntityType != entityType)
+				throw new ArgumentException("The schema entity type must match the requested entity type.", nameof(schema));
+
+			var syntax = new ExpressionAnalyzer(expression).Analyze();
+			return new ExpressionSemanticAnalyzer(expression, schema, variables, syntax).Analyze();
+		}
+
 		public static EvaluationResult<T, bool> ParsePredicate<T>(this string expression, VariableResolver variableResolver = null, IEnumerable<string> validProperties = null, IDictionary<string, string> propertyMapping = null)
 		{
 			if (string.IsNullOrWhiteSpace(expression)) throw new ArgumentException("Invalid expression", nameof(expression));

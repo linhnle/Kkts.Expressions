@@ -31,6 +31,7 @@ The library targets `netstandard2.0` and is available on
     - [Retrieve a page](#retrieve-a-page)
   - [Supported operators](#supported-operators)
   - [Parsing and validation behavior](#parsing-and-validation-behavior)
+  - [Expression semantic analysis](#expression-semantic-analysis)
   - [Expression editor integration (v3.0 only)](#expression-editor-integration-v30-only)
     - [Building editor highlight runs](#building-editor-highlight-runs)
     - [Displaying syntax diagnostics while typing](#displaying-syntax-diagnostics-while-typing)
@@ -647,6 +648,41 @@ The library does not debounce or retain editor state. Consumers may debounce
 or schedule analysis for long inputs. If work is scheduled asynchronously, apply
 the result only if its input snapshot is still the current editor text, so an
 older result cannot overwrite newer highlighting or diagnostics.
+
+## Expression semantic analysis
+
+For editor feedback that depends on entity members, variable declarations, and
+operand types, use semantic analysis in addition to syntax highlighting. Supply
+metadata rather than runtime entity or variable values:
+
+```csharp
+var schema = ExpressionSchema.FromType<Data>(
+    validProperties: new[] { "Id", "Name", "IsEnabled" });
+
+var variables = new ExpressionVariableSchema(new[]
+{
+    ExpressionVariableDefinition.FromType("minimum", typeof(int))
+});
+
+var analysis = Interpreter.AnalyzeExpression<Data>(
+    "Id > 'abc' and UnknownField = $minimum",
+    schema,
+    variables);
+
+foreach (var diagnostic in analysis.SemanticDiagnostics)
+{
+    Console.WriteLine(
+        $"{diagnostic.Code} at {diagnostic.Start}+{diagnostic.Length}: " +
+        diagnostic.Message);
+}
+```
+
+This reports the incompatible operand and unknown property separately while
+the user is typing. Analysis never resolves variable values or invokes entity
+getters, and semantic validity does not guarantee EF Core SQL translation.
+For query permissions, aliases, nested paths, stable diagnostic codes,
+correction suggestions, and incomplete-input behavior, see the
+[semantic analysis guide](docs/semantic-analysis.md).
 
 ## TimeSpan durations
 

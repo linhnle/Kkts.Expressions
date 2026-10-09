@@ -38,12 +38,22 @@ namespace Kkts.Expressions.Internal
 
 			if (leftConstant && CanConvertConstant(left, rightType)) leftType = rightType;
 			if (rightConstant && CanConvertConstant(right, leftType)) rightType = leftType;
-			var type = Promote(leftType, rightType);
-			if (Nullable.GetUnderlyingType(left.Type) != null || Nullable.GetUnderlyingType(right.Type) != null ||
-				IsNull(left) || IsNull(right))
-				type = typeof(Nullable<>).MakeGenericType(type);
+			var type = LiftNullable(
+				Promote(leftType, rightType),
+				left.Type,
+				right.Type,
+				IsNull(left) || IsNull(right));
 			left = ConvertOperand(left, type);
 			right = ConvertOperand(right, type);
+		}
+
+		internal static Type LiftNullable(Type type, Type leftType, Type rightType, bool hasNull = false)
+		{
+			return Nullable.GetUnderlyingType(leftType) != null ||
+				Nullable.GetUnderlyingType(rightType) != null ||
+				hasNull
+				? typeof(Nullable<>).MakeGenericType(type)
+				: type;
 		}
 
 		private static bool CanConvertConstant(Expression expression, Type target)
@@ -51,7 +61,15 @@ namespace Kkts.Expressions.Internal
 			if (target != typeof(uint) && target != typeof(ulong)) return false;
 			if (expression.Type != typeof(int) && !(target == typeof(ulong) && expression.Type == typeof(long))) return false;
 			if (!TryGetIntegralConstant(expression, out var value)) return false;
-			return value >= 0 && (target == typeof(ulong) || value <= uint.MaxValue);
+			return CanConvertIntegralConstant(expression.Type, value, target);
+		}
+
+		internal static bool CanConvertIntegralConstant(Type sourceType, decimal value, Type targetType)
+		{
+			if (targetType != typeof(uint) && targetType != typeof(ulong)) return false;
+			if (sourceType != typeof(int) &&
+				!(targetType == typeof(ulong) && sourceType == typeof(long))) return false;
+			return value >= 0 && (targetType == typeof(ulong) || value <= uint.MaxValue);
 		}
 
 		private static bool TryGetIntegralConstant(Expression expression, out decimal value)
@@ -90,7 +108,7 @@ namespace Kkts.Expressions.Internal
 			return expression.Type == type ? expression : Expression.Convert(expression, type);
 		}
 
-		private static Type Promote(Type left, Type right)
+		internal static Type Promote(Type left, Type right)
 		{
 			if (left == typeof(decimal) || right == typeof(decimal))
 			{

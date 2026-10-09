@@ -325,30 +325,7 @@ namespace Kkts.Expressions.Internal
 
 		private static string GetStandardOperator(string op)
 		{
-			switch (op)
-			{
-				case Interpreter.LogicalAnd2:
-				case Interpreter.LogicalAnd3:
-					return Interpreter.LogicalAnd;
-				case Interpreter.LogicalOr2:
-				case Interpreter.LogicalOr3:
-					return Interpreter.LogicalOr;
-				case Interpreter.ComparisonEqual:
-					return Interpreter.ComparisonEqual2;
-				case Interpreter.ComparisonNotEqual2:
-					return Interpreter.ComparisonNotEqual;
-				case Interpreter.ComparisonContains2:
-				case Interpreter.ComparisonContains3:
-					return Interpreter.ComparisonContains;
-				case Interpreter.ComparisonStartsWith2:
-				case Interpreter.ComparisonStartsWith3:
-					return Interpreter.ComparisonStartsWith;
-				case Interpreter.ComparisonEndsWith2:
-				case Interpreter.ComparisonEndsWith3:
-					return Interpreter.ComparisonEndsWith;
-				default:
-					return op;
-			}
+			return ExpressionGrammar.NormalizeOperator(op);
 		}
 	}
 }

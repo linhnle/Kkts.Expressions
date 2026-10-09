@@ -131,17 +131,15 @@ namespace Kkts.Expressions.Internal.Nodes
 					return Expression.Call(left, Interpreter.StringEndsWithMethod, right);
 				case Interpreter.ComparisonEqual:
 				case Interpreter.ComparisonEqual2:
-					return Expression.Equal(left, right ?? throw new FormatException(GetErrorMessage()));
 				case Interpreter.ComparisonGreaterThan:
-					return Expression.GreaterThan(left, right ?? throw new FormatException(GetErrorMessage()));
 				case Interpreter.ComparisonGreaterThanOrEqual:
-					return Expression.GreaterThanOrEqual(left, right ?? throw new FormatException(GetErrorMessage()));
 				case Interpreter.ComparisonLessThan:
-					return Expression.LessThan(left, right ?? throw new FormatException(GetErrorMessage()));
 				case Interpreter.ComparisonLessThanOrEqual:
-					return Expression.LessThanOrEqual(left, right ?? throw new FormatException(GetErrorMessage()));
 				case Interpreter.ComparisonNotEqual:
-					return Expression.NotEqual(left, right ?? throw new FormatException(GetErrorMessage()));
+					return ExpressionOperatorRules.ApplyComparison(
+						Operator,
+						left,
+						right ?? throw new FormatException(GetErrorMessage()));
 				case Interpreter.LogicalNot:
 					return left;
 				case Interpreter.ComparisonIn:
