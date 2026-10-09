@@ -784,6 +784,19 @@ guarantee translation for every expression, provider, database version,
 collation, or provider configuration. Translation gaps discovered by these
 tests are compatibility findings, not silently worked-around behavior.
 
+#### Character arithmetic limitation
+
+Although `char` is treated as a numeric type by the predicate arithmetic
+implementation, arithmetic on character properties is not portable across
+relational providers. For example, with a character property containing `'2'`,
+the expression `Character + 1 = 51` follows C# character-code arithmetic when
+evaluated in memory, but SQL Server and MySQL do not produce the same result
+when translating and executing it as a database query. The expression is
+therefore intentionally excluded from the passing cross-provider integration
+suite; its behavior is not a compatibility guarantee. Avoid arithmetic on
+`char` properties in relational predicates. Use a numeric property if numeric
+arithmetic is required, or compare the character directly.
+
 See the [EF Core relational provider test report (2026-10-09)](./EFCORE-RELATIONAL-TEST-REPORT-2026-10-09.md)
 for the latest SQL Server and MySQL run results.
 
