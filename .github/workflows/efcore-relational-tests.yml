@@ -1,0 +1,31 @@
+name: EF Core relational tests
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  relational-tests:
+    name: ${{ matrix.provider }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        provider:
+          - SqlServer
+          - MySql
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - name: Run ${{ matrix.provider }} integration tests
+        run: >-
+          dotnet test
+          src/Kkts.Expressions.EntityFrameworkCore.Tests/Kkts.Expressions.EntityFrameworkCore.Tests.csproj
+          --configuration Release
+          --filter "Provider=${{ matrix.provider }}|FullyQualifiedName~ParserValidationTests"

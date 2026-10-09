@@ -742,6 +742,51 @@ The unit test project targets .NET 10 and requires the .NET 10 SDK:
 dotnet test src/Kkts.Expressions.UnitTest/Kkts.Expressions.UnitTest.csproj
 ```
 
+### Relational Entity Framework Core tests
+
+The separate `Kkts.Expressions.EntityFrameworkCore.Tests` project verifies a
+selected set of generated predicates against real relational databases. It
+targets .NET 10 and pins EF Core 10.0.9, `Microsoft.EntityFrameworkCore.SqlServer`
+10.0.9, Oracle's `MySql.EntityFrameworkCore` 10.0.9, and Testcontainers for .NET
+4.16.0. Its database containers use SQL Server 2022 build 16.0.4255.1, pinned
+to image digest
+`mcr.microsoft.com/mssql/server@sha256:e07b9699a2b749969f19d86563ceeea22bd3a69f7f1db85a8d1ac4bdaf0c6f56`,
+and MySQL 8.4 (`mysql:8.4.4`). These versions define the tested baseline, not
+a compatibility promise for every release in either family.
+
+Docker must be running locally. Run one provider or both:
+
+```sh
+dotnet test src/Kkts.Expressions.EntityFrameworkCore.Tests/Kkts.Expressions.EntityFrameworkCore.Tests.csproj --filter "Provider=SqlServer"
+dotnet test src/Kkts.Expressions.EntityFrameworkCore.Tests/Kkts.Expressions.EntityFrameworkCore.Tests.csproj --filter "Provider=MySql"
+dotnet test src/Kkts.Expressions.EntityFrameworkCore.Tests/Kkts.Expressions.EntityFrameworkCore.Tests.csproj
+```
+
+The SQL Server fixture configures `Latin1_General_100_BIN2`; MySQL fixture
+startup explicitly alters its pre-created test database to
+`utf8mb4_0900_bin` before creating tables. Metadata assertions verify MySQL's
+effective column collation. These binary collations make the tested string
+cases deterministic and case-sensitive within each database. Date/time columns
+use millisecond precision (`datetime2(3)` on SQL Server and `datetime(3)` on
+MySQL through EF Core's precision mapping), also verified against database
+metadata. Seeded fractional seconds therefore use millisecond values.
+Nullable comparisons are tested as SQL queries with EF Core's normal null
+semantics; generated predicates are compared with handwritten LINQ predicates
+on the same seeded database. Results are not assumed identical where a
+provider's configured semantics differ.
+
+The shared suite directly applies generated expression trees to
+`IQueryable.Where` and materializes database results. It does not compile
+predicates or permit client-side evaluation. Parser validation tests run
+separately from translation/execution tests. The suite covers the listed
+operators and representative scalar/navigation cases only; it does not
+guarantee translation for every expression, provider, database version,
+collation, or provider configuration. Translation gaps discovered by these
+tests are compatibility findings, not silently worked-around behavior.
+
+See the [EF Core relational provider test report (2026-10-09)](./EFCORE-RELATIONAL-TEST-REPORT-2026-10-09.md)
+for the latest SQL Server and MySQL run results.
+
 The library continues to target `netstandard2.0`; the example projects retain
 their existing target frameworks.
 
