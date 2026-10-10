@@ -263,10 +263,18 @@ namespace Kkts.Expressions
 					arg.QueryContext.Policy.MaxInItems.HasValue &&
 					value is System.Collections.IEnumerable collectionValue &&
 					!(value is string))
-					return BuildMembership(prop, Expression.Constant(collectionValue), prop.Type, @operator == ComparisonOperator.NotIn);
+					return TypedFilterExpressionBuilder.BuildMembership(
+						prop,
+						Expression.Constant(collectionValue),
+						prop.Type,
+						@operator == ComparisonOperator.NotIn);
 
 				var collection = new ArrayList { Type = prop.Type, DrawValue = value.ToString() }.Build(arg);
-				return BuildMembership(prop, collection, prop.Type, @operator == ComparisonOperator.NotIn);
+				return TypedFilterExpressionBuilder.BuildMembership(
+					prop,
+					collection,
+					prop.Type,
+					@operator == ComparisonOperator.NotIn);
 			}
 
 			return BuildBody(@operator, prop, value, arg.VariableResolver);
@@ -280,7 +288,11 @@ namespace Kkts.Expressions
 				@operator = CorrectOperator(prop.Type, @operator);
 				var collection = await new ArrayList { Type = prop.Type, DrawValue = value.ToString() }
 					.BuildAsync(new BuildArgument { VariableResolver = variableResolver, CancellationToken = cancellationToken });
-				return BuildMembership(prop, collection, prop.Type, @operator == ComparisonOperator.NotIn);
+				return TypedFilterExpressionBuilder.BuildMembership(
+					prop,
+					collection,
+					prop.Type,
+					@operator == ComparisonOperator.NotIn);
 			}
 			if (value is string && prop.Type != typeof(string) &&
 				(!IsMembership(@operator) || (Nullable.GetUnderlyingType(prop.Type) ?? prop.Type) != typeof(TimeSpan)))
@@ -329,33 +341,27 @@ namespace Kkts.Expressions
 				arg.CancellationToken).ConfigureAwait(false);
 		}
 
-		private static Expression BuildBodyCore(ComparisonOperator @operator, MemberExpression prop, object value, VariableResolver variableResolver)
+        private static Expression BuildBodyCore(ComparisonOperator @operator, MemberExpression prop, object value, VariableResolver variableResolver)
         {
 			@operator = CorrectOperator(prop.Type, @operator);
-			switch (@operator)
+			if (IsMembership(@operator))
 			{
-				case ComparisonOperator.NotEqual:
-					return Expression.NotEqual(prop, Expression.Constant(value, prop.Type));
-				case ComparisonOperator.LessThan:
-					return Expression.LessThan(prop, Expression.Constant(value, prop.Type));
-				case ComparisonOperator.LessThanOrEqual:
-					return Expression.LessThanOrEqual(prop, Expression.Constant(value, prop.Type));
-				case ComparisonOperator.GreaterThan:
-					return Expression.GreaterThan(prop, Expression.Constant(value, prop.Type));
-				case ComparisonOperator.GreaterThanOrEqual:
-					return Expression.GreaterThanOrEqual(prop, Expression.Constant(value, prop.Type));
-				case ComparisonOperator.Contains:
-					return Expression.Call(prop, StringContainsMethod, Expression.Constant(value, prop.Type));
-				case ComparisonOperator.StartsWith:
-					return Expression.Call(prop, StringStartsWithMethod, Expression.Constant(value, prop.Type));
-				case ComparisonOperator.EndsWith:
-					return Expression.Call(prop, StringEndsWithMethod, Expression.Constant(value, prop.Type));
-				case ComparisonOperator.In:
-				case ComparisonOperator.NotIn:
-					return BuildMembership(prop, new ArrayList { Type = prop.Type, DrawValue = value.ToString() }.Build(new BuildArgument { VariableResolver = variableResolver }), prop.Type, @operator == ComparisonOperator.NotIn);
-				default:
-					return Expression.Equal(prop, Expression.Constant(value, prop.Type));
+				var collection = new ArrayList
+				{
+					Type = prop.Type,
+					DrawValue = value.ToString()
+				}.Build(new BuildArgument { VariableResolver = variableResolver });
+				return TypedFilterExpressionBuilder.BuildMembership(
+					prop,
+					collection,
+					prop.Type,
+					@operator == ComparisonOperator.NotIn);
 			}
+
+			return TypedFilterExpressionBuilder.ApplyComparison(
+				prop,
+				@operator,
+				Expression.Constant(value, prop.Type));
 		}
 
 		internal static ComparisonOperator GetComparisonOperator(this string operatorString)
@@ -407,8 +413,7 @@ namespace Kkts.Expressions
 
 		internal static Expression BuildMembership(Expression value, Expression collection, Type elementType, bool negate)
 		{
-			var membership = Expression.Call(typeof(Enumerable), nameof(Enumerable.Contains), new[] { elementType }, collection, value);
-			return negate ? (Expression)Expression.Not(membership) : membership;
+			return TypedFilterExpressionBuilder.BuildMembership(value, collection, elementType, negate);
 		}
 
 		internal static string NormalizeComparisonOperator(string value)

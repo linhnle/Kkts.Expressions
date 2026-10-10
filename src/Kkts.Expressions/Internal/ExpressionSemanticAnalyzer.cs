@@ -556,89 +556,23 @@ namespace Kkts.Expressions.Internal
 
         private bool CanConvertLiteral(SemanticNode value, Type targetType)
         {
-            if (value.Invalid) return false;
-            if (value.IsNull) return !targetType.IsValueType || Nullable.GetUnderlyingType(targetType) != null;
-            var nullableTarget = Nullable.GetUnderlyingType(targetType) != null;
-            targetType = Nullable.GetUnderlyingType(targetType) ?? targetType;
-            if (value.Type == targetType || targetType == typeof(string)) return true;
-            if (CanConvertNumericLiteral(value, targetType)) return true;
-            if (value.LiteralValue is string text)
-            {
-                if (targetType.IsEnum)
-                {
-                    try
-                    {
-                        Enum.Parse(targetType, text, true);
-                        return true;
-                    }
-                    catch (ArgumentException) { return false; }
-                    catch (OverflowException) { return false; }
-                }
-                if (nullableTarget && string.IsNullOrWhiteSpace(text)) return true;
-                if (targetType == typeof(Guid)) return Guid.TryParse(text, out _);
-                if (targetType == typeof(DateTime))
-                {
-                    if (RequiresDateDefaults(text)) return false;
-                    return MachineDateTimeParser.IsValid(text) ||
-                        DateTime.TryParse(text, _schema.ConversionContext.Culture, DateTimeStyles.None, out _) ||
-                        DateTime.TryParseExact(text, _schema.ConversionContext.DateTimeFormats.ToArray(),
-                            _schema.ConversionContext.Culture, DateTimeStyles.None, out _);
-                }
-                if (targetType == typeof(DateTimeOffset))
-                {
-                    if (!HasExplicitOffset(text)) return false;
-                    return MachineDateTimeParser.IsValid(text) ||
-                        DateTimeOffset.TryParse(text, _schema.ConversionContext.Culture, DateTimeStyles.None, out _) ||
-                        DateTimeOffset.TryParseExact(text, _schema.ConversionContext.DateTimeFormats.ToArray(),
-                            _schema.ConversionContext.Culture, DateTimeStyles.None, out _);
-                }
-                if (targetType == typeof(TimeSpan)) return TimeSpan.TryParse(text, CultureInfo.InvariantCulture, out _);
-                if (targetType == typeof(bool)) return bool.TryParse(text, out _);
-                if (NumericOperands.IsNumeric(targetType))
-                {
-                    try
-                    {
-                        Convert.ChangeType(text, targetType, _schema.ConversionContext.Culture);
-                        return true;
-                    }
-                    catch (FormatException) { return false; }
-                    catch (OverflowException) { return false; }
-                    catch (InvalidCastException) { return false; }
-                }
-            }
-            if (NumericOperands.IsNumeric(value.Type) && NumericOperands.IsNumeric(targetType))
-            {
-                try
-                {
-                    Convert.ChangeType(value.LiteralValue, targetType, CultureInfo.InvariantCulture);
-                    return true;
-                }
-                catch (FormatException) { return false; }
-                catch (OverflowException) { return false; }
-                catch (InvalidCastException) { return false; }
-            }
-            return false;
+            return !value.Invalid && ExpressionConversionRules.CanConvertLiteral(
+                value.LiteralValue,
+                value.Type,
+                value.IsNull,
+                targetType,
+                _schema.ConversionContext);
         }
 
-        private static bool CanConvertNumericLiteral(SemanticNode value, Type targetType)
-        {
-            if (!value.IsLiteral || value.LiteralValue == null ||
-                (value.Type != typeof(int) && value.Type != typeof(long)))
-                return false;
-
-            targetType = Nullable.GetUnderlyingType(targetType) ?? targetType;
-            if (targetType != typeof(uint) && targetType != typeof(ulong)) return false;
-            var numericValue = Convert.ToDecimal(value.LiteralValue, CultureInfo.InvariantCulture);
-            return NumericOperands.CanConvertIntegralConstant(value.Type, numericValue, targetType);
-        }
+        private static bool CanConvertNumericLiteral(SemanticNode value, Type targetType) =>
+            value.IsLiteral && ExpressionConversionRules.CanConvertNumericLiteral(
+                value.LiteralValue,
+                value.Type,
+                targetType);
 
         private static bool IsContextDependent(SemanticNode value, Type targetType)
         {
-            targetType = Nullable.GetUnderlyingType(targetType) ?? targetType;
-            if (!(value.LiteralValue is string text)) return false;
-            if (targetType == typeof(DateTime)) return RequiresDateDefaults(text);
-            if (targetType == typeof(DateTimeOffset)) return !HasExplicitOffset(text);
-            return false;
+            return ExpressionConversionRules.IsContextDependent(value.LiteralValue, targetType);
         }
 
         private void ReportOperand(SemanticNode value, Type expectedType)
@@ -797,22 +731,6 @@ namespace Kkts.Expressions.Internal
                 value.Append(text[index]);
             }
             return value.ToString();
-        }
-
-        private static bool RequiresDateDefaults(string value)
-        {
-            if (MachineDateTimeParser.HasCompactCalendarDate(value)) return false;
-            if (value.IndexOfAny(new[] { '-', '/' }) < 0) return true;
-            var parts = value.Split(new[] { '/', '-' }, StringSplitOptions.RemoveEmptyEntries);
-            return parts.Length == 2 && !parts.Any(part => part.Length == 4);
-        }
-
-        private static bool HasExplicitOffset(string value)
-        {
-            if (value.EndsWith("Z", StringComparison.OrdinalIgnoreCase)) return true;
-            var separator = value.IndexOf('T');
-            if (separator < 0) separator = value.IndexOf(' ');
-            return separator >= 0 && (value.IndexOf('+', separator) >= 0 || value.IndexOf('-', separator + 1) >= 0);
         }
 
         private static bool IsLogical(string op) =>

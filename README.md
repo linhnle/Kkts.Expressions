@@ -20,6 +20,7 @@ The library targets `netstandard2.0` and is available on
     - [Query policy quick start](#query-policy-quick-start)
   - [Structured filters](#structured-filters)
     - [Filter groups](#filter-groups)
+  - [Nested JSON filter trees](#nested-json-filter-trees)
   - [Sorting](#sorting)
   - [Variables](#variables)
     - [Built-in variables](#built-in-variables)
@@ -210,6 +211,47 @@ Expression<Func<Data, bool>> predicate = groups.BuildPredicate<Data>();
 ```
 
 Use `groups.TryBuildPredicate<Data>()` when you need validation details.
+
+## Nested JSON filter trees
+
+For arbitrarily nested AND/OR/NOT conditions with typed values and explicit
+variable references, use `FilterNode` and `FilterTreeJson`:
+
+```csharp
+var tree = FilterNode.And(new[]
+{
+    FilterNode.Or(new[]
+    {
+        FilterNode.Condition("Status", "=", FilterValue.String("Active")),
+        FilterNode.Condition("Priority", ">=", FilterValue.Number("3"))
+    }),
+    FilterNode.Not(FilterNode.Condition(
+        "Department",
+        "in",
+        FilterValue.Collection(new[]
+        {
+            FilterValue.String("Archived"),
+            FilterValue.String("External")
+        })))
+});
+
+var json = FilterTreeJson.Serialize(tree);
+var queryContext = new ExpressionQueryContext(
+    ExpressionSchema.FromType<Data>(),
+    QueryPolicy.Recommended);
+var decoded = FilterTreeJson.TryDeserialize(json, queryContext);
+if (!decoded.Succeeded) throw new QueryPolicyException(decoded.Diagnostics);
+var predicate = queryContext.BuildPredicate<Data>(decoded.Result);
+```
+
+The context-aware codec validates the tree against entity permissions and
+query policy before returning it. The no-context codec validates JSON shape
+only. See the [nested filter guide](docs/nested-filters.md) for JSON shapes,
+typed values, diagnostics, depth limits, serializer transport settings, and
+migration from `FilterGroup`, plus the supported
+[expression editor conversions](docs/nested-filters.md#expression-editor-exchange);
+see the [query policy guide](docs/query-policies.md)
+for policy accounting and server-side boundaries.
 
 ## Sorting
 

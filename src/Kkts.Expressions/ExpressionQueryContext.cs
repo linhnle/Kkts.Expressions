@@ -71,6 +71,52 @@ namespace Kkts.Expressions
                 syntaxAnalyzer.IsTruncated).Analyze();
         }
 
+        /// <summary>Parses a supported expression into a tree under this context's policy.</summary>
+        public FilterOperationResult<FilterNode> ParseFilterTree(
+            string expression,
+            ExpressionVariableSchema variables = null)
+        {
+            if (expression == null) throw new ArgumentNullException(nameof(expression));
+            var sourceExecution = new QueryPolicyExecution(Policy);
+            if (!QueryPolicySourceScanner.TryScan(expression, sourceExecution))
+                return FilterOperationResult<FilterNode>.Failure(
+                    sourceExecution.Diagnostics.ToReadOnlyList(),
+                    sourceExecution.Diagnostics.IsTruncated);
+
+            var parsed = FilterExpression.Parse(expression, Schema, variables);
+            if (!parsed.Succeeded) return parsed;
+
+            var treeExecution = new QueryPolicyExecution(Policy);
+            if (!FilterTreePolicyScanner.TryScan(parsed.Result, this, treeExecution))
+                return FilterOperationResult<FilterNode>.Failure(
+                    treeExecution.Diagnostics.ToReadOnlyList(),
+                    treeExecution.Diagnostics.IsTruncated);
+            return parsed;
+        }
+
+        /// <summary>Formats a tree under this context's independent tree and expression policies.</summary>
+        public FilterOperationResult<string> FormatFilterTree(
+            FilterNode tree,
+            ExpressionVariableSchema variables = null)
+        {
+            if (tree == null) throw new ArgumentNullException(nameof(tree));
+            var treeExecution = new QueryPolicyExecution(Policy);
+            if (!FilterTreePolicyScanner.TryScan(tree, this, treeExecution))
+                return FilterOperationResult<string>.Failure(
+                    treeExecution.Diagnostics.ToReadOnlyList(),
+                    treeExecution.Diagnostics.IsTruncated);
+
+            var formatted = FilterExpression.Format(tree, Schema, variables);
+            if (!formatted.Succeeded) return formatted;
+
+            var textExecution = new QueryPolicyExecution(Policy);
+            if (!QueryPolicySourceScanner.TryScan(formatted.Result, textExecution))
+                return FilterOperationResult<string>.Failure(
+                    textExecution.Diagnostics.ToReadOnlyList(),
+                    textExecution.Diagnostics.IsTruncated);
+            return formatted;
+        }
+
         /// <summary>Builds a predicate after enforcing the configured policy on the actual input.</summary>
         public EvaluationResult<T, bool> ParsePredicate<T>(
             string expression,
@@ -120,6 +166,176 @@ namespace Kkts.Expressions
             var argument = CreateBuildArgument(expression, variableResolver);
             argument.CancellationToken = cancellationToken;
             return ExpressionParser.ParseAsync(expression, Schema.EntityType, argument);
+        }
+
+        /// <summary>Validates a nested filter tree using schema metadata without resolving runtime values.</summary>
+        public FilterOperationResult<FilterNode> ValidateFilterTree(
+            FilterNode tree,
+            ExpressionVariableSchema variables = null)
+        {
+            if (tree == null) throw new ArgumentNullException(nameof(tree));
+            return ValidateFilterTree(tree, variables, allowUnresolvedVariables: false, new QueryPolicyExecution(Policy));
+        }
+
+        /// <summary>Builds a policy-checked predicate directly from a nested filter tree.</summary>
+        public Expression<Func<T, bool>> BuildPredicate<T>(
+            FilterNode tree,
+            VariableResolver variableResolver = null)
+        {
+            ValidateEntityType(typeof(T));
+            return ThrowIfFailed(TryBuildPredicate<T>(tree, variableResolver));
+        }
+
+        /// <summary>Builds a policy-checked predicate using this context's entity type.</summary>
+        public LambdaExpression BuildPredicate(
+            FilterNode tree,
+            VariableResolver variableResolver = null)
+        {
+            return ThrowIfFailed(TryBuildPredicate(tree, variableResolver));
+        }
+
+        /// <summary>Attempts policy-checked nested-tree construction without returning a partial predicate.</summary>
+        public EvaluationResult<T, bool> TryBuildPredicate<T>(
+            FilterNode tree,
+            VariableResolver variableResolver = null)
+        {
+            ValidateEntityType(typeof(T));
+            return TryBuildPredicate(tree, variableResolver).ToGeneric<T, bool>();
+        }
+
+        /// <summary>Attempts nested-tree construction using this context's entity type.</summary>
+        public EvaluationResult TryBuildPredicate(
+            FilterNode tree,
+            VariableResolver variableResolver = null)
+        {
+            if (tree == null) throw new ArgumentNullException(nameof(tree));
+            var execution = new QueryPolicyExecution(Policy);
+            var validation = ValidateFilterTree(
+                tree,
+                variables: null,
+                allowUnresolvedVariables: true,
+                execution);
+            if (!validation.Succeeded)
+                return FailureFromFilterTreeValidation(validation);
+
+            try
+            {
+                var argument = CreateBuildArgument(string.Empty, variableResolver, execution);
+                return new EvaluationResult
+                {
+                    Result = FilterTreePredicateBuilder.Build(tree, Schema, variableResolver, argument),
+                    Succeeded = true
+                };
+            }
+            catch (QueryPolicyException exception)
+            {
+                return FailedPolicyResult(exception.Diagnostics);
+            }
+            catch (FilterTreeBuildException exception)
+            {
+                if (exception.InnerException is QueryPolicyException policyException)
+                    return FailedPolicyResult(policyException.Diagnostics);
+                return new EvaluationResult
+                {
+                    Exception = exception,
+                    Diagnostics = new[] { exception.Diagnostic }
+                };
+            }
+            catch (Exception exception)
+            {
+                return new EvaluationResult { Exception = exception };
+            }
+        }
+
+        /// <summary>Asynchronously builds a policy-checked nested-tree predicate.</summary>
+        public async Task<Expression<Func<T, bool>>> BuildPredicateAsync<T>(
+            FilterNode tree,
+            VariableResolver variableResolver = null,
+            CancellationToken cancellationToken = default)
+        {
+            ValidateEntityType(typeof(T));
+            return ThrowIfFailed(await TryBuildPredicateAsync<T>(
+                tree,
+                variableResolver,
+                cancellationToken).ConfigureAwait(false));
+        }
+
+        /// <summary>Asynchronously builds a nested-tree predicate using this context's entity type.</summary>
+        public async Task<LambdaExpression> BuildPredicateAsync(
+            FilterNode tree,
+            VariableResolver variableResolver = null,
+            CancellationToken cancellationToken = default)
+        {
+            return ThrowIfFailed(await TryBuildPredicateAsync(
+                tree,
+                variableResolver,
+                cancellationToken).ConfigureAwait(false));
+        }
+
+        /// <summary>Asynchronously attempts tree construction without returning a partial predicate.</summary>
+        public async Task<EvaluationResult<T, bool>> TryBuildPredicateAsync<T>(
+            FilterNode tree,
+            VariableResolver variableResolver = null,
+            CancellationToken cancellationToken = default)
+        {
+            ValidateEntityType(typeof(T));
+            return (await TryBuildPredicateAsync(
+                tree,
+                variableResolver,
+                cancellationToken).ConfigureAwait(false)).ToGeneric<T, bool>();
+        }
+
+        /// <summary>Asynchronously attempts tree construction using this context's entity type.</summary>
+        public async Task<EvaluationResult> TryBuildPredicateAsync(
+            FilterNode tree,
+            VariableResolver variableResolver = null,
+            CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (tree == null) throw new ArgumentNullException(nameof(tree));
+            var execution = new QueryPolicyExecution(Policy);
+            var validation = ValidateFilterTree(
+                tree,
+                variables: null,
+                allowUnresolvedVariables: true,
+                execution);
+            if (!validation.Succeeded)
+                return FailureFromFilterTreeValidation(validation);
+
+            try
+            {
+                var argument = CreateBuildArgument(string.Empty, variableResolver, execution);
+                argument.CancellationToken = cancellationToken;
+                var result = await FilterTreePredicateBuilder.BuildAsync(
+                    tree,
+                    Schema,
+                    variableResolver,
+                    cancellationToken,
+                    argument).ConfigureAwait(false);
+                return new EvaluationResult { Result = result, Succeeded = true };
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (QueryPolicyException exception)
+            {
+                return FailedPolicyResult(exception.Diagnostics);
+            }
+            catch (FilterTreeBuildException exception)
+            {
+                if (exception.InnerException is QueryPolicyException policyException)
+                    return FailedPolicyResult(policyException.Diagnostics);
+                return new EvaluationResult
+                {
+                    Exception = exception,
+                    Diagnostics = new[] { exception.Diagnostic }
+                };
+            }
+            catch (Exception exception)
+            {
+                return new EvaluationResult { Exception = exception };
+            }
         }
 
         /// <summary>Builds a direct field predicate and throws if construction or policy validation fails.</summary>
@@ -857,6 +1073,14 @@ namespace Kkts.Expressions
                 predicates.Add(groups.Result);
             }
 
+            if (options.FilterTree != null)
+            {
+                var tree = TryBuildPredicate(options.FilterTree, variableResolver);
+                if (!tree.Succeeded)
+                    return InvalidCondition(ProjectFilterTreeEvaluation(tree));
+                predicates.Add(tree.Result);
+            }
+
             return new Condition
             {
                 IsValid = true,
@@ -905,6 +1129,17 @@ namespace Kkts.Expressions
                 predicates.Add(groups.Result);
             }
 
+            if (options.FilterTree != null)
+            {
+                var tree = await TryBuildPredicateAsync(
+                    options.FilterTree,
+                    variableResolver,
+                    cancellationToken).ConfigureAwait(false);
+                if (!tree.Succeeded)
+                    return InvalidCondition(ProjectFilterTreeEvaluation(tree));
+                predicates.Add(tree.Result);
+            }
+
             return new Condition
             {
                 IsValid = true,
@@ -948,6 +1183,20 @@ namespace Kkts.Expressions
                 if (preparation.Groups.Failure != null)
                 {
                     preparation.Failure = preparation.Groups.Failure;
+                    return preparation;
+                }
+            }
+
+            if (options.FilterTree != null)
+            {
+                var validation = ValidateFilterTree(
+                    options.FilterTree,
+                    variables: null,
+                    allowUnresolvedVariables: true,
+                    new QueryPolicyExecution(Policy));
+                if (!validation.Succeeded)
+                {
+                    preparation.Failure = FailureFromFilterTreeValidation(validation, "/FilterTree");
                     return preparation;
                 }
             }
@@ -1053,7 +1302,97 @@ namespace Kkts.Expressions
                     return FailedPolicyResult(execution.Diagnostics.ToReadOnlyList());
                 }
             }
+
+            if (options.FilterTree != null)
+            {
+                foreach (var item in EnumerateTreeConditions(options.FilterTree))
+                {
+                    length += (long)item.Node.Field.Length +
+                        item.Node.Operator.Length +
+                        GetFilterTreeValueTextLength(item.Node.Value);
+                    if (Policy.MaxExpressionLength.HasValue && length > Policy.MaxExpressionLength.Value)
+                    {
+                        execution.Diagnostics.Add(
+                            "query-policy-expression-length-exceeded",
+                            "The condition inputs exceed the configured UTF-16 length limit.",
+                            0,
+                            0,
+                            Policy.MaxExpressionLength.Value,
+                            length,
+                            inputPath: item.Path + "/value");
+                        return FailedPolicyResult(execution.Diagnostics.ToReadOnlyList());
+                    }
+
+                    conditions++;
+                    if (Policy.MaxAtomicConditions.HasValue && conditions > Policy.MaxAtomicConditions.Value)
+                    {
+                        execution.Diagnostics.Add(
+                            "query-policy-condition-count-exceeded",
+                            "The condition inputs contain more atomic conditions than the configured limit.",
+                            0,
+                            0,
+                            Policy.MaxAtomicConditions.Value,
+                            conditions,
+                            inputPath: item.Path + "/op");
+                        return FailedPolicyResult(execution.Diagnostics.ToReadOnlyList());
+                    }
+                }
+            }
             return null;
+        }
+
+        private static IEnumerable<(FilterNode Node, string Path)> EnumerateTreeConditions(FilterNode tree)
+        {
+            var pending = new Stack<(FilterNode Node, string Path)>();
+            pending.Push((tree, "/FilterTree"));
+            while (pending.Count > 0)
+            {
+                var current = pending.Pop();
+                if (current.Node.Kind == FilterNodeKind.Condition)
+                {
+                    yield return current;
+                    continue;
+                }
+
+                var member = current.Node.Kind == FilterNodeKind.And
+                    ? "and"
+                    : current.Node.Kind == FilterNodeKind.Or ? "or" : "not";
+                var nodePath = FilterTreeDiagnosticProjection.AppendPointer(current.Path, member);
+                if (current.Node.Kind == FilterNodeKind.Not)
+                {
+                    pending.Push((current.Node.Child, nodePath));
+                    continue;
+                }
+                for (var index = current.Node.Children.Count - 1; index >= 0; --index)
+                    pending.Push((
+                        current.Node.Children[index],
+                        FilterTreeDiagnosticProjection.AppendPointer(nodePath, index.ToString())));
+            }
+        }
+
+        private static long GetFilterTreeValueTextLength(FilterValue value)
+        {
+            switch (value.Kind)
+            {
+                case FilterValueKind.Null:
+                    return 4;
+                case FilterValueKind.Boolean:
+                    return value.BooleanValue ? 4 : 5;
+                case FilterValueKind.Number:
+                case FilterValueKind.String:
+                case FilterValueKind.Variable:
+                    return value.Text.Length;
+                case FilterValueKind.Collection:
+                    long length = 0;
+                    foreach (var item in value.Items)
+                    {
+                        var itemLength = GetFilterTreeValueTextLength(item);
+                        length = long.MaxValue - length < itemLength ? long.MaxValue : length + itemLength;
+                    }
+                    return length;
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(value), "Unknown filter value kind.");
+            }
         }
 
         private static IEnumerable<(Filter Filter, string Path)> EnumerateConditionFilters(
@@ -1537,6 +1876,51 @@ namespace Kkts.Expressions
             throw new InvalidOperationException("Ordering failed.");
         }
 
+        private FilterOperationResult<FilterNode> ValidateFilterTree(
+            FilterNode tree,
+            ExpressionVariableSchema variables,
+            bool allowUnresolvedVariables,
+            QueryPolicyExecution execution)
+        {
+            if (!FilterTreePolicyScanner.TryScan(tree, this, execution))
+                return FilterOperationResult<FilterNode>.Failure(
+                    execution.Diagnostics.ToReadOnlyList(),
+                    execution.Diagnostics.IsTruncated);
+
+            return FilterTreeSemanticValidator.Validate(
+                tree,
+                Schema,
+                variables,
+                allowUnresolvedVariables);
+        }
+
+        private EvaluationResult FailureFromFilterTreeValidation(
+            FilterOperationResult<FilterNode> validation,
+            string inputPathPrefix = null)
+        {
+            var diagnostics = inputPathPrefix == null
+                ? validation.Diagnostics
+                : FilterTreeDiagnosticProjection.Project(validation.Diagnostics, inputPathPrefix);
+            if (diagnostics.Any(diagnostic =>
+                    diagnostic.Code.StartsWith("query-policy-", StringComparison.Ordinal) ||
+                    diagnostic.Code == "property-not-queryable"))
+                return FailedPolicyResult(diagnostics);
+            return new EvaluationResult { Diagnostics = diagnostics };
+        }
+
+        private static EvaluationResult ProjectFilterTreeEvaluation(EvaluationResult result)
+        {
+            return new EvaluationResult
+            {
+                Exception = result.Exception,
+                Diagnostics = FilterTreeDiagnosticProjection.Project(result.Diagnostics, "/FilterTree"),
+                InvalidProperties = result.InvalidProperties,
+                InvalidOperators = result.InvalidOperators,
+                InvalidVariables = result.InvalidVariables,
+                InvalidValues = result.InvalidValues
+            };
+        }
+
         private bool TryGetRuntimePolicyDiagnostics(
             string expression,
             out IReadOnlyList<ExpressionDiagnostic> diagnostics)
@@ -1550,7 +1934,10 @@ namespace Kkts.Expressions
             return diagnostics.Count > 0;
         }
 
-        private BuildArgument CreateBuildArgument(string expression, VariableResolver variableResolver)
+        private BuildArgument CreateBuildArgument(
+            string expression,
+            VariableResolver variableResolver,
+            QueryPolicyExecution policyExecution = null)
         {
             return new BuildArgument
             {
@@ -1562,7 +1949,7 @@ namespace Kkts.Expressions
                     StringComparer.OrdinalIgnoreCase),
                 VariableResolver = variableResolver ?? new VariableResolver(),
                 QueryContext = this,
-                PolicyExecution = new QueryPolicyExecution(Policy),
+                PolicyExecution = policyExecution ?? new QueryPolicyExecution(Policy),
                 SourceOffset = LeadingWhitespaceLength(expression),
                 SourceExpression = expression,
                 MembershipInputPath = string.IsNullOrEmpty(expression) ? "Value" : null

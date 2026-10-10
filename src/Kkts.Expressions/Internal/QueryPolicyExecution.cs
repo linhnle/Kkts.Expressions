@@ -18,6 +18,8 @@ namespace Kkts.Expressions.Internal
 
         internal QueryPolicyCounter ConditionCount { get; } = new QueryPolicyCounter();
 
+        internal QueryPolicyCounter ExpressionTextLength { get; } = new QueryPolicyCounter();
+
         internal QueryPolicyCounter CreateMembershipCounter() => new QueryPolicyCounter();
 
         internal bool TryAdmitExpression(string expression, string inputPath = null)
@@ -36,6 +38,44 @@ namespace Kkts.Expressions.Internal
                 expression.Length - limit,
                 limit,
                 expression.Length,
+                inputPath: inputPath);
+            return false;
+        }
+
+        internal bool TryAdmitCombinedExpression(string expression, string inputPath = null)
+        {
+            if (expression == null) throw new ArgumentNullException(nameof(expression));
+            var previous = ExpressionTextLength.Value;
+            var observed = ExpressionTextLength.Add(expression.Length);
+            if (!Policy.MaxExpressionLength.HasValue || observed <= Policy.MaxExpressionLength.Value)
+                return true;
+
+            var limit = Policy.MaxExpressionLength.Value;
+            Diagnostics.Add(
+                "query-policy-expression-length-exceeded",
+                "The query exceeds the configured UTF-16 text contribution limit.",
+                previous == 0 ? Math.Min(limit, expression.Length) : 0,
+                previous == 0 ? Math.Max(0, expression.Length - limit) : 0,
+                limit,
+                observed,
+                inputPath: inputPath);
+            return false;
+        }
+
+        internal bool TryAdmitTreeText(long contribution, string inputPath)
+        {
+            if (contribution < 0) throw new ArgumentOutOfRangeException(nameof(contribution));
+            var observed = ExpressionTextLength.Add(contribution);
+            if (!Policy.MaxExpressionLength.HasValue || observed <= Policy.MaxExpressionLength.Value)
+                return true;
+
+            Diagnostics.Add(
+                "query-policy-expression-length-exceeded",
+                "The query exceeds the configured UTF-16 text contribution limit.",
+                0,
+                0,
+                Policy.MaxExpressionLength.Value,
+                observed,
                 inputPath: inputPath);
             return false;
         }
@@ -96,7 +136,15 @@ namespace Kkts.Expressions.Internal
 
         internal long Increment()
         {
-            if (_value < long.MaxValue) ++_value;
+            return Add(1);
+        }
+
+        internal long Add(long amount)
+        {
+            if (amount < 0) throw new ArgumentOutOfRangeException(nameof(amount));
+            _value = long.MaxValue - _value < amount
+                ? long.MaxValue
+                : _value + amount;
             return _value;
         }
     }

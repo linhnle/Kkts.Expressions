@@ -137,6 +137,85 @@ namespace Kkts.Expressions.UnitTest.Units
             Assert.Equal(new[] { 1, 2 }, tenantScoped.Select(item => item.Id));
         }
 
+        [Fact]
+        public void NestedTreePolicyGuideExamplesUseContextAwareDecodeAndBuild()
+        {
+            var schema = ExpressionSchema.FromType<GuideProduct>(
+                validProperties: new[] { "Id", "Name", "Price" });
+            var queryContext = new ExpressionQueryContext(schema, QueryPolicy.Recommended);
+            Assert.Equal(16, queryContext.Policy.MaxFilterTreeDepth);
+            var variableSchema = new ExpressionVariableSchema(new[]
+            {
+                new ExpressionVariableDefinition("priceFloor", typeof(decimal))
+            });
+            var tree = FilterNode.And(new[]
+            {
+                FilterNode.Condition("Price", ">=", FilterValue.Variable("priceFloor")),
+                FilterNode.Not(FilterNode.Condition(
+                    "Name",
+                    "contains",
+                    FilterValue.String("$literal")))
+            });
+            var json = FilterTreeJson.Serialize(tree);
+            var decoded = FilterTreeJson.TryDeserialize(json, queryContext, variableSchema);
+            Assert.True(decoded.Succeeded);
+            var resolver = new VariableResolver();
+            Assert.True(resolver.TryAdd("priceFloor", 10m));
+            var result = queryContext.TryBuildPredicate<GuideProduct>(decoded.Result, resolver);
+
+            Assert.True(result.Succeeded);
+            Assert.True(result.Result.Compile()(new GuideProduct { Price = 20m, Name = "Item" }));
+
+            var copiedPolicy = QueryPolicy.Recommended.WithMaxFilterTreeDepth(8);
+            var unlimitedTreePolicy = new QueryPolicy().WithMaxFilterTreeDepth(null);
+            Assert.Equal(8, copiedPolicy.MaxFilterTreeDepth);
+            Assert.Null(unlimitedTreePolicy.MaxFilterTreeDepth);
+        }
+
+        [Fact]
+        public void FilterTreeMigrationGuideExampleUsesTypedReferencesAndAndComposition()
+        {
+            var context = new ExpressionQueryContext(
+                ExpressionSchema.FromType<GuideProduct>(
+                    validProperties: new[] { "Id", "Name", "Price" }),
+                new QueryPolicy());
+            var migratedGroups = FilterNode.Or(new[]
+            {
+                FilterNode.And(new[]
+                {
+                    FilterNode.Condition("Name", "=", FilterValue.String("A")),
+                    FilterNode.Condition("Price", ">=", FilterValue.Variable("priceFloor"))
+                }),
+                FilterNode.And(new[]
+                {
+                    FilterNode.Condition("Name", "=", FilterValue.String("B")),
+                    FilterNode.Condition("Price", ">=", FilterValue.Variable("priceFloor"))
+                })
+            });
+            var resolver = new VariableResolver();
+            Assert.True(resolver.TryAdd("priceFloor", 10m));
+            var condition = context.BuildCondition<GuideProduct>(
+                new ConditionOptions
+                {
+                    Where = "Id > 0",
+                    FilterTree = migratedGroups
+                },
+                resolver);
+
+            Assert.True(condition.IsValid);
+            Assert.Equal(2, condition.Predicates.Count);
+            var predicates = condition.Predicates
+                .Cast<System.Linq.Expressions.Expression<System.Func<GuideProduct, bool>>>()
+                .Select(predicate => predicate.Compile())
+                .ToArray();
+            Assert.True(predicates.All(predicate =>
+                predicate(new GuideProduct { Id = 1, Name = "A", Price = 12m })));
+            Assert.False(predicates.All(predicate =>
+                predicate(new GuideProduct { Id = 1, Name = "A", Price = 8m })));
+            Assert.False(predicates.All(predicate =>
+                predicate(new GuideProduct { Id = 0, Name = "A", Price = 12m })));
+        }
+
         private sealed class GuideProduct
         {
             public int Id { get; set; }

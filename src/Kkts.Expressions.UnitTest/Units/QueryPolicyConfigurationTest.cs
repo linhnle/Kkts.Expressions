@@ -13,6 +13,7 @@ namespace Kkts.Expressions.UnitTest.Units
 
             Assert.Null(policy.MaxExpressionLength);
             Assert.Null(policy.MaxParenthesisDepth);
+            Assert.Null(policy.MaxFilterTreeDepth);
             Assert.Null(policy.MaxAtomicConditions);
             Assert.Null(policy.MaxInItems);
             Assert.Null(policy.MaxNavigationDepth);
@@ -28,6 +29,7 @@ namespace Kkts.Expressions.UnitTest.Units
             Assert.Same(policy, QueryPolicy.Recommended);
             Assert.Equal(4096, policy.MaxExpressionLength);
             Assert.Equal(16, policy.MaxParenthesisDepth);
+            Assert.Equal(16, policy.MaxFilterTreeDepth);
             Assert.Equal(64, policy.MaxAtomicConditions);
             Assert.Equal(100, policy.MaxInItems);
             Assert.Equal(3, policy.MaxNavigationDepth);
@@ -75,6 +77,47 @@ namespace Kkts.Expressions.UnitTest.Units
             Assert.Equal(0, policy.MaxAtomicConditions);
             Assert.Equal(0, policy.MaxInItems);
             Assert.Equal(0, policy.MaxNavigationDepth);
+        }
+
+        [Fact]
+        public void TreeDepthCopyIsImmutableAndPreservesOtherPolicySettings()
+        {
+            var original = new QueryPolicy(
+                maxExpressionLength: 123,
+                maxParenthesisDepth: 7,
+                maxAtomicConditions: 9,
+                maxInItems: 11,
+                maxNavigationDepth: 2,
+                allowCollectionAccess: false,
+                allowedOperators: new Dictionary<string, IEnumerable<ComparisonOperator>>
+                {
+                    ["Price"] = new[] { ComparisonOperator.GreaterThan }
+                });
+
+            var limited = original.WithMaxFilterTreeDepth(4);
+            var unlimited = limited.WithMaxFilterTreeDepth(null);
+
+            Assert.Null(original.MaxFilterTreeDepth);
+            Assert.Equal(4, limited.MaxFilterTreeDepth);
+            Assert.Null(unlimited.MaxFilterTreeDepth);
+            Assert.Equal(123, limited.MaxExpressionLength);
+            Assert.Equal(7, limited.MaxParenthesisDepth);
+            Assert.Equal(9, limited.MaxAtomicConditions);
+            Assert.Equal(11, limited.MaxInItems);
+            Assert.Equal(2, limited.MaxNavigationDepth);
+            Assert.False(limited.AllowCollectionAccess);
+            Assert.Equal(
+                new[] { ComparisonOperator.GreaterThan },
+                limited.AllowedOperators["price"]);
+        }
+
+        [Fact]
+        public void TreeDepthCopyAcceptsZeroAndRejectsNegativeValues()
+        {
+            Assert.Equal(0, new QueryPolicy().WithMaxFilterTreeDepth(0).MaxFilterTreeDepth);
+            var exception = Assert.Throws<ArgumentOutOfRangeException>(() =>
+                new QueryPolicy().WithMaxFilterTreeDepth(-1));
+            Assert.Equal("maxFilterTreeDepth", exception.ParamName);
         }
 
         [Fact]

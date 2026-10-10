@@ -176,6 +176,54 @@ internal static class RelationalPredicateAssertions
             Assert.Equal(handwrittenIds, generatedIds);
         }
     }
+
+    public static async Task AssertNestedFilterTreeAsync(
+        Func<RelationalTestDbContext> createContext,
+        string provider)
+    {
+        var schema = ExpressionSchema.FromType<RelationalRecord>(
+            propertyMapping: new Dictionary<string, string> { ["state"] = "Status" });
+        var queryContext = new ExpressionQueryContext(schema, new QueryPolicy());
+        var tree = FilterNode.And(new[]
+        {
+            FilterNode.Or(new[]
+            {
+                FilterNode.Condition("state", "==", FilterValue.String("Active")),
+                FilterNode.Condition("Integer", ">=", FilterValue.Variable("minimum"))
+            }),
+            FilterNode.Not(FilterNode.Condition(
+                "NullableInteger",
+                "in",
+                FilterValue.Collection(new[]
+                {
+                    FilterValue.Null,
+                    FilterValue.Number("1")
+                })))
+        });
+        var variables = new VariableResolver();
+        Assert.True(variables.TryAdd("minimum", 4));
+        var built = queryContext.TryBuildPredicate<RelationalRecord>(tree, variables);
+        Assert.True(built.Succeeded, $"{provider} failed to build the nested tree: {built.Exception}");
+
+        await using var context = createContext();
+        var generatedIds = await context.Records
+            .AsNoTracking()
+            .Where(built.Result)
+            .OrderBy(record => record.Id)
+            .Select(record => record.Id)
+            .ToArrayAsync();
+        var handwrittenIds = await context.Records
+            .AsNoTracking()
+            .Where(record =>
+                (record.Status == RelationalStatus.Active || record.Integer >= 4) &&
+                !new int?[] { null, 1 }.Contains(record.NullableInteger))
+            .OrderBy(record => record.Id)
+            .Select(record => record.Id)
+            .ToArrayAsync();
+
+        Assert.Equal(new[] { 3, 5 }, generatedIds);
+        Assert.Equal(handwrittenIds, generatedIds);
+    }
 }
 
 [Trait("Provider", "SqlServer")]
@@ -185,6 +233,10 @@ public sealed class SqlServerPredicateIntegrationTests(SqlServerFixture fixture)
     [Fact]
     public Task ExecutesSharedPredicatesOnSqlServer() =>
         RelationalPredicateAssertions.AssertSharedCasesAsync(fixture.CreateContext, "SQL Server");
+
+    [Fact]
+    public Task ExecutesNestedFilterTreeOnSqlServer() =>
+        RelationalPredicateAssertions.AssertNestedFilterTreeAsync(fixture.CreateContext, "SQL Server");
 
     [Fact]
     public async Task UsesConfiguredCollationAndDatePrecision()
@@ -220,6 +272,10 @@ public sealed class MySqlPredicateIntegrationTests(MySqlFixture fixture)
     [Fact]
     public Task ExecutesSharedPredicatesOnMySql() =>
         RelationalPredicateAssertions.AssertSharedCasesAsync(fixture.CreateContext, "MySQL");
+
+    [Fact]
+    public Task ExecutesNestedFilterTreeOnMySql() =>
+        RelationalPredicateAssertions.AssertNestedFilterTreeAsync(fixture.CreateContext, "MySQL");
 
     [Fact]
     public async Task UsesConfiguredCollationAndDatePrecision()

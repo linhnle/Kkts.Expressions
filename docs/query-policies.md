@@ -69,6 +69,7 @@ Opt in explicitly to `QueryPolicy.Recommended` for these starting limits:
 | --- | ---: |
 | Maximum expression length | 4096 UTF-16 units |
 | Maximum parenthesis depth | 16 |
+| Maximum filter-tree depth | 16 |
 | Maximum atomic conditions | 64 |
 | Maximum membership items | 100 |
 | Maximum entity navigation depth | 3 |
@@ -88,8 +89,11 @@ context operations require the generic entity type to match
 `Interpreter`, filter, condition, and ordering overloads remain available and
 do not inherit this policy implicitly. Applications opt in by retaining a
 server-owned `ExpressionQueryContext` and using its policy-aware operations
-consistently. The policy does not add operators, collection syntax, filter
-shapes, or mapping callback support.
+consistently. The policy does not add query operators or mapping callback
+support. It does enforce nested JSON filter trees and policy-aware
+expression-to-tree conversion. See the
+[nested-filter guide](nested-filters.md) for the JSON contract, condition
+integration, and conversion boundaries.
 
 ## Static analysis, counting, and field binding
 
@@ -109,13 +113,17 @@ slots before tokenization. Parentheses inside quoted text do not count;
 brackets and braces do not consume parenthesis depth. A quote that is not
 closed remains active to end of input. Semantic binding then checks fields,
 navigation, collection traversal, and normalized operator permissions.
+Nested JSON trees are traversed iteratively and use their independent
+`MaxFilterTreeDepth`; logical containers are not counted as source
+parentheses.
 
 | Limit | Counting rule |
 | --- | --- |
 | Expression length | Exact untrimmed .NET `string.Length`; whitespace, quotes, and escapes count, and supplementary characters use two UTF-16 units. |
 | Parenthesis depth | Maximum simultaneous `(` outside quoted text, including grouping, NOT/function calls, and parenthesized membership lists. |
-| Atomic conditions | One per comparison, membership operation, supported Boolean comparison-function call, or standalone Boolean predicate. AND, OR, NOT, parentheses, and arithmetic add none. |
-| Membership items | Each parsed list slot before conversion or deduplication. Duplicates and nulls count; quoted commas remain within one slot. |
+| Filter-tree depth | A condition leaf has depth zero; each supplied AND, OR, or NOT container adds one along its descendant path. Single-child groups and repeated NOT count; wrappers are not flattened. |
+| Atomic conditions | One per comparison, membership operation, supported Boolean comparison-function call, standalone Boolean predicate, or nested-tree condition leaf. AND, OR, NOT, parentheses, and arithmetic add none. |
+| Membership items | Each parsed list slot or tree collection slot before conversion or deduplication. Duplicates, nulls, and scalar references count; quoted commas remain within one text-list slot. A whole collection reference is checked after resolution. |
 | Navigation depth | Canonical entity member-type transitions. `Customer.Address.City` is depth 2; `CreatedAt.Year` and `Name.Length` are depth 0. A collection member transition adds one level. |
 | Collection access | Whether an entity collection member is referenced or traversed. Strings and variable collections are not entity collection navigation. |
 
@@ -125,6 +133,31 @@ uses `ComparisonOperator.Equal` for its field permission. An incomplete
 recognized comparison such as `Id =` reserves one condition; a missing
 operand is not counted separately. A bare Boolean value followed by an
 explicit comparison is counted only once.
+
+Tree length accounting sums each leaf's field and canonical operator string,
+literal string, exact JSON number token, variable path, and canonical `true`,
+`false`, or `null` token. It does not charge JSON keys, delimiters, escaping,
+or logical containers. Tree text and leaf counts participate in the same
+condition budget as Where and legacy structured inputs; ordering retains its
+separate length budget. A standalone Filter/FilterGroup keeps its documented
+legacy group-depth behavior; internal adapter containers do not add tree
+depth.
+
+`MaxFilterTreeDepth` is independent from `MaxParenthesisDepth`. A tree
+`AND -> NOT -> leaf` has depth two; adding another logical container makes
+depth three. Setting parenthesis depth to zero does not reject a tree whose
+tree-depth limit admits it.
+
+Use `WithMaxFilterTreeDepth` to copy a policy without changing the existing
+constructor signature:
+
+```csharp
+var treePolicy = QueryPolicy.Recommended.WithMaxFilterTreeDepth(8);
+var unlimitedTreePolicy = new QueryPolicy().WithMaxFilterTreeDepth(null);
+```
+
+The default policy remains unlimited for tree depth; the recommended preset
+sets it to 16. Zero admits a leaf but rejects every logical container.
 
 Field paths are resolved through the schema's exact external-name mapping
 before navigation and operator checks. Operator aliases and casing are
@@ -143,7 +176,8 @@ path mappings, not computed mapping callbacks or prefix rewrites. The target
 entity path is the canonical path used for policy checks. Internal member
 access under a mapped scalar path must be explicitly represented and resolve
 through the existing schema; mapping a source name does not make arbitrary
-computed members queryable.
+computed members queryable. Nested tree fields use the same mapping,
+allowlist, navigation, collection, and normalized operator checks.
 
 Computed CLR properties are application-owned opaque members. Analysis reads
 their member metadata but never invokes their getter, and policy checks cover
@@ -170,6 +204,7 @@ declared metadata.
 | `query-policy-parenthesis-depth-exceeded` | The first `(` that exceeds the depth limit. | Flatten nested groups or calls. |
 | `query-policy-condition-count-exceeded` | Excess comparison operator, or standalone Boolean token when applicable. | Remove conditions. |
 | `query-policy-in-items-exceeded` | The first membership item beyond the limit. | Shorten the collection. |
+| `query-policy-filter-tree-depth-exceeded` | The first AND/OR/NOT container beyond the tree-depth limit; `InputPath` is a JSON Pointer. | Reduce logical nesting or deliberately raise the tree-depth limit. |
 | `query-policy-navigation-depth-exceeded` | The source field token that exceeds the configured entity depth. | Use a shallower permitted field. |
 | `query-policy-collection-access-denied` | The source field token that traverses an entity collection. | Use a scalar field or explicitly allow supported collection access. |
 | `query-policy-operator-denied` | The operator token whose normalized operator is not allowed. | Choose a permitted operator. |
@@ -185,7 +220,9 @@ reports were omitted. Policy denials do not suggest restricted field names.
 Structured diagnostics use `Start = 0` and `Length = 0` and identify their
 source with `InputPath`, for example `Filter.Operator`, `Filters[2].Value`,
 `FilterGroup.Filters[0].Property`, `FilterGroups[1].Filters[0].Value`,
-`OrderBy`, or `OrderBys[0].Property`. Limit diagnostics include the configured
+`/and/1/not/field`, `OrderBy`, or `OrderBys[0].Property`. Tree pointers are
+RFC 6901 escaped and are relative to the tree root; a tree nested in
+`ConditionOptions` is prefixed with `/FilterTree`. Limit diagnostics include the configured
 limit and observed value when available; runtime enumeration failures also
 indicate whether the observed value is only a lower bound. Inspect diagnostics
 before consuming a predicate, ordered source, or condition result.
@@ -287,6 +324,24 @@ length budget. An invalid condition exposes no partial predicates or
 OrderByClause. Existing `ConditionOptions.BuildCondition` calls remain
 policy-free.
 
+For JSON trees, use context-aware decoding and construction rather than the
+transport-only codec:
+
+```csharp
+var decodedTree = FilterTreeJson.TryDeserialize(json, queryContext, variables);
+if (!decodedTree.Succeeded) throw new QueryPolicyException(decodedTree.Diagnostics);
+
+var treeResult = queryContext.TryBuildPredicate<Product>(decodedTree.Result, variableResolver);
+if (!treeResult.Succeeded) throw treeResult.Exception;
+```
+
+Policy-aware decoding checks logical depth before descending, counts
+membership slots before materializing them, applies text/condition budgets as
+leaves complete, and then validates all fields and typed values. Construction
+revalidates the supplied tree independently before resolver execution. The
+standalone `FilterTreeJson` codec and `FilterNode` extension methods have no
+`QueryPolicy`; use the bound context for server-side policy enforcement.
+
 Ordering clauses can be checked with `TryBuildOrderByClause` from string or
 `OrderByInfo` entries, and `TryOrderBy` can apply them to the existing
 `IQueryable`, `IEnumerable`, or runtime `IQueryable` source forms. Ordering
@@ -335,6 +390,11 @@ a database query to discover the count. A caller may resolve a query into an
 already bounded in-memory collection before passing it to the expression
 builder. Without a finite `MaxInItems`, legacy supported collection behavior
 is retained.
+
+The context-aware JSON facade and tree traversal do not replace HTTP body,
+request time, or application transport limits. Direct `JsonSerializer`
+consumers must configure `JsonSerializerOptions.MaxDepth` as an explicit
+transport cap; that setting is distinct from `MaxFilterTreeDepth`.
 
 Metadata-only analysis can determine literal list slots and declared variable
 types, but cannot know resolver availability, runtime values, collection size,

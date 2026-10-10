@@ -14,7 +14,8 @@ namespace Kkts.Expressions
             maxAtomicConditions: 64,
             maxInItems: 100,
             maxNavigationDepth: 3,
-            allowCollectionAccess: false);
+            allowCollectionAccess: false)
+            .WithMaxFilterTreeDepth(16);
 
         /// <summary>
         /// Creates an immutable policy. Null limits are unlimited; collection access is allowed
@@ -28,18 +29,40 @@ namespace Kkts.Expressions
             int? maxNavigationDepth = null,
             bool allowCollectionAccess = true,
             IDictionary<string, IEnumerable<ComparisonOperator>> allowedOperators = null)
+            : this(
+                maxExpressionLength,
+                maxParenthesisDepth,
+                maxAtomicConditions,
+                maxInItems,
+                maxNavigationDepth,
+                allowCollectionAccess,
+                allowedOperators,
+                maxFilterTreeDepth: null)
+        {
+        }
+
+        private QueryPolicy(
+            int? maxExpressionLength,
+            int? maxParenthesisDepth,
+            int? maxAtomicConditions,
+            int? maxInItems,
+            int? maxNavigationDepth,
+            bool allowCollectionAccess,
+            IDictionary<string, IEnumerable<ComparisonOperator>> allowedOperators,
+            int? maxFilterTreeDepth)
         {
             MaxExpressionLength = ValidateLimit(maxExpressionLength, nameof(maxExpressionLength));
             MaxParenthesisDepth = ValidateLimit(maxParenthesisDepth, nameof(maxParenthesisDepth));
             MaxAtomicConditions = ValidateLimit(maxAtomicConditions, nameof(maxAtomicConditions));
             MaxInItems = ValidateLimit(maxInItems, nameof(maxInItems));
             MaxNavigationDepth = ValidateLimit(maxNavigationDepth, nameof(maxNavigationDepth));
+            MaxFilterTreeDepth = ValidateLimit(maxFilterTreeDepth, nameof(maxFilterTreeDepth));
             AllowCollectionAccess = allowCollectionAccess;
             AllowedOperators = SnapshotOperators(allowedOperators);
         }
 
-        /// <summary>An opt-in starting policy: 4096 units, depth 16, 64 conditions, 100 items,
-        /// navigation depth 3, and entity collection access disabled.</summary>
+        /// <summary>An opt-in starting policy: 4096 units, expression/tree depth 16, 64 conditions,
+        /// 100 items, navigation depth 3, and entity collection access disabled.</summary>
         public static QueryPolicy Recommended => RecommendedPolicy;
 
         /// <summary>Maximum original UTF-16 expression length, or null for unlimited.</summary>
@@ -47,6 +70,9 @@ namespace Kkts.Expressions
 
         /// <summary>Maximum parenthesis depth, or null for unlimited.</summary>
         public int? MaxParenthesisDepth { get; }
+
+        /// <summary>Maximum logical filter-tree depth, where leaves have depth zero, or null for unlimited.</summary>
+        public int? MaxFilterTreeDepth { get; }
 
         /// <summary>Maximum atomic predicate count, or null for unlimited.</summary>
         public int? MaxAtomicConditions { get; }
@@ -62,6 +88,24 @@ namespace Kkts.Expressions
 
         /// <summary>Case-insensitive field paths and their allowed comparison operators.</summary>
         public IReadOnlyDictionary<string, IReadOnlyCollection<ComparisonOperator>> AllowedOperators { get; }
+
+        /// <summary>Returns a policy copy with the supplied logical filter-tree depth limit.</summary>
+        public QueryPolicy WithMaxFilterTreeDepth(int? maxFilterTreeDepth)
+        {
+            var operatorRules = AllowedOperators.ToDictionary(
+                pair => pair.Key,
+                pair => (IEnumerable<ComparisonOperator>)pair.Value,
+                StringComparer.OrdinalIgnoreCase);
+            return new QueryPolicy(
+                MaxExpressionLength,
+                MaxParenthesisDepth,
+                MaxAtomicConditions,
+                MaxInItems,
+                MaxNavigationDepth,
+                AllowCollectionAccess,
+                operatorRules,
+                maxFilterTreeDepth);
+        }
 
         private static int? ValidateLimit(int? value, string parameterName)
         {

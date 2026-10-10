@@ -235,7 +235,11 @@ namespace Kkts.Expressions
             return SnapshotMembershipCollection(value, enumerable, start, length, MembershipInputPath);
         }
 
-        internal object SnapshotDirectMembershipCollection(object value, Type elementType)
+        internal object SnapshotDirectMembershipCollection(
+            object value,
+            Type elementType,
+            string inputPath = "Value",
+            CancellationToken cancellationToken = default)
         {
             if (QueryContext == null ||
                 !QueryContext.Policy.MaxInItems.HasValue ||
@@ -244,7 +248,14 @@ namespace Kkts.Expressions
                 !(value is IEnumerable enumerable))
                 return value;
 
-            return SnapshotMembershipCollection(value, enumerable, 0, 0, "Value", elementType);
+            return SnapshotMembershipCollection(
+                value,
+                enumerable,
+                0,
+                0,
+                inputPath,
+                elementType,
+                cancellationToken);
         }
 
         private object SnapshotMembershipCollection(
@@ -253,7 +264,8 @@ namespace Kkts.Expressions
             int start,
             int length,
             string inputPath,
-            Type targetElementType = null)
+            Type targetElementType = null,
+            CancellationToken cancellationToken = default)
         {
             var maximum = QueryContext.Policy.MaxInItems.Value;
             if (value is IQueryable)
@@ -278,6 +290,7 @@ namespace Kkts.Expressions
             {
                 while (enumerator.MoveNext())
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
                     if (!PolicyExecution.TryCountMembershipItem(counter, start, length, inputPath))
                         throw new QueryPolicyException(PolicyExecution.Diagnostics.ToReadOnlyList());
                     items.Add(enumerator.Current);

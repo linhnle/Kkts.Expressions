@@ -23,6 +23,8 @@ or translate to SQL for a particular EF Core provider.
 For reusable expression limits and field operator/collection policies enforced
 both during analysis and runtime construction, see the
 [query policies guide](query-policies.md).
+For the supported, metadata-only exchange subset between editor expressions
+and JSON filter trees, see [nested filters](nested-filters.md#expression-editor-exchange).
 
 ## Entity schema, query permissions, and mappings
 
@@ -269,6 +271,23 @@ Syntax codes remain those returned by syntax analysis, including
 `unmatched-delimiter`, `unterminated-string`, and
 `incomplete-identifier`. Syntax and semantic codes remain separate in
 `SyntaxDiagnostics` and `SemanticDiagnostics`.
+
+## Shared rule and syntax boundaries
+
+Semantic analysis shares pure operator-applicability, numeric promotion, and
+contextual literal-conversion checks with the library's other metadata-aware
+operations. These checks decide whether a known expression shape is compatible;
+they do not execute runtime conversions, custom operators, or application code.
+Variable conversion remains value-dependent until runtime resolution, and the
+immutable analysis conversion context does not change legacy runtime culture,
+date-format, current-date, or local-time-zone defaults.
+
+The public syntax-analysis result remains a token-and-diagnostic snapshot, not
+an executable expression tree. Internal positioned syntax reduction preserves
+operators, operands, functions, list elements, and grouping for library
+features that need that structure. It does not call the runtime predicate
+builder, and it does not change syntax token classifications, completeness,
+recovery, or diagnostic spans described above.
 
 ## Incomplete input and editor consumption
 
