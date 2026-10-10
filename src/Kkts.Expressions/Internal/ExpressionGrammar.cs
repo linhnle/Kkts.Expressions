@@ -30,7 +30,16 @@ namespace Kkts.Expressions.Internal
 
 		internal static string NormalizeOperator(string value)
 		{
-			switch (value?.ToLowerInvariant())
+			var normalized = value?.ToLowerInvariant();
+			if (normalized != null && normalized.Length > 5 &&
+				normalized.StartsWith("not", StringComparison.Ordinal) && char.IsWhiteSpace(normalized[3]))
+			{
+				var index = 3;
+				while (index < normalized.Length && char.IsWhiteSpace(normalized[index])) ++index;
+				if (normalized.Substring(index) == Interpreter.ComparisonIn)
+					normalized = Interpreter.ComparisonNotIn;
+			}
+			switch (normalized)
 			{
 				case Interpreter.LogicalAnd2:
 				case Interpreter.LogicalAnd3:
@@ -52,7 +61,7 @@ namespace Kkts.Expressions.Internal
 				case Interpreter.ComparisonEndsWith3:
 					return Interpreter.ComparisonEndsWith;
 				default:
-					return value;
+					return normalized;
 			}
 		}
 

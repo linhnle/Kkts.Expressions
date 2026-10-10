@@ -13,11 +13,32 @@ namespace Kkts.Expressions.Internal
         private bool _lastTokenWasDot;
         private char _listEnd;
         private QueryPolicyCounter _membershipItems;
+        private readonly Stack<char> _completionScopes;
 
-        private QueryPolicySourceScanner(string source, QueryPolicyExecution execution)
+        private QueryPolicySourceScanner(string source, QueryPolicyExecution execution, bool completion = false)
         {
             _source = source;
             _execution = execution;
+            if (completion) _completionScopes = new Stack<char>();
+        }
+
+        internal static bool TryScanCompletion(string source, QueryPolicyExecution execution)
+        {
+            if (source == null) throw new ArgumentNullException(nameof(source));
+            if (execution == null) throw new ArgumentNullException(nameof(execution));
+            if (!execution.TryAdmitExpression(source)) return false;
+            if (source.Length > ExpressionCompletionBudget.MaximumSourceLength)
+            {
+                execution.Diagnostics.Add(
+                    "completion-work-limit-exceeded",
+                    "The expression exceeds the completion UTF-16 source budget.",
+                    ExpressionCompletionBudget.MaximumSourceLength,
+                    source.Length - ExpressionCompletionBudget.MaximumSourceLength,
+                    ExpressionCompletionBudget.MaximumSourceLength,
+                    source.Length);
+                return false;
+            }
+            return new QueryPolicySourceScanner(source, execution, completion: true).Scan();
         }
 
         internal static bool TryScan(string source, QueryPolicyExecution execution)
@@ -113,6 +134,7 @@ namespace Kkts.Expressions.Internal
                 {
                     if (value == _listEnd)
                     {
+                        CloseCompletionScope(value);
                         if (value == ')') DecreaseParenthesisDepth();
                         _listEnd = '\0';
                         _membershipItems = null;
@@ -137,6 +159,7 @@ namespace Kkts.Expressions.Internal
 
                 if (_membershipPending && ExpressionGrammar.IsListStart(value))
                 {
+                    if (!OpenCompletionScope(value, index)) return false;
                     _membershipPending = false;
                     _listEnd = ExpressionGrammar.ListEnd(value);
                     _membershipItems = _execution.CreateMembershipCounter();
@@ -227,6 +250,7 @@ namespace Kkts.Expressions.Internal
 
                 if (value == '(')
                 {
+                    if (!OpenCompletionScope(value, index)) return false;
                     if (!IncreaseParenthesisDepth(index)) return false;
                     _expectsOperand = true;
                     _lastTokenWasDot = false;
@@ -236,6 +260,7 @@ namespace Kkts.Expressions.Internal
 
                 if (value == ')')
                 {
+                    CloseCompletionScope(value);
                     DecreaseParenthesisDepth();
                     _expectsOperand = false;
                     _lastTokenWasDot = false;
@@ -270,6 +295,14 @@ namespace Kkts.Expressions.Internal
 
                 if (value == ',' || value == '[' || value == ']' || value == '{' || value == '}')
                 {
+                    if (value == '[' || value == '{')
+                    {
+                        if (!OpenCompletionScope(value, index)) return false;
+                    }
+                    else if (value == ']' || value == '}')
+                    {
+                        CloseCompletionScope(value);
+                    }
                     _expectsOperand = value == ',' || value == '[' || value == '{';
                     _lastTokenWasDot = false;
                     ++index;
@@ -282,6 +315,29 @@ namespace Kkts.Expressions.Internal
             }
 
             return true;
+        }
+
+        private bool OpenCompletionScope(char opening, int start)
+        {
+            if (_completionScopes == null) return true;
+            if (_completionScopes.Count >= ExpressionCompletionBudget.MaximumScopes)
+            {
+                _execution.Diagnostics.Add(
+                    "completion-work-limit-exceeded",
+                    "The expression exceeds the completion open-scope budget.",
+                    start, 1, ExpressionCompletionBudget.MaximumScopes,
+                    ExpressionCompletionBudget.MaximumScopes + 1);
+                return false;
+            }
+            _completionScopes.Push(ExpressionGrammar.ListEnd(opening));
+            return true;
+        }
+
+        private void CloseCompletionScope(char closing)
+        {
+            if (_completionScopes != null && _completionScopes.Count > 0 &&
+                _completionScopes.Peek() == closing)
+                _completionScopes.Pop();
         }
 
         private bool IncreaseParenthesisDepth(int index)

@@ -8,6 +8,50 @@ namespace Kkts.Expressions.Internal
 {
     internal static class ExpressionConversionRules
     {
+        internal static bool CanConvertVariable(Type sourceType, Type targetType, bool membershipItem = false)
+        {
+            if (sourceType == null) throw new ArgumentNullException(nameof(sourceType));
+            if (targetType == null) throw new ArgumentNullException(nameof(targetType));
+            sourceType = Nullable.GetUnderlyingType(sourceType) ?? sourceType;
+            if (!membershipItem && Nullable.GetUnderlyingType(targetType) != null &&
+                Nullable.GetUnderlyingType(targetType) != typeof(TimeSpan))
+                return false;
+            targetType = Nullable.GetUnderlyingType(targetType) ?? targetType;
+
+            if (sourceType == typeof(string))
+            {
+                // Constant preserves IEnumerable values, except for its special TimeSpan path.
+                // ArrayList instead sends each scalar directly through the literal converter.
+                if (!membershipItem) return targetType == typeof(string) || targetType == typeof(TimeSpan);
+                return targetType.IsEnum || targetType == typeof(Guid) || targetType == typeof(TimeSpan) ||
+                    IsFrameworkConvertible(targetType);
+            }
+            if (sourceType == targetType && !typeof(System.Collections.IEnumerable).IsAssignableFrom(sourceType))
+                return true;
+            if (!IsFrameworkConvertible(sourceType) && !sourceType.IsEnum) return false;
+            if (!IsFrameworkConvertible(targetType)) return false;
+
+            var sampleType = sourceType.IsEnum ? Enum.GetUnderlyingType(sourceType) : sourceType;
+            object sample = sampleType == typeof(DateTime) ? (object)DateTime.MinValue :
+                sampleType == typeof(bool) ? true :
+                sampleType == typeof(char) ? '1' :
+                Convert.ChangeType(1, sampleType, CultureInfo.InvariantCulture);
+            if (sourceType.IsEnum) sample = Enum.ToObject(sourceType, sample);
+            try
+            {
+                Convert.ChangeType(sample, targetType, CultureInfo.InvariantCulture);
+                return true;
+            }
+            catch (InvalidCastException)
+            {
+                return false;
+            }
+        }
+
+        private static bool IsFrameworkConvertible(Type type) =>
+            type == typeof(string) || type == typeof(bool) || type == typeof(DateTime) ||
+            NumericOperands.IsNumeric(type);
+
         internal static bool CanConvertLiteral(
             object value,
             Type sourceType,

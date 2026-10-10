@@ -1,0 +1,31 @@
+@baseUrl = http://localhost:5178
+
+### Configured operators
+POST {{baseUrl}}/api/completion
+Content-Type: application/json
+
+{"text":"Price ","offset":6,"snapshot":1}
+
+### Configured values
+POST {{baseUrl}}/api/completion
+Content-Type: application/json
+
+{"text":"Status = ","offset":9,"snapshot":2}
+
+### Declared temporal variables
+POST {{baseUrl}}/api/completion
+Content-Type: application/json
+
+{"text":"CreatedAt > $","offset":13,"snapshot":3}
+
+### Permitted legacy path
+POST {{baseUrl}}/api/completion
+Content-Type: application/json
+
+{"text":"Customer.","offset":9,"snapshot":4}
+
+### Invalid UTF-16 offset returns Problem Details
+POST {{baseUrl}}/api/completion
+Content-Type: application/json
+
+{"text":"Price","offset":6,"snapshot":5}

@@ -15,9 +15,11 @@ namespace Kkts.Expressions.Internal
         private readonly ExpressionQueryContext _queryContext;
         private readonly QueryPolicyExecution _policyExecution;
         private readonly bool _syntaxTruncated;
+        private readonly bool _completionMode;
         private readonly List<ExpressionDiagnostic> _diagnostics = new List<ExpressionDiagnostic>();
         private readonly HashSet<Tuple<string, int, int>> _reported = new HashSet<Tuple<string, int, int>>();
         private bool _isTruncated;
+        private bool _probeFailed;
 
         internal ExpressionSemanticAnalyzer(
             string source,
@@ -26,8 +28,11 @@ namespace Kkts.Expressions.Internal
             ExpressionAnalysisResult syntax,
             ExpressionQueryContext queryContext = null,
             QueryPolicyExecution policyExecution = null,
-            bool syntaxTruncated = false)
+            bool syntaxTruncated = false,
+            bool completionMode = false)
         {
+            if (completionMode && policyExecution != null)
+                throw new ArgumentException("Completion probes must not mutate policy execution state.", nameof(policyExecution));
             _source = source;
             _schema = schema;
             _variables = variables ?? new ExpressionVariableSchema(null);
@@ -35,6 +40,46 @@ namespace Kkts.Expressions.Internal
             _queryContext = queryContext;
             _policyExecution = policyExecution;
             _syntaxTruncated = syntaxTruncated;
+            _completionMode = completionMode;
+        }
+
+        internal bool TryDescribeOperand(
+            int tokenStart, int tokenEnd, out SemanticNode operand, bool membershipOperand = false)
+        {
+            if (!_completionMode) throw new InvalidOperationException("Operand probes require completion mode.");
+            if (tokenStart < 0 || tokenEnd < tokenStart || tokenEnd > _syntax.Tokens.Count)
+                throw new ArgumentOutOfRangeException(nameof(tokenStart));
+            _probeFailed = false;
+            var parser = new Parser(this, _syntax.Tokens, tokenStart, tokenEnd);
+            operand = membershipOperand ? parser.ParseMembershipOperand() : parser.Parse();
+            if (operand != null && !operand.Invalid && parser.AtEnd && !_probeFailed) return true;
+            operand = null;
+            return false;
+        }
+
+        internal bool TryDescribeBinary(
+            string op, SemanticNode left, SemanticNode right, out SemanticNode result)
+        {
+            if (!_completionMode) throw new InvalidOperationException("Operand probes require completion mode.");
+            if (op == null) throw new ArgumentNullException(nameof(op));
+            if (left == null) throw new ArgumentNullException(nameof(left));
+            if (right == null) throw new ArgumentNullException(nameof(right));
+            _probeFailed = false;
+            result = CheckBinary(op, left, right, left.End, right.Start);
+            if (!result.Invalid && !_probeFailed) return true;
+            result = null;
+            return false;
+        }
+
+        internal bool TryDescribeToken(ExpressionToken token, out SemanticNode operand)
+        {
+            if (!_completionMode) throw new InvalidOperationException("Operand probes require completion mode.");
+            if (token == null) throw new ArgumentNullException(nameof(token));
+            _probeFailed = false;
+            operand = Bind(token);
+            if (!operand.Invalid && !_probeFailed) return true;
+            operand = null;
+            return false;
         }
 
         internal ExpressionSemanticAnalysisResult Analyze()
@@ -207,7 +252,8 @@ namespace Kkts.Expressions.Internal
             {
                 var name = text.Substring(1);
                 if (_variables.TryGetVariable(name, out var variableType, out var nullable, out var elementType, out var rootDeclared))
-                    return SemanticNode.Value(variableType, nullable, token.Start, token.Start + token.Length, elementType);
+                    return SemanticNode.Value(variableType, nullable, token.Start, token.Start + token.Length,
+                        elementType, isVariable: true);
                 Report(
                     rootDeclared ? "unknown-variable-member" : "undeclared-variable",
                     rootDeclared
@@ -237,7 +283,8 @@ namespace Kkts.Expressions.Internal
                 {
                     if (!_queryContext.IsNavigationAllowed(text, out var navigationDepth))
                     {
-                        _policyExecution.Diagnostics.Add(
+                        if (_completionMode) _probeFailed = true;
+                        else _policyExecution.Diagnostics.Add(
                             "query-policy-navigation-depth-exceeded",
                             "The field exceeds the configured entity navigation depth.",
                             token.Start,
@@ -247,7 +294,8 @@ namespace Kkts.Expressions.Internal
                     }
                     if (!_queryContext.IsCollectionAccessAllowed(text))
                     {
-                        _policyExecution.Diagnostics.Add(
+                        if (_completionMode) _probeFailed = true;
+                        else _policyExecution.Diagnostics.Add(
                             "query-policy-collection-access-denied",
                             "Traversal through entity collection fields is not permitted.",
                             token.Start,
@@ -262,12 +310,14 @@ namespace Kkts.Expressions.Internal
                     entityPaths: new[] { text },
                     isBareBooleanPredicate: type == typeof(bool),
                     predicateStart: token.Start,
-                    predicateLength: token.Length);
+                    predicateLength: token.Length,
+                    isField: true);
             }
 
             if (!_schema.IsPublicSchema &&
                 _variables.TryGetVariable(text, out var fallbackType, out var fallbackNullability, out var fallbackElement, out _))
-                return SemanticNode.Value(fallbackType, fallbackNullability, token.Start, token.Start + token.Length, fallbackElement);
+                return SemanticNode.Value(fallbackType, fallbackNullability, token.Start, token.Start + token.Length,
+                    fallbackElement, isVariable: true);
 
             var suggestion = FindPropertySuggestion(text, token);
             Report(
@@ -386,7 +436,9 @@ namespace Kkts.Expressions.Internal
                     ReportOperator(start, end - start, typeof(string), left.Type);
                     return SemanticNode.Error(nodeStart, nodeEnd);
                 }
-                if (right.Type != typeof(string))
+                if (right.Type != typeof(string) &&
+                    !(left.IsField && right.IsVariable && right.ElementType == null &&
+                        ExpressionConversionRules.CanConvertVariable(right.Type, typeof(string))))
                 {
                     ReportOperand(right, typeof(string));
                     return SemanticNode.Error(nodeStart, nodeEnd);
@@ -400,9 +452,9 @@ namespace Kkts.Expressions.Internal
                 if (right.IsList && right.ElementNodes != null)
                 {
                     foreach (var item in right.ElementNodes)
-                        if (!item.Invalid && !CanConvertLiteral(item, targetType))
+                        if (!item.Invalid && !CanConvertMembershipItem(item, targetType))
                             ReportOperand(item, targetType);
-                    return right.ElementNodes.Any(item => item.Invalid || !CanConvertLiteral(item, targetType))
+                    return right.ElementNodes.Any(item => item.Invalid || !CanConvertMembershipItem(item, targetType))
                         ? SemanticNode.Error(nodeStart, nodeEnd)
                         : SemanticNode.Value(typeof(bool), ExpressionNullability.NonNullable, nodeStart, nodeEnd);
                 }
@@ -429,6 +481,12 @@ namespace Kkts.Expressions.Internal
                         : valueType;
                     return ComparisonResult(op, comparisonType, comparisonType, nodeStart, nodeEnd, start, end);
                 }
+                if (left.IsField && right.IsVariable && right.ElementType == null &&
+                    ExpressionConversionRules.CanConvertVariable(right.Type, left.Type))
+                    return ComparisonResult(op, left.Type, left.Type, nodeStart, nodeEnd, start, end);
+                if (right.IsField && left.IsVariable && left.ElementType == null &&
+                    ExpressionConversionRules.CanConvertVariable(left.Type, right.Type))
+                    return ComparisonResult(op, right.Type, right.Type, nodeStart, nodeEnd, start, end);
                 if (right.IsLiteral && CanConvertLiteral(right, left.Type))
                     return ComparisonResult(op, left.Type, left.Type, nodeStart, nodeEnd, start, end);
                 if (left.IsLiteral && CanConvertLiteral(left, right.Type))
@@ -594,6 +652,12 @@ namespace Kkts.Expressions.Internal
                 _schema.ConversionContext);
         }
 
+        private bool CanConvertMembershipItem(SemanticNode value, Type targetType) =>
+            !value.Invalid && (value.IsVariable
+                ? value.ElementType == null &&
+                    ExpressionConversionRules.CanConvertVariable(value.Type, targetType, membershipItem: true)
+                : CanConvertLiteral(value, targetType));
+
         private static bool CanConvertNumericLiteral(SemanticNode value, Type targetType) =>
             value.IsLiteral && ExpressionConversionRules.CanConvertNumericLiteral(
                 value.LiteralValue,
@@ -644,6 +708,11 @@ namespace Kkts.Expressions.Internal
             IEnumerable<ExpressionTypeInfo> actualTypes = null,
             IEnumerable<ExpressionCorrectionSuggestion> suggestions = null)
         {
+            if (_completionMode)
+            {
+                _probeFailed = true;
+                return;
+            }
             if (_queryContext != null && _isTruncated) return;
             if (_reported.Add(Tuple.Create(code, start, length)))
             {
@@ -674,7 +743,7 @@ namespace Kkts.Expressions.Internal
 
         private ExpressionCorrectionSuggestion FindPropertySuggestion(string sourceName, ExpressionToken token)
         {
-            if (_queryContext != null) return null;
+            if (_completionMode || _queryContext != null) return null;
 
             if (_schema.IsPublicSchema)
             {
@@ -765,17 +834,7 @@ namespace Kkts.Expressions.Internal
 
         private static string Unquote(string text)
         {
-            var quote = text[0];
-            var value = new StringBuilder();
-            for (var index = 1; index < text.Length - 1; index++)
-            {
-                if (text[index] == ExpressionGrammar.Escape &&
-                    index + 1 < text.Length - 1 &&
-                    text[index + 1] == quote)
-                    index++;
-                value.Append(text[index]);
-            }
-            return value.ToString();
+            return ExpressionLiteralCodec.DecodeString(text.Substring(1, text.Length - 2), text[0]);
         }
 
         private static bool IsLogical(string op) =>
@@ -796,8 +855,7 @@ namespace Kkts.Expressions.Internal
             op == "*@";
 
         private static bool IsMembership(string op) =>
-            op.Equals("in", StringComparison.OrdinalIgnoreCase) ||
-            op.Equals("not in", StringComparison.OrdinalIgnoreCase);
+            Interpreter.IsMembership(ExpressionGrammar.NormalizeOperator(op));
 
         private static bool IsComparison(string op) =>
             op == "=" || op == "==" || op == "!=" || op == "<>" ||
@@ -814,7 +872,7 @@ namespace Kkts.Expressions.Internal
             node.IsNull ? ExpressionTypeInfo.Null() :
             ExpressionTypeInfo.ForClr(node.Type, node.Nullability, node.ElementType);
 
-        private sealed class SemanticNode
+        internal sealed class SemanticNode
         {
             private SemanticNode(
                 Type type,
@@ -831,7 +889,9 @@ namespace Kkts.Expressions.Internal
                 IReadOnlyList<string> entityPaths,
                 bool isBareBooleanPredicate,
                 int predicateStart,
-                int predicateLength)
+                int predicateLength,
+                bool isVariable = false,
+                bool isField = false)
             {
                 Type = type;
                 Nullability = nullability;
@@ -848,6 +908,8 @@ namespace Kkts.Expressions.Internal
                 IsBareBooleanPredicate = isBareBooleanPredicate;
                 PredicateStart = predicateStart < 0 ? start : predicateStart;
                 PredicateLength = predicateLength < 0 ? Math.Max(0, end - start) : predicateLength;
+                IsVariable = isVariable;
+                IsField = isField;
             }
 
             internal Type Type { get; }
@@ -863,6 +925,8 @@ namespace Kkts.Expressions.Internal
             internal IReadOnlyList<SemanticNode> ElementNodes { get; }
             internal IReadOnlyList<string> EntityPaths { get; }
             internal bool IsBareBooleanPredicate { get; }
+            internal bool IsVariable { get; }
+            internal bool IsField { get; }
             internal int PredicateStart { get; }
             internal int PredicateLength { get; }
 
@@ -875,7 +939,9 @@ namespace Kkts.Expressions.Internal
                 IReadOnlyList<string> entityPaths = null,
                 bool isBareBooleanPredicate = false,
                 int predicateStart = -1,
-                int predicateLength = -1) =>
+                int predicateLength = -1,
+                bool isVariable = false,
+                bool isField = false) =>
                 new SemanticNode(
                     type,
                     nullability,
@@ -891,7 +957,9 @@ namespace Kkts.Expressions.Internal
                     entityPaths,
                     isBareBooleanPredicate,
                     predicateStart,
-                    predicateLength);
+                    predicateLength,
+                    isVariable,
+                    isField);
             internal static SemanticNode Literal(Type type, int start, int end, object value) =>
                 new SemanticNode(
                     type,
@@ -918,6 +986,11 @@ namespace Kkts.Expressions.Internal
             internal static SemanticNode Error(int start, int end) =>
                 new SemanticNode(null, ExpressionNullability.Unknown, start, end, false, false, false, true, null, null,
                     null, null, false, start, end - start);
+            internal static SemanticNode Grouped(SemanticNode operand) =>
+                operand == null ? null : new SemanticNode(
+                    operand.Type, operand.Nullability, operand.Start, operand.End, operand.IsNull, operand.IsLiteral,
+                    operand.IsList, operand.Invalid, operand.LiteralValue, operand.ElementType, operand.ElementNodes,
+                    operand.EntityPaths, operand.IsBareBooleanPredicate, operand.PredicateStart, operand.PredicateLength);
         }
 
         private sealed class Parser
@@ -938,6 +1011,9 @@ namespace Kkts.Expressions.Internal
             internal bool AtEnd => _index == _end;
 
             internal SemanticNode Parse() => ParseExpression(0);
+
+            internal SemanticNode ParseMembershipOperand() =>
+                IsPunctuation("[") || IsPunctuation("{") || IsPunctuation("(") ? ParseList() : Parse();
 
             private SemanticNode ParseExpression(int minimumPrecedence)
             {
@@ -987,7 +1063,7 @@ namespace Kkts.Expressions.Internal
                 if (_index >= _end) return null;
                 var token = _tokens[_index];
                 var text = _owner.Text(token);
-                if (_owner._queryContext != null && IsUnaryOperator(token, text))
+                if ((_owner._completionMode || _owner._queryContext != null) && IsUnaryOperator(token, text))
                     return ParsePolicyUnaryChain();
 
                 if (token.Kind == ExpressionTokenKind.Operator &&
@@ -1030,7 +1106,7 @@ namespace Kkts.Expressions.Internal
                     ++_index;
                     var grouped = ParseExpression(0);
                     if (IsPunctuation(")")) ++_index;
-                    return grouped;
+                    return SemanticNode.Grouped(grouped);
                 }
 
                 if (token.Kind == ExpressionTokenKind.Punctuation || token.Kind == ExpressionTokenKind.Unknown)

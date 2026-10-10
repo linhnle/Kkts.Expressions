@@ -23,6 +23,8 @@ or translate to SQL for a particular EF Core provider.
 For reusable expression limits and field operator/collection policies enforced
 both during analysis and runtime construction, see the
 [query policies guide](query-policies.md).
+For the additive completion contracts and cursor-context work under development,
+see [expression autocomplete](autocomplete.md).
 For the supported, metadata-only exchange subset between editor expressions
 and JSON filter trees, see [nested filters](nested-filters.md#expression-editor-exchange).
 
@@ -146,6 +148,20 @@ Explicit `$` references bind only to declared variables; a missing root is
 `unknown-variable-member`. An exact dotted declaration can describe that path
 without declaring a traversable root. Array and generic enumerable types
 provide element-type metadata without enumerating runtime values.
+
+Scalar variables compared directly with a field use the runtime's contextual
+conversion rules where compatibility is metadata-decidable. For example, a
+declared Double variable can be compared with a Decimal field even though those
+types cannot be promoted together in arithmetic. Range overflow, missing values,
+and invalid conversions of actual values remain runtime checks.
+
+Membership list items use scalar conversion, including declared String
+variables that may contain numeric text. Whole membership collections still
+require exact element-type compatibility. A String variable is not converted to
+a numeric scalar in a direct comparison: the existing runtime constant path
+preserves enumerable values (including strings). Arithmetic uses natural
+variable types rather than this contextual conversion. No resolver, getter, or
+application-defined conversion is invoked to decide these rules.
 
 ## Conversion context
 

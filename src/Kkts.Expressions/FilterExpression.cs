@@ -237,22 +237,7 @@ namespace Kkts.Expressions
 
         private static string UnescapeString(string text, char quote)
         {
-            var output = new StringBuilder(text.Length);
-            for (var index = 0; index < text.Length; ++index)
-            {
-                if (text[index] == ExpressionGrammar.Escape &&
-                    index + 1 < text.Length &&
-                    text[index + 1] == quote)
-                {
-                    output.Append(quote);
-                    ++index;
-                }
-                else
-                {
-                    output.Append(text[index]);
-                }
-            }
-            return output.ToString();
+            return ExpressionLiteralCodec.DecodeString(text, quote);
         }
 
         private static string FormatTree(FilterNode tree)
@@ -383,27 +368,12 @@ namespace Kkts.Expressions
 
         private static string Quote(string value)
         {
-            var escaped = value.Replace("'", "\\'");
-            return "'" + escaped + "'";
+            return ExpressionLiteralCodec.Quote(value);
         }
 
         private static string CanonicalOperator(string op)
         {
-            switch (op.ToLowerInvariant())
-            {
-                case "==": return "=";
-                case "!=": return "!=";
-                case "<>": return "!=";
-                case "in": return "in";
-                case "not in": return "not in";
-                case "contain": return "contains";
-                case "contains": return "contains";
-                case "startwith": return "startswith";
-                case "startswith": return "startswith";
-                case "endwith": return "endswith";
-                case "endswith": return "endswith";
-                default: return op;
-            }
+            return ExpressionLiteralCodec.CanonicalOperator(op);
         }
 
         private static int GetPrecedence(FilterNode node)

@@ -52,6 +52,17 @@ namespace Kkts.Expressions
         /// <summary>The immutable policy used by this context.</summary>
         public QueryPolicy Policy { get; }
 
+        internal IReadOnlyList<string> CompletionValidProperties => _validProperties;
+
+        /// <summary>Returns cursor-local metadata completions using this context's schema, policy, and field restrictions.</summary>
+        public ExpressionCompletionResult CompleteExpression(
+            string expression,
+            int cursorPosition,
+            ExpressionVariableSchema variables = null,
+            ExpressionValueSuggestionSchema valueSuggestions = null,
+            ExpressionCompletionOptions options = null) =>
+            ExpressionCompleter.Complete(expression, cursorPosition, Schema, variables, valueSuggestions, options, this);
+
         /// <summary>The additional external-name allowlist, if one was supplied.</summary>
         public IReadOnlyList<string> ValidProperties => _validProperties;
 

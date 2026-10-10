@@ -89,6 +89,16 @@ namespace Kkts.Expressions
 			return new ExpressionAnalyzer(expression).Analyze();
 		}
 
+		/// <summary>Returns metadata-only completions at a zero-based UTF-16 cursor offset in exact source text.</summary>
+		public static ExpressionCompletionResult CompleteExpression(
+			string expression,
+			int cursorPosition,
+			ExpressionSchema schema,
+			ExpressionVariableSchema variables = null,
+			ExpressionValueSuggestionSchema valueSuggestions = null,
+			ExpressionCompletionOptions options = null) =>
+			ExpressionCompleter.Complete(expression, cursorPosition, schema, variables, valueSuggestions, options);
+
 		/// <summary>
 		/// Analyzes syntax and validates entity members, declared variables, and operand types
 		/// without reading runtime values or constructing a predicate.

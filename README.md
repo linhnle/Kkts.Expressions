@@ -35,6 +35,7 @@ The library targets `netstandard2.0` and is available on
   - [Supported operators](#supported-operators)
   - [Parsing and validation behavior](#parsing-and-validation-behavior)
   - [Expression semantic analysis](#expression-semantic-analysis)
+  - [Expression autocomplete](#expression-autocomplete)
   - [Expression editor integration (v3.0 only)](#expression-editor-integration-v30-only)
     - [Building editor highlight runs](#building-editor-highlight-runs)
     - [Displaying syntax diagnostics while typing](#displaying-syntax-diagnostics-while-typing)
@@ -797,6 +798,36 @@ format list. `CreatedOffset = '20261009T152646'` still reports
 `context-dependent-conversion` because no offset was supplied. Semantic
 acceptance does not guarantee identical runtime values across machine timezones
 or EF Core SQL translation.
+
+## Expression autocomplete
+
+Request UI-independent suggestions from the same immutable public metadata used
+for analysis. Literal hints are advisory, not allowed-value constraints:
+
+```csharp
+var completionSchema = new QuerySchema<Data>()
+    .Field("Name", data => data.Name, allowedOperators: new[] { ComparisonOperator.Equal })
+    .Build();
+var hints = new ExpressionValueSuggestionSchema(completionSchema, new[]
+{
+    new KeyValuePair<string, IEnumerable<ExpressionValueSuggestion>>("Name", new[]
+    {
+        new ExpressionValueSuggestion(FilterValue.String("Active"))
+    })
+});
+var completion = Interpreter.CompleteExpression(
+    "Name = ", 7, completionSchema, valueSuggestions: hints);
+```
+
+Apply each item's exact UTF-16 `Start`/`Length` replacement using its
+`InsertionText`. Query-context completion also applies that context's policy and
+additional allowlist. Variables must be explicitly declared; completion never
+resolves runtime values or grants execution permission.
+
+See the [autocomplete guide](docs/autocomplete.md) for contracts, precise edits,
+limits, and performance evidence, and the runnable
+[CodeMirror sample](examples/Kkts.Examples/Kkts.Examples.Autocomplete/README.md)
+for snapshot-safe browser integration.
 
 ## DateTime and DateTimeOffset strings
 

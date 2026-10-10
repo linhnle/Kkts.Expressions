@@ -23,6 +23,66 @@ namespace Kkts.Expressions.Internal
 		internal bool HasOpenGroups => _groups.Count > 0;
 		internal bool IsRecoveredScope(Parser parser) => _recoveredScopes?.Contains(parser) == true;
 
+		internal ExpressionParserExpectation Observe()
+		{
+			var current = ExpressionParserSlot.None;
+			var continuation = ExpressionParserSlot.None;
+			var complete = false;
+			var tokenStart = -1;
+			var tokenLength = 0;
+			var list = false;
+			var closing = _groups.Count > 0 ? ')' : '\0';
+			foreach (var parser in _accepted)
+			{
+				current |= Slot(parser);
+				if (parser.StartIndex >= tokenStart && parser.StartIndex >= 0)
+				{
+					tokenStart = parser.StartIndex;
+					tokenLength = parser.Length;
+				}
+				if (parser is ArrayParser array && array.HasOpenList)
+				{
+					list = true;
+					closing = array.ClosingDelimiter;
+					current |= ExpressionParserSlot.MembershipContent;
+				}
+				if (parser is StringParser && _keepTrack)
+					current |= ExpressionParserSlot.QuotedContent;
+				if (parser.StartIndex < 0 ||
+					!(parser is PropertyParser property ? property.HasCompleteIdentifier : Validate(parser)))
+					continue;
+				complete = true;
+				AddContinuation(parser, '\0', ref continuation);
+				AddContinuation(parser, '+', ref continuation);
+				AddContinuation(parser, '.', ref continuation);
+			}
+			return new ExpressionParserExpectation(
+				current, continuation, complete, tokenStart, tokenLength,
+				_groups.Count + (list ? 1 : 0), closing);
+		}
+
+		private static void AddContinuation(Parser parser, char value, ref ExpressionParserSlot slots)
+		{
+			var next = parser.GetNextParsersForObservation(value);
+			if (next == null) return;
+			foreach (var candidate in next) slots |= Slot(candidate);
+		}
+
+		private static ExpressionParserSlot Slot(Parser parser)
+		{
+			if (parser is PropertyParser property)
+				return property.ForInOperator ? ExpressionParserSlot.Variable : ExpressionParserSlot.Operand;
+			if (parser is NumberParser || parser is StringParser) return ExpressionParserSlot.Operand;
+			if (parser is NotOperatorParser || parser is NotFunctionParser) return ExpressionParserSlot.UnaryNot;
+			if (parser is GroupParser) return ExpressionParserSlot.Group;
+			if (parser is ComparisonOparatorParser) return ExpressionParserSlot.Comparison;
+			if (parser is LogicalOperatorParser) return ExpressionParserSlot.Logical;
+			if (parser is AdditiveOperatorParser) return ExpressionParserSlot.Additive;
+			if (parser is ArrayParser) return ExpressionParserSlot.MembershipList;
+			if (parser is ComparisonFunctionOperatorParser) return ExpressionParserSlot.ComparisonFunction;
+			return ExpressionParserSlot.None;
+		}
+
 		internal void Read(ExpressionReader reader)
 		{
 			var whitespace = _keepTrack ? 0 : reader.IgnoreWhiteSpace();

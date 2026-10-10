@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Kkts expression autocomplete</title>
+    <style>
+      body { max-width: 900px; margin: 2rem auto; padding: 0 1rem; font-family: system-ui, sans-serif; }
+      .cm-editor { border: 1px solid #888; min-height: 8rem; }
+      #status { white-space: pre-wrap; }
+    </style>
+  </head>
+  <body>
+    <h1>Expression autocomplete</h1>
+    <p>Try <code>Price </code>, <code>Status = </code>, <code>CreatedAt &gt; $</code>,
+      or <code>Customer.</code>. Press Ctrl-Space for suggestions.</p>
+    <p>Suggestions are advisory. Metadata is server-owned; no predicate or runtime resolver is executed.</p>
+    <div id="editor"></div>
+    <p id="status" role="status"></p>
+    <script type="module" src="/main.js"></script>
+  </body>
+</html>

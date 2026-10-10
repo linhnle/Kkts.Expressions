@@ -9,6 +9,9 @@ namespace Kkts.Expressions.Internal
 		private bool _isInEntity = false;
 		private char _endScope = ']';
 
+		internal bool HasOpenList => _startArray && !_endArray;
+		internal char ClosingDelimiter => _endScope;
+
 		public override bool Accept(char @char, int noOfWhiteSpaceIgnored, int index, ref bool keepTrack, ref bool isStartGroup)
 		{
 			if (_endArray) return false;

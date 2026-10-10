@@ -13,6 +13,10 @@ namespace Kkts.Expressions.Internal
             new ConditionalWeakTable<Type, ReadOnlyDictionary<string, string>>();
         private static readonly ConditionalWeakTable<Type, ReadOnlyDictionary<string, Type>> MemberTypes =
             new ConditionalWeakTable<Type, ReadOnlyDictionary<string, Type>>();
+        private static readonly ConditionalWeakTable<Type, ReadOnlyCollection<KeyValuePair<string, Type>>> OrderedMembers =
+            new ConditionalWeakTable<Type, ReadOnlyCollection<KeyValuePair<string, Type>>>();
+        private static readonly ConditionalWeakTable<Type, ReadOnlyCollection<string>> EnumNames =
+            new ConditionalWeakTable<Type, ReadOnlyCollection<string>>();
         private static readonly ConditionalWeakTable<Type, ReadOnlyDictionary<string, string>>.CreateValueCallback Factory =
             CreatePropertyNames;
 
@@ -25,6 +29,14 @@ namespace Kkts.Expressions.Internal
         {
             return MemberTypes.GetValue(type, CreateMemberTypes);
         }
+
+        internal static IReadOnlyList<KeyValuePair<string, Type>> GetOrderedMemberTypes(Type type) =>
+            OrderedMembers.GetValue(type, key => Array.AsReadOnly(GetMemberTypes(key)
+                .OrderBy(member => member.Key, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(member => member.Key, StringComparer.Ordinal).ToArray()));
+
+        internal static IReadOnlyList<string> GetEnumNames(Type type) =>
+            EnumNames.GetValue(type, key => Array.AsReadOnly(Enum.GetNames(key)));
 
         private static ReadOnlyDictionary<string, Type> CreateMemberTypes(Type type)
         {
