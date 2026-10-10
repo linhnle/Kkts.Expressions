@@ -18,6 +18,7 @@ The library targets `netstandard2.0` and is available on
   - [Installation](#installation)
   - [Quick start](#quick-start)
     - [Query policy quick start](#query-policy-quick-start)
+    - [Typed public-field quick start](#typed-public-field-quick-start)
   - [Structured filters](#structured-filters)
     - [Filter groups](#filter-groups)
   - [Nested JSON filter trees](#nested-json-filter-trees)
@@ -139,6 +140,36 @@ input. Query policies control permitted expression construction and
 complexity; they are not authorization, tenant isolation, or database cost
 controls. See the [query policy guide](docs/query-policies.md) for configuration,
 counting rules, structured APIs, diagnostics, and security boundaries.
+
+### Typed public-field quick start
+
+Register only the names an API should expose. Selectors are strongly typed,
+and computed expressions remain in the resulting expression tree:
+
+```csharp
+var publicSchema = new QuerySchema<Data>()
+    .Field("displayName", item => item.Name)
+    .Field("enabled", item => item.IsEnabled)
+    .Field("createdAt", item => item.CreationDate, canFilter: false)
+    .Build();
+var publicContext = new ExpressionQueryContext(
+    publicSchema,
+    new QueryPolicy());
+
+var predicate = publicContext.ParsePredicate<Data>(
+    "displayName = 'Test' and enabled = true");
+if (!predicate.Succeeded)
+{
+    throw predicate.Exception;
+}
+var results = context.Entities.Where(predicate.Result).ToList();
+```
+
+Public mode exposes exactly the registered names and keeps filter/sort
+permissions independent. See the
+[expression-field mapping guide](docs/expression-field-mapping.md) for
+computed selectors, metadata, policy integration, migration, and SQL
+translation limits.
 
 ## Structured filters
 

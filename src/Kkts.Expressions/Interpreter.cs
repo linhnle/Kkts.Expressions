@@ -231,7 +231,7 @@ namespace Kkts.Expressions
 			return BuildPredicateAsync(@operator, propertyName, value, type, variableResolver ?? new VariableResolver(), cancellationToken);
 		}
 
-		internal static Expression BuildBody(ComparisonOperator @operator, MemberExpression prop, object value, VariableResolver variableResolver)
+		internal static Expression BuildBody(ComparisonOperator @operator, Expression prop, object value, VariableResolver variableResolver)
 		{
 			if (value is string && prop.Type != typeof(string) &&
 				(!IsMembership(@operator) || (Nullable.GetUnderlyingType(prop.Type) ?? prop.Type) != typeof(TimeSpan)))
@@ -252,16 +252,14 @@ namespace Kkts.Expressions
 
 		internal static Expression BuildBody(
 			ComparisonOperator @operator,
-			MemberExpression prop,
+			Expression prop,
 			object value,
 			BuildArgument arg)
 		{
 			if (IsMembership(@operator))
 			{
 				@operator = CorrectOperator(prop.Type, @operator);
-				if (arg.QueryContext != null &&
-					arg.QueryContext.Policy.MaxInItems.HasValue &&
-					value is System.Collections.IEnumerable collectionValue &&
+				if (value is System.Collections.IEnumerable collectionValue &&
 					!(value is string))
 					return TypedFilterExpressionBuilder.BuildMembership(
 						prop,
@@ -280,12 +278,20 @@ namespace Kkts.Expressions
 			return BuildBody(@operator, prop, value, arg.VariableResolver);
 		}
 
-		internal static async Task<Expression> BuildBodyAsync(ComparisonOperator @operator, MemberExpression prop, object value, VariableResolver variableResolver, CancellationToken cancellationToken)
+		internal static async Task<Expression> BuildBodyAsync(ComparisonOperator @operator, Expression prop, object value, VariableResolver variableResolver, CancellationToken cancellationToken)
 		{
 			cancellationToken.ThrowIfCancellationRequested();
 			if (IsMembership(@operator))
 			{
 				@operator = CorrectOperator(prop.Type, @operator);
+				if (value is System.Collections.IEnumerable collectionValue &&
+					!(value is string))
+					return TypedFilterExpressionBuilder.BuildMembership(
+						prop,
+						Expression.Constant(collectionValue),
+						prop.Type,
+						@operator == ComparisonOperator.NotIn);
+
 				var collection = await new ArrayList { Type = prop.Type, DrawValue = value.ToString() }
 					.BuildAsync(new BuildArgument { VariableResolver = variableResolver, CancellationToken = cancellationToken });
 				return TypedFilterExpressionBuilder.BuildMembership(
@@ -314,7 +320,7 @@ namespace Kkts.Expressions
 
 		internal static async Task<Expression> BuildBodyAsync(
 			ComparisonOperator @operator,
-			MemberExpression prop,
+			Expression prop,
 			object value,
 			BuildArgument arg)
 		{
@@ -341,7 +347,7 @@ namespace Kkts.Expressions
 				arg.CancellationToken).ConfigureAwait(false);
 		}
 
-        private static Expression BuildBodyCore(ComparisonOperator @operator, MemberExpression prop, object value, VariableResolver variableResolver)
+        private static Expression BuildBodyCore(ComparisonOperator @operator, Expression prop, object value, VariableResolver variableResolver)
         {
 			@operator = CorrectOperator(prop.Type, @operator);
 			if (IsMembership(@operator))
@@ -509,7 +515,7 @@ namespace Kkts.Expressions
 			BuildArgument arg)
 		{
 			var param = type.CreateParameterExpression();
-			var prop = param.CreatePropertyExpression(arg.MapProperty(propertyName));
+			var prop = arg.BuildPropertyExpression(param, propertyName);
 			var body = BuildBody(@operator, prop, value, arg);
 			return Expression.Lambda(body, param);
 		}
@@ -531,7 +537,7 @@ namespace Kkts.Expressions
 			BuildArgument arg)
 		{
 			var param = type.CreateParameterExpression();
-			var prop = param.CreatePropertyExpression(arg.MapProperty(propertyName));
+			var prop = arg.BuildPropertyExpression(param, propertyName);
 			var body = await BuildBodyAsync(@operator, prop, value, arg).ConfigureAwait(false);
 			return Expression.Lambda(body, param);
 		}

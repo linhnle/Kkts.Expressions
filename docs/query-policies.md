@@ -53,8 +53,11 @@ var queryContext = new ExpressionQueryContext(
 and combines it with the schema's restrictions. It does not grant access
 forbidden by the schema or allowlist. Policy operator rules are snapshotted
 when `QueryPolicy` is created; field paths are validated and resolved against
-the schema when the context is created. Rules supplied through aliases of the
-same mapped member are intersected.
+the schema when the context is created. In legacy schemas, rules supplied
+through aliases of the same mapped member are intersected. In a
+`QuerySchema<T>` public schema, policy keys and additional `validProperties`
+entries use registered public names; internal member names are rejected, and
+field and policy operator sets intersect on that public name.
 
 Configuration with negative limits, null/whitespace field paths, null operator
 sets, undefined `ComparisonOperator` values, duplicate paths, or unknown
@@ -105,6 +108,15 @@ when editor diagnostics should include them; the declaration contains types
 and member metadata, not runtime values. See the
 [semantic-analysis guide](semantic-analysis.md) for schema, variable, and
 diagnostic fundamentals.
+
+With an expression-based public schema, navigation-depth and collection
+policies inspect only fields written by the query author. A registered
+projection is trusted application configuration: its internal navigation,
+collection access, and method calls are opaque to policy traversal checks.
+Apply appropriate restrictions when registering public fields; these limits do
+not estimate the cost or provider translation of a selector. See the
+[expression-field guide](expression-field-mapping.md) for the trust boundary
+and registration example.
 
 The text analyzer checks the original UTF-16 source length first. It then
 streams the source using the existing quote and escape rules to reject

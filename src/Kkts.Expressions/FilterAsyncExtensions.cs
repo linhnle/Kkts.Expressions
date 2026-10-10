@@ -228,7 +228,7 @@ namespace Kkts.Expressions
 
         internal static Task<Expression> BuildConditionAsync(ParameterExpression param, Filter filter, BuildArgument arg, CancellationToken cancellationToken)
         {
-            var prop = param.CreatePropertyExpression(arg.MapProperty(filter.Property));
+            var prop = arg.BuildPropertyExpression(param, filter.Property);
             if (arg.QueryContext == null)
                 return Interpreter.BuildBodyAsync(
                     filter.Operator.GetComparisonOperator(),

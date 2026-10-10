@@ -15,12 +15,14 @@ namespace Kkts.Expressions.Internal
 		
 		private OrderByParser()
 		{
-			ThenBys = new List<(string Name, bool Descending)>();
+			ThenBys = new List<(string Name, bool Descending, ResolvedQueryField Field)>();
 		}
 
-		public readonly ICollection<(string Name, bool Descending)> ThenBys;
+		public readonly ICollection<(string Name, bool Descending, ResolvedQueryField Field)> ThenBys;
 
 		public string PropertyName { get; set; }
+
+		public ResolvedQueryField PropertyField { get; set; }
 
 		public bool Descending { get; set; }
 
@@ -33,11 +35,11 @@ namespace Kkts.Expressions.Internal
 			{
 				if (!parser.IsValid)
 				{
-					arg.IsValidProperty(orderBy.Property);
+					arg.IsValidOrderByProperty(orderBy.Property);
 					continue;
 				}
 
-				if (!arg.IsValidProperty(orderBy.Property))
+				if (!arg.IsValidOrderByProperty(orderBy.Property))
 				{
 					parser.IsValid = false;
 					continue;
@@ -45,12 +47,11 @@ namespace Kkts.Expressions.Internal
 
 				if (parser.PropertyName == null)
 				{
-					parser.PropertyName = arg.MapProperty(orderBy.Property);
-					parser.Descending = orderBy.Descending;
+					parser.SetFirst(orderBy.Property, orderBy.Descending, arg);
 				}
 				else
 				{
-					parser.ThenBys.Add((arg.MapProperty(orderBy.Property), orderBy.Descending));
+					parser.ThenBys.Add(ResolveKey(orderBy.Property, orderBy.Descending, arg));
 				}
 			}
 
@@ -75,13 +76,13 @@ namespace Kkts.Expressions.Internal
 				var parts = segment.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
 				if (!parser.IsValid)
 				{
-					arg.IsValidProperty(parts[0]);
+					arg.IsValidOrderByProperty(parts[0]);
 					if (parts.Length == 2) arg.IsValidOrderByDirection(parts[1]);
 					continue;
 				}
 
 				if (parts.Length > 2
-					|| !arg.IsValidProperty(parts[0])
+					|| !arg.IsValidOrderByProperty(parts[0])
 					|| (parts.Length == 2 && !arg.IsValidOrderByDirection(parts[1])))
 				{
 					parser.IsValid = false;
@@ -90,12 +91,11 @@ namespace Kkts.Expressions.Internal
 
 				if (parser.PropertyName == null)
 				{
-					parser.PropertyName = arg.MapProperty(parts[0]);
-					parser.Descending = IsDescending(parts);
+					parser.SetFirst(parts[0], IsDescending(parts), arg);
 				}
 				else
 				{
-					parser.ThenBys.Add((arg.MapProperty(parts[0]), IsDescending(parts)));
+					parser.ThenBys.Add(ResolveKey(parts[0], IsDescending(parts), arg));
 				}
 			}
 
@@ -113,6 +113,26 @@ namespace Kkts.Expressions.Internal
 
 			bool IsDescending(string[] parts)
 				=> parts.Length >= 2 && DescendingOptions.Contains(parts[1], StringComparer.OrdinalIgnoreCase);
+		}
+
+		private void SetFirst(string sourceName, bool descending, BuildArgument arg)
+		{
+			var key = ResolveKey(sourceName, descending, arg);
+			PropertyName = key.Name;
+			PropertyField = key.Field;
+			Descending = key.Descending;
+		}
+
+		private static (string Name, bool Descending, ResolvedQueryField Field) ResolveKey(
+			string sourceName,
+			bool descending,
+			BuildArgument arg)
+		{
+			arg.TryResolveQueryField(sourceName, out var field);
+			return (
+				field?.Identity ?? arg.MapProperty(sourceName),
+				descending,
+				field);
 		}
 
 	}

@@ -146,7 +146,9 @@ namespace Kkts.Expressions.Internal
                 !schema.TryGetProperty(mappedPath, out var propertyType, out _, out _))
                 throw new InvalidOperationException("The condition field is not present in the entity schema.");
 
-            var member = BuildMemberAccess(parameter, mappedPath);
+            var member = policyArgument == null
+                ? BuildMemberAccess(parameter, mappedPath)
+                : policyArgument.BuildPropertyExpression(parameter, condition.Field);
             var operation = QueryPolicyFieldMetadata.NormalizeComparisonOperator(condition.Operator);
             var valuePath = FilterTreeDiagnosticProjection.AppendPointer(nodePath, "value");
             try
@@ -282,7 +284,9 @@ namespace Kkts.Expressions.Internal
                 !schema.TryGetProperty(mappedPath, out var propertyType, out _, out _))
                 throw new InvalidOperationException("The condition field is not present in the entity schema.");
 
-            var member = BuildMemberAccess(parameter, mappedPath);
+            var member = policyArgument == null
+                ? BuildMemberAccess(parameter, mappedPath)
+                : policyArgument.BuildPropertyExpression(parameter, condition.Field);
             var operation = QueryPolicyFieldMetadata.NormalizeComparisonOperator(condition.Operator);
             var valuePath = FilterTreeDiagnosticProjection.AppendPointer(nodePath, "value");
             try

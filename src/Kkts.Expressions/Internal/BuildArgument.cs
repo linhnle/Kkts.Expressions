@@ -79,6 +79,8 @@ namespace Kkts.Expressions
 
         public ExpressionQueryContext QueryContext { get; set; }
 
+        public ExpressionSchema Schema { get; set; }
+
         public QueryPolicyExecution PolicyExecution { get; set; }
 
         public int SourceOffset { get; set; }
@@ -106,7 +108,38 @@ namespace Kkts.Expressions
 
         public string MapProperty(string name)
         {
+            if (Schema?.IsPublicSchema == true)
+                return name;
             return _evaluateMapping(name);
+        }
+
+        internal Expression BuildPropertyExpression(ParameterExpression parameter, string sourcePath)
+        {
+            if (Schema != null && Schema.TryResolveQueryField(sourcePath, out var field))
+                return field.Compose(parameter);
+            return parameter.CreatePropertyExpression(MapProperty(sourcePath));
+        }
+
+        internal bool IsValidOrderByProperty(string value)
+        {
+            if (Schema?.IsPublicSchema == true)
+            {
+                if (Schema.TryResolveQueryField(value, out var field) &&
+                    field.CanSort &&
+                    (QueryContext == null || QueryContext.IsPropertySortable(value)))
+                    return true;
+                InvalidProperties.Add(value ?? "null");
+                return false;
+            }
+            return IsValidProperty(value);
+        }
+
+        internal bool TryResolveQueryField(string sourcePath, out ResolvedQueryField field)
+        {
+            if (Schema != null)
+                return Schema.TryResolveQueryField(sourcePath, out field);
+            field = null;
+            return false;
         }
 
         internal void ValidateQueryProperty(string sourcePath, int start, int length)
@@ -369,6 +402,15 @@ namespace Kkts.Expressions
         public bool IsValidProperty(string value)
         {
             if (value == null) return false;
+            if (Schema?.IsPublicSchema == true)
+            {
+                if (Schema.TryResolveQueryField(value, out var field) &&
+                    field.CanFilter &&
+                    (QueryContext == null || QueryContext.IsPropertyQueryable(value)))
+                    return true;
+                InvalidProperties.Add(value);
+                return false;
+            }
             return _evaluateValidProperty(value);
         }
 

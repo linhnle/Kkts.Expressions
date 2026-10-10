@@ -224,6 +224,274 @@ internal static class RelationalPredicateAssertions
         Assert.Equal(new[] { 3, 5 }, generatedIds);
         Assert.Equal(handwrittenIds, generatedIds);
     }
+
+    public static async Task AssertExpressionMappedFieldsAsync(
+        Func<RelationalTestDbContext> createContext,
+        string provider)
+    {
+        var schema = new QuerySchema<RelationalRecord>()
+            .Field("customerName", record => record.Parent.Name)
+            .Field("total", record => record.DecimalValue * record.Integer)
+            .Field("optionalTotal", record => record.NullableDecimalValue * record.Integer)
+            .Field(
+                "optionalParentName",
+                record => record.OptionalParent == null ? null : record.OptionalParent.Name,
+                nullability: ExpressionNullability.Nullable)
+            .Field("createdAt", record => record.CreatedAt)
+            .Field("id", record => record.Id)
+            .Build();
+        var queryContext = new ExpressionQueryContext(schema, new QueryPolicy());
+
+        var customer = queryContext.ParsePredicate<RelationalRecord>("customerName = 'North'");
+        var total = queryContext.ParsePredicate<RelationalRecord>("total > 8");
+        var optionalNull = queryContext.ParsePredicate<RelationalRecord>("optionalTotal = null");
+        var optionalTotal = queryContext.TryBuildPredicate<RelationalRecord>(
+            "optionalTotal",
+            ComparisonOperator.GreaterThan,
+            8m);
+        var structuredTotal = queryContext.TryBuildPredicate<RelationalRecord>(new Filter
+        {
+            Property = "total",
+            Operator = ">",
+            Value = "8"
+        });
+        var treeOptionalTotal = queryContext.TryBuildPredicate<RelationalRecord>(
+            FilterNode.Condition("optionalTotal", ">", FilterValue.Number("8")));
+        var nullableMembership = queryContext.TryBuildPredicate<RelationalRecord>(
+            FilterNode.Condition(
+                "optionalTotal",
+                "in",
+                FilterValue.Collection(new[]
+                {
+                    FilterValue.Null,
+                    FilterValue.Number("9")
+                })));
+        var optionalNavigation = queryContext.ParsePredicate<RelationalRecord>(
+            "optionalParentName = null");
+
+        Assert.True(customer.Succeeded, $"{provider}: {customer.Exception}");
+        Assert.True(total.Succeeded, $"{provider}: {total.Exception}");
+        Assert.True(optionalNull.Succeeded, $"{provider}: {optionalNull.Exception}");
+        Assert.True(optionalTotal.Succeeded, $"{provider}: {optionalTotal.Exception}");
+        Assert.True(structuredTotal.Succeeded, $"{provider}: {structuredTotal.Exception}");
+        Assert.True(treeOptionalTotal.Succeeded, $"{provider}: {treeOptionalTotal.Exception}");
+        Assert.True(nullableMembership.Succeeded, $"{provider}: {nullableMembership.Exception}");
+        Assert.True(optionalNavigation.Succeeded, $"{provider}: {optionalNavigation.Exception}");
+
+        await using var context = createContext();
+        await AssertMappedPredicateAsync(
+            context,
+            customer.Result,
+            record => record.Parent.Name == "North",
+            new[] { 1, 2, 5 },
+            provider,
+            "customerName");
+        await AssertMappedPredicateAsync(
+            context,
+            total.Result,
+            record => record.DecimalValue * record.Integer > 8,
+            new[] { 3, 4, 5 },
+            provider,
+            "total");
+        await AssertMappedPredicateAsync(
+            context,
+            optionalNull.Result,
+            record => record.NullableDecimalValue * record.Integer == null,
+            new[] { 2, 4 },
+            provider,
+            "optionalTotal null");
+        await AssertMappedPredicateAsync(
+            context,
+            optionalTotal.Result,
+            record => record.NullableDecimalValue * record.Integer > 8,
+            new[] { 3, 5 },
+            provider,
+            "optionalTotal");
+        await AssertMappedPredicateAsync(
+            context,
+            structuredTotal.Result,
+            record => record.DecimalValue * record.Integer > 8,
+            new[] { 3, 4, 5 },
+            provider,
+            "structured total");
+        await AssertMappedPredicateAsync(
+            context,
+            treeOptionalTotal.Result,
+            record => record.NullableDecimalValue * record.Integer > 8,
+            new[] { 3, 5 },
+            provider,
+            "tree optionalTotal");
+        await AssertMappedPredicateAsync(
+            context,
+            nullableMembership.Result,
+            record => new decimal?[] { null, 9m }
+                .Contains(record.NullableDecimalValue * record.Integer),
+            new[] { 2, 3, 4 },
+            provider,
+            "nullable optionalTotal membership");
+        await AssertMappedPredicateAsync(
+            context,
+            optionalNavigation.Result,
+            record => record.OptionalParent == null,
+            new[] { 2, 4 },
+            provider,
+            "optional navigation null");
+
+        var totalOrder = queryContext.TryBuildOrderByClause("total desc, id asc");
+        var dateOrder = queryContext.TryBuildOrderByClause("createdAt desc, id asc");
+        var customerOrder = queryContext.TryBuildOrderByClause("customerName asc, id asc");
+        var optionalNameOrder = queryContext.TryBuildOrderByClause(
+            "optionalParentName asc, id asc");
+        Assert.True(totalOrder.Succeeded, $"{provider}: {totalOrder.Exception}");
+        Assert.True(dateOrder.Succeeded, $"{provider}: {dateOrder.Exception}");
+        Assert.True(customerOrder.Succeeded, $"{provider}: {customerOrder.Exception}");
+        Assert.True(optionalNameOrder.Succeeded, $"{provider}: {optionalNameOrder.Exception}");
+
+        var generatedTotalOrder = await totalOrder.Result.Sort(context.Records.AsNoTracking())
+            .Select(record => record.Id)
+            .ToArrayAsync();
+        var handwrittenTotalOrder = await context.Records.AsNoTracking()
+            .OrderByDescending(record => record.DecimalValue * record.Integer)
+            .ThenBy(record => record.Id)
+            .Select(record => record.Id)
+            .ToArrayAsync();
+        Assert.Equal(new[] { 5, 4, 3, 2, 1 }, generatedTotalOrder);
+        Assert.Equal(handwrittenTotalOrder, generatedTotalOrder);
+
+        var generatedDateOrder = await dateOrder.Result.Sort(context.Records.AsNoTracking())
+            .Select(record => record.Id)
+            .ToArrayAsync();
+        var handwrittenDateOrder = await context.Records.AsNoTracking()
+            .OrderByDescending(record => record.CreatedAt)
+            .ThenBy(record => record.Id)
+            .Select(record => record.Id)
+            .ToArrayAsync();
+        Assert.Equal(new[] { 5, 4, 3, 2, 1 }, generatedDateOrder);
+        Assert.Equal(handwrittenDateOrder, generatedDateOrder);
+
+        var generatedCustomerOrder = await customerOrder.Result.Sort(context.Records.AsNoTracking())
+            .Select(record => record.Id)
+            .ToArrayAsync();
+        var handwrittenCustomerOrder = await context.Records.AsNoTracking()
+            .OrderBy(record => record.Parent.Name)
+            .ThenBy(record => record.Id)
+            .Select(record => record.Id)
+            .ToArrayAsync();
+        Assert.Equal(new[] { 1, 2, 5, 3, 4 }, generatedCustomerOrder);
+        Assert.Equal(handwrittenCustomerOrder, generatedCustomerOrder);
+
+        var generatedOptionalNameOrder = await optionalNameOrder.Result
+            .Sort(context.Records.AsNoTracking())
+            .Select(record => record.Id)
+            .ToArrayAsync();
+        var handwrittenOptionalNameOrder = await context.Records.AsNoTracking()
+            .OrderBy(record =>
+                record.OptionalParent == null ? null : record.OptionalParent.Name)
+            .ThenBy(record => record.Id)
+            .Select(record => record.Id)
+            .ToArrayAsync();
+        Assert.Equal(new[] { 2, 4, 1, 5, 3 }, generatedOptionalNameOrder);
+        Assert.Equal(handwrittenOptionalNameOrder, generatedOptionalNameOrder);
+
+        var condition = queryContext.BuildCondition<RelationalRecord>(new ConditionOptions
+        {
+            Where = "total > 8",
+            OrderBy = "total desc, id asc"
+        });
+        Assert.True(condition.IsValid, $"{provider}: {condition.Error?.EvaluationResult?.Exception}");
+        IQueryable<RelationalRecord> filtered = context.Records.AsNoTracking();
+        foreach (var predicate in condition.Predicates)
+            filtered = filtered.Where(predicate);
+        var generatedConditionIds = await condition.OrderByClause.Sort(filtered)
+            .Select(record => record.Id)
+            .ToArrayAsync();
+        var handwrittenConditionIds = await context.Records.AsNoTracking()
+            .Where(record => record.DecimalValue * record.Integer > 8)
+            .OrderByDescending(record => record.DecimalValue * record.Integer)
+            .ThenBy(record => record.Id)
+            .Select(record => record.Id)
+            .ToArrayAsync();
+        Assert.Equal(new[] { 5, 4, 3 }, generatedConditionIds);
+        Assert.Equal(handwrittenConditionIds, generatedConditionIds);
+
+        var filterOnlyContext = new ExpressionQueryContext(
+            new QuerySchema<RelationalRecord>()
+                .Field("total", record => record.DecimalValue * record.Integer, canSort: false)
+                .Build(),
+            new QueryPolicy());
+        var deniedSort = filterOnlyContext.TryBuildOrderByClause("total desc");
+        Assert.False(deniedSort.Succeeded);
+        Assert.Equal("property-not-queryable", Assert.Single(deniedSort.Diagnostics).Code);
+    }
+
+    public static async Task AssertNonTranslatableSelectorAsync(
+        Func<RelationalTestDbContext> createContext,
+        string provider)
+    {
+        var execution = new SelectorExecutionCounter();
+        var schema = new QuerySchema<RelationalRecord>()
+            .Field(
+                "businessValue",
+                record => CalculateBusinessValue(record.DecimalValue, execution))
+            .Build();
+        var queryContext = new ExpressionQueryContext(schema, new QueryPolicy());
+        Assert.True(queryContext.AnalyzeExpression("businessValue > 1").IsSemanticallyValid);
+        var predicate = queryContext.ParsePredicate<RelationalRecord>("businessValue > 1");
+        Assert.True(predicate.Succeeded, $"{provider}: {predicate.Exception}");
+        Assert.Equal(0, execution.Calls);
+
+        var orderBy = queryContext.TryBuildOrderByClause("businessValue desc");
+        Assert.True(orderBy.Succeeded, $"{provider}: {orderBy.Exception}");
+        await using var context = createContext();
+        await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+            await context.Records.AsNoTracking()
+                .Where(predicate.Result)
+                .Select(record => record.Id)
+                .ToArrayAsync());
+        await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+            await orderBy.Result.Sort(context.Records.AsNoTracking())
+                .Select(record => record.Id)
+                .ToArrayAsync());
+        Assert.Equal(0, execution.Calls);
+    }
+
+    private static decimal CalculateBusinessValue(decimal value, SelectorExecutionCounter execution)
+    {
+        execution.Increment();
+        return value + 1m;
+    }
+
+    private sealed class SelectorExecutionCounter
+    {
+        private int _calls;
+
+        public int Calls => _calls;
+
+        public void Increment() => System.Threading.Interlocked.Increment(ref _calls);
+    }
+
+    private static async Task AssertMappedPredicateAsync(
+        RelationalTestDbContext context,
+        Expression<Func<RelationalRecord, bool>> generated,
+        Expression<Func<RelationalRecord, bool>> handwritten,
+        int[] expected,
+        string provider,
+        string fieldName)
+    {
+        var generatedIds = await context.Records.AsNoTracking()
+            .Where(generated)
+            .OrderBy(record => record.Id)
+            .Select(record => record.Id)
+            .ToArrayAsync();
+        var handwrittenIds = await context.Records.AsNoTracking()
+            .Where(handwritten)
+            .OrderBy(record => record.Id)
+            .Select(record => record.Id)
+            .ToArrayAsync();
+        Assert.True(expected.SequenceEqual(generatedIds),
+            $"{provider} mapped field '{fieldName}' returned [{string.Join(", ", generatedIds)}], expected [{string.Join(", ", expected)}].");
+        Assert.Equal(handwrittenIds, generatedIds);
+    }
 }
 
 [Trait("Provider", "SqlServer")]
@@ -237,6 +505,18 @@ public sealed class SqlServerPredicateIntegrationTests(SqlServerFixture fixture)
     [Fact]
     public Task ExecutesNestedFilterTreeOnSqlServer() =>
         RelationalPredicateAssertions.AssertNestedFilterTreeAsync(fixture.CreateContext, "SQL Server");
+
+    [Fact]
+    public Task ExecutesExpressionMappedFieldsOnSqlServer() =>
+        RelationalPredicateAssertions.AssertExpressionMappedFieldsAsync(
+            fixture.CreateContext,
+            "SQL Server");
+
+    [Fact]
+    public Task DistinguishesValidSelectorsFromSqlTranslationOnSqlServer() =>
+        RelationalPredicateAssertions.AssertNonTranslatableSelectorAsync(
+            fixture.CreateContext,
+            "SQL Server");
 
     [Fact]
     public async Task UsesConfiguredCollationAndDatePrecision()
@@ -276,6 +556,18 @@ public sealed class MySqlPredicateIntegrationTests(MySqlFixture fixture)
     [Fact]
     public Task ExecutesNestedFilterTreeOnMySql() =>
         RelationalPredicateAssertions.AssertNestedFilterTreeAsync(fixture.CreateContext, "MySQL");
+
+    [Fact]
+    public Task ExecutesExpressionMappedFieldsOnMySql() =>
+        RelationalPredicateAssertions.AssertExpressionMappedFieldsAsync(
+            fixture.CreateContext,
+            "MySQL");
+
+    [Fact]
+    public Task DistinguishesValidSelectorsFromSqlTranslationOnMySql() =>
+        RelationalPredicateAssertions.AssertNonTranslatableSelectorAsync(
+            fixture.CreateContext,
+            "MySQL");
 
     [Fact]
     public async Task UsesConfiguredCollationAndDatePrecision()

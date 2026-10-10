@@ -265,7 +265,8 @@ namespace Kkts.Expressions.Internal
                     predicateLength: token.Length);
             }
 
-            if (_variables.TryGetVariable(text, out var fallbackType, out var fallbackNullability, out var fallbackElement, out _))
+            if (!_schema.IsPublicSchema &&
+                _variables.TryGetVariable(text, out var fallbackType, out var fallbackNullability, out var fallbackElement, out _))
                 return SemanticNode.Value(fallbackType, fallbackNullability, token.Start, token.Start + token.Length, fallbackElement);
 
             var suggestion = FindPropertySuggestion(text, token);
@@ -319,7 +320,7 @@ namespace Kkts.Expressions.Internal
             var nodeStart = Math.Min(left.Start, start);
             var nodeEnd = Math.Max(right.End, end);
             op = ExpressionGrammar.NormalizeOperator(op);
-            if (_queryContext != null &&
+            if ((_queryContext != null || _schema.IsPublicSchema) &&
                 (IsComparison(op) || IsStringFunction(op) || IsMembership(op)))
                 CheckAllowedOperator(op, left.EntityPaths.Concat(right.EntityPaths), start, end - start);
 
@@ -516,32 +517,61 @@ namespace Kkts.Expressions.Internal
             int length)
         {
             var comparisonOperator = QueryPolicyFieldMetadata.NormalizeComparisonOperator(op);
-            if (_queryContext.AreOperatorsAllowed(sourcePaths.Distinct(StringComparer.OrdinalIgnoreCase), comparisonOperator))
+            var fields = sourcePaths.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+            if (_queryContext != null
+                ? _queryContext.AreOperatorsAllowed(fields, comparisonOperator)
+                : _schema.AreOperatorsAllowed(fields, comparisonOperator))
                 return;
 
-            _policyExecution.Diagnostics.Add(
-                "query-policy-operator-denied",
-                "The comparison operator is not permitted for one or more fields in this predicate.",
-                start,
-                length);
+            const string message =
+                "The comparison operator is not permitted for one or more fields in this predicate.";
+            if (_policyExecution != null)
+            {
+                _policyExecution.Diagnostics.Add(
+                    "query-policy-operator-denied",
+                    message,
+                    start,
+                    length);
+            }
+            else
+            {
+                Report("query-policy-operator-denied", message, start, length);
+            }
         }
 
         private void CheckBareBooleanPredicate(SemanticNode node)
         {
-            if (_policyExecution == null) return;
-
-            if (_queryContext != null &&
-                node.EntityPaths.Count > 0 &&
-                !_queryContext.AreOperatorsAllowed(node.EntityPaths, ComparisonOperator.Equal))
+            if (node.EntityPaths.Count > 0 &&
+                (_queryContext != null
+                    ? !_queryContext.AreOperatorsAllowed(
+                        node.EntityPaths,
+                        ComparisonOperator.Equal)
+                    : !_schema.AreOperatorsAllowed(
+                        node.EntityPaths,
+                        ComparisonOperator.Equal)))
             {
-                _policyExecution.Diagnostics.Add(
-                    "query-policy-operator-denied",
-                    "The comparison operator is not permitted for one or more fields in this predicate.",
-                    node.PredicateStart,
-                    node.PredicateLength);
+                const string message =
+                    "The comparison operator is not permitted for one or more fields in this predicate.";
+                if (_policyExecution != null)
+                {
+                    _policyExecution.Diagnostics.Add(
+                        "query-policy-operator-denied",
+                        message,
+                        node.PredicateStart,
+                        node.PredicateLength);
+                }
+                else
+                {
+                    Report(
+                        "query-policy-operator-denied",
+                        message,
+                        node.PredicateStart,
+                        node.PredicateLength);
+                }
             }
 
-            if (!_policyExecution.TryCountCondition(node.PredicateStart, node.PredicateLength))
+            if (_policyExecution != null &&
+                !_policyExecution.TryCountCondition(node.PredicateStart, node.PredicateLength))
                 throw new PolicyAnalysisStoppedException();
         }
 
@@ -645,6 +675,21 @@ namespace Kkts.Expressions.Internal
         private ExpressionCorrectionSuggestion FindPropertySuggestion(string sourceName, ExpressionToken token)
         {
             if (_queryContext != null) return null;
+
+            if (_schema.IsPublicSchema)
+            {
+                var publicFieldCandidates = _schema.Fields
+                    .Where(field => _schema.IsPropertyQueryable(field.Name))
+                    .Select(field => field.Name)
+                    .Where(candidate => EditDistanceAtMostOne(sourceName, candidate))
+                    .ToArray();
+                if (publicFieldCandidates.Length != 1) return null;
+                return new ExpressionCorrectionSuggestion(
+                    $"Replace '{sourceName}' with '{publicFieldCandidates[0]}'.",
+                    publicFieldCandidates[0],
+                    token.Start,
+                    token.Length);
+            }
 
             var normalized = ExpressionSchema.NormalizePath(sourceName);
             var separator = normalized.LastIndexOf('.');

@@ -31,6 +31,148 @@ namespace Kkts.Expressions.UnitTest.Units
         }
 
         [Fact]
+        public void AnalyzeExpression_PublicSchemaUsesRegisteredFieldsAndPermissions()
+        {
+            var schema = new QuerySchema<PublicAnalysisEntity>()
+                .Field(
+                    "amount",
+                    entity => entity.UnitPrice * entity.Quantity,
+                    allowedOperators: new[] { ComparisonOperator.Equal })
+                .Field(
+                    "sortOnly",
+                    entity => entity.UnitPrice,
+                    canFilter: false)
+                .Field("flag", entity => entity.IsFlag)
+                .Field("label", entity => entity.Name)
+                .Build();
+            var variables = new ExpressionVariableSchema(new[]
+            {
+                new ExpressionVariableDefinition("UnitPrice", typeof(decimal)),
+                new ExpressionVariableDefinition("minimum", typeof(decimal))
+            });
+
+            var valid = Interpreter.AnalyzeExpression<PublicAnalysisEntity>(
+                "AMOUNT = $minimum",
+                schema,
+                variables);
+            Assert.True(valid.IsSemanticallyValid, Messages(valid));
+
+            var incompatible = Interpreter.AnalyzeExpression<PublicAnalysisEntity>(
+                "amount = 'abc'",
+                schema,
+                variables);
+            Assert.Equal("incompatible-operand",
+                Assert.Single(incompatible.SemanticDiagnostics).Code);
+
+            var deniedOperator = Interpreter.AnalyzeExpression<PublicAnalysisEntity>(
+                "amount > 3",
+                schema,
+                variables);
+            Assert.Equal("query-policy-operator-denied",
+                Assert.Single(deniedOperator.SemanticDiagnostics).Code);
+
+            var deniedField = Interpreter.AnalyzeExpression<PublicAnalysisEntity>(
+                "sortOnly = 1",
+                schema,
+                variables);
+            Assert.Equal("property-not-queryable",
+                Assert.Single(deniedField.SemanticDiagnostics).Code);
+
+            var internalName = Interpreter.AnalyzeExpression<PublicAnalysisEntity>(
+                "UnitPrice = 1",
+                schema,
+                variables);
+            Assert.Equal("unknown-property",
+                Assert.Single(internalName.SemanticDiagnostics).Code);
+
+            var appendedPath = Interpreter.AnalyzeExpression<PublicAnalysisEntity>(
+                "amount.Length = 1",
+                schema,
+                variables);
+            Assert.Equal("unknown-property",
+                Assert.Single(appendedPath.SemanticDiagnostics).Code);
+
+            var bareVariable = Interpreter.AnalyzeExpression<PublicAnalysisEntity>(
+                "minimum = 1",
+                schema,
+                variables);
+            Assert.Equal("unknown-property",
+                Assert.Single(bareVariable.SemanticDiagnostics).Code);
+
+            var inapplicableOperator = Interpreter.AnalyzeExpression<PublicAnalysisEntity>(
+                "flag > true",
+                schema,
+                variables);
+            Assert.Equal("operator-not-applicable",
+                Assert.Single(inapplicableOperator.SemanticDiagnostics).Code);
+            Assert.True(Interpreter.AnalyzeExpression<PublicAnalysisEntity>(
+                "label.contains('a')",
+                schema,
+                variables).IsSemanticallyValid);
+
+            var publicContext = new ExpressionQueryContext(
+                schema,
+                new QueryPolicy(
+                    allowedOperators: new Dictionary<string, IEnumerable<ComparisonOperator>>
+                    {
+                        ["amount"] = new[] { ComparisonOperator.Equal }
+                    }));
+            Assert.True(publicContext.AnalyzeExpression("amount = $minimum", variables)
+                .IsSemanticallyValid);
+            Assert.Equal(
+                "query-policy-operator-denied",
+                Assert.Single(publicContext.AnalyzeExpression("amount > 1")
+                    .SemanticDiagnostics).Code);
+        }
+
+        [Fact]
+        public void AnalyzeExpression_PublicSchemaDoesNotExecuteSelectorsAndCountsQueryConditions()
+        {
+            PublicAnalysisEntity.SelectorCalls = 0;
+            var schema = new QuerySchema<PublicAnalysisEntity>()
+                .Field("eligible", entity => entity.ThrowingBooleanSelector())
+                .Build();
+            var context = new ExpressionQueryContext(
+                schema,
+                new QueryPolicy(maxExpressionLength: 100, maxAtomicConditions: 1));
+
+            var valid = context.AnalyzeExpression("eligible");
+            Assert.True(valid.IsSemanticallyValid, Messages(valid));
+            Assert.Equal(0, PublicAnalysisEntity.SelectorCalls);
+
+            var tree = context.ParseFilterTree("eligible");
+            Assert.True(tree.Succeeded, string.Join("\n", tree.Diagnostics.Select(diagnostic => diagnostic.Message)));
+            Assert.True(context.FormatFilterTree(tree.Result).Succeeded);
+            var predicate = context.TryBuildPredicate(tree.Result);
+            Assert.True(predicate.Succeeded, predicate.Exception?.ToString());
+            Assert.Equal("eligible", context.PublicFields.Single().Name);
+            Assert.Equal(0, PublicAnalysisEntity.SelectorCalls);
+
+            var incomplete = context.AnalyzeExpression("eligible and");
+            Assert.False(incomplete.IsComplete);
+            Assert.Equal(0, PublicAnalysisEntity.SelectorCalls);
+
+            var tooManyConditions = context.AnalyzeExpression("eligible and eligible");
+            Assert.Contains(
+                tooManyConditions.Diagnostics,
+                diagnostic => diagnostic.Code == "query-policy-condition-count-exceeded");
+            Assert.Equal(0, PublicAnalysisEntity.SelectorCalls);
+
+            var tooLong = new ExpressionQueryContext(
+                schema,
+                new QueryPolicy(maxExpressionLength: 5))
+                .AnalyzeExpression("eligible");
+            Assert.Equal(
+                "query-policy-expression-length-exceeded",
+                Assert.Single(tooLong.Diagnostics).Code);
+            Assert.Equal(0, PublicAnalysisEntity.SelectorCalls);
+
+            Assert.Throws<InvalidOperationException>(() =>
+                new PublicAnalysisEntity().ThrowingBooleanSelector());
+            Assert.Equal(1, PublicAnalysisEntity.SelectorCalls);
+        }
+
+        [Fact]
         public void AnalyzeExpression_DistinguishesRestrictedPropertiesAndDoesNotSuggestThem()
         {
             var result = Analyze("Secret = 1");
@@ -714,6 +856,22 @@ namespace Kkts.Expressions.UnitTest.Units
         public sealed class ProductChild
         {
             public string Name { get; set; }
+        }
+
+        public sealed class PublicAnalysisEntity
+        {
+            public static int SelectorCalls { get; set; }
+
+            public decimal UnitPrice { get; set; }
+            public int Quantity { get; set; }
+            public bool IsFlag { get; set; }
+            public string Name { get; set; }
+
+            public bool ThrowingBooleanSelector()
+            {
+                SelectorCalls++;
+                throw new InvalidOperationException("Selector should not execute during analysis.");
+            }
         }
 
         public sealed class UserMetadata

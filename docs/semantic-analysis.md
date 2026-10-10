@@ -28,6 +28,24 @@ and JSON filter trees, see [nested filters](nested-filters.md#expression-editor-
 
 ## Entity schema, query permissions, and mappings
 
+`QuerySchema<T>` provides an explicit public-field boundary. Only registered
+names bind in that mode; registrations can describe nested or computed scalar
+expressions, and their inferred result types, nullability, and permissions are
+shared by semantic analysis and runtime construction. The schema's metadata
+does not expose selector bodies or internal member paths. Public names are
+case-insensitive and exact: `total.Year` does not extend a registered
+`total` field. Use explicit `$` references for declared variables because
+bare identifiers are reserved for public fields.
+
+Unknown fields report `unknown-property`, while known fields that are not
+filterable report `property-not-queryable`. Operator restrictions, incompatible
+operators, and incompatible values use the existing query-policy and semantic
+diagnostics. See the
+[expression-field guide](expression-field-mapping.md) for typed registration,
+metadata, permissions, and compatibility with legacy mappings.
+
+Legacy `ExpressionSchema.FromType` behavior remains unchanged:
+
 The schema reflects public readable instance properties and fields. Add
 selective overrides for nullability and query permission; callers do not need
 to duplicate every CLR member:

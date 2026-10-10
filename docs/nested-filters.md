@@ -305,6 +305,14 @@ Standalone tree extensions bind to the supplied entity type, optional
 `validProperties`, and `propertyMapping`, but do not apply an
 `ExpressionQueryContext` query policy.
 
+When the context uses a `QuerySchema<T>` public schema, each tree condition's
+`field` must be an exact registered public name. Computed selectors compose
+directly into the predicate; internal members and appended member paths remain
+unavailable. The same field types, filter permissions, and operator
+intersections are used for tree validation and construction. See the
+[expression-field guide](expression-field-mapping.md) for the public-schema
+boundary and registration examples.
+
 ### Query-policy accounting for trees
 
 `MaxFilterTreeDepth` is independent of `MaxParenthesisDepth`. A condition leaf

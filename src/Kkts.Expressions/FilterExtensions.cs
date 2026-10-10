@@ -246,7 +246,7 @@ namespace Kkts.Expressions
 
 		internal static Expression BuildCondition(ParameterExpression param, Filter filter, BuildArgument arg)
 		{
-			var prop = param.CreatePropertyExpression(arg.MapProperty(filter.Property));
+			var prop = arg.BuildPropertyExpression(param, filter.Property);
 			return arg.QueryContext == null
 				? Interpreter.BuildBody(filter.Operator.GetComparisonOperator(), prop, filter.Value, arg.VariableResolver)
 				: Interpreter.BuildBody(filter.Operator.GetComparisonOperator(), prop, filter.Value, arg);

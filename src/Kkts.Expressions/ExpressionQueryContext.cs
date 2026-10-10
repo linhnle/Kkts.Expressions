@@ -24,7 +24,26 @@ namespace Kkts.Expressions
             Schema = schema ?? throw new ArgumentNullException(nameof(schema));
             Policy = policy ?? throw new ArgumentNullException(nameof(policy));
             _validProperties = SnapshotValidProperties(validProperties);
+            ValidatePublicSchemaRestrictions(schema, policy, _validProperties);
             _allowedOperators = BindAllowedOperators(schema, policy);
+            PublicFields = Array.AsReadOnly(schema.Fields.Select(field =>
+            {
+                var canFilter = IsPropertyQueryable(field.Name);
+                var allowedOperators = !canFilter
+                    ? Array.Empty<ComparisonOperator>()
+                    : TryGetAllowedOperators(field.Name, out var effectiveOperators)
+                        ? effectiveOperators
+                        : null;
+                return new ExpressionFieldDefinition(
+                    field.Name,
+                    field.ClrType,
+                    field.Nullability,
+                    canFilter,
+                    IsPropertySortable(field.Name),
+                    allowedOperators,
+                    field.DisplayName,
+                    field.Description);
+            }).ToArray());
         }
 
         /// <summary>The immutable entity schema used by this context.</summary>
@@ -35,6 +54,12 @@ namespace Kkts.Expressions
 
         /// <summary>The additional external-name allowlist, if one was supplied.</summary>
         public IReadOnlyList<string> ValidProperties => _validProperties;
+
+        /// <summary>
+        /// The public schema fields with this context's effective permissions and operators.
+        /// Empty for legacy schemas.
+        /// </summary>
+        public IReadOnlyList<ExpressionFieldDefinition> PublicFields { get; }
 
         /// <summary>Analyzes an expression using the entity metadata and configured policy.</summary>
         public ExpressionSemanticAnalysisResult AnalyzeExpression(
@@ -970,17 +995,34 @@ namespace Kkts.Expressions
 
         internal bool IsPropertyQueryable(string sourcePath)
         {
+            if (Schema.IsPublicSchema)
+            {
+                return Schema.TryResolveQueryField(sourcePath, out var field) &&
+                    field.CanFilter &&
+                    IsIncludedInAdditionalAllowlist(sourcePath);
+            }
             return Schema.IsPropertyQueryable(sourcePath) &&
-                (_validProperties.Count == 0 ||
-                 _validProperties.Contains(ExpressionSchema.NormalizePath(sourcePath), StringComparer.OrdinalIgnoreCase));
+                IsIncludedInAdditionalAllowlist(sourcePath);
+        }
+
+        internal bool IsPropertySortable(string sourcePath)
+        {
+            if (Schema.IsPublicSchema)
+            {
+                return Schema.TryResolveQueryField(sourcePath, out var field) &&
+                    field.CanSort &&
+                    IsIncludedInAdditionalAllowlist(sourcePath);
+            }
+            return Schema.IsPropertyQueryable(sourcePath) &&
+                IsIncludedInAdditionalAllowlist(sourcePath);
         }
 
         internal bool TryGetAllowedOperators(
             string sourcePath,
             out IReadOnlyCollection<ComparisonOperator> allowedOperators)
         {
-            if (Schema.TryGetPolicyPathInfo(sourcePath, out var clrPath, out _, out _) &&
-                _allowedOperators.TryGetValue(clrPath, out allowedOperators))
+            if (Schema.TryResolveQueryField(sourcePath, out var field) &&
+                _allowedOperators.TryGetValue(field.Identity, out allowedOperators))
                 return true;
 
             allowedOperators = null;
@@ -1009,6 +1051,8 @@ namespace Kkts.Expressions
 
         internal bool IsCollectionAccessAllowed(string sourcePath)
         {
+            if (Schema.IsPublicSchema)
+                return Schema.TryResolveQueryField(sourcePath, out _);
             if (!Schema.TryGetPolicyPathInfo(sourcePath, out _, out _, out var hasCollectionAccess))
                 return false;
             return Policy.AllowCollectionAccess || !hasCollectionAccess;
@@ -1771,7 +1815,7 @@ namespace Kkts.Expressions
         {
             if (string.IsNullOrWhiteSpace(sourcePath) ||
                 !Schema.TryGetPolicyPathInfo(sourcePath, out _, out var navigationDepth, out var collectionAccess) ||
-                !IsPropertyQueryable(sourcePath))
+                !IsPropertySortable(sourcePath))
             {
                 execution.Diagnostics.Add(
                     "property-not-queryable",
@@ -1942,6 +1986,7 @@ namespace Kkts.Expressions
             return new BuildArgument
             {
                 EvaluationType = Schema.EntityType,
+                Schema = Schema,
                 ValidProperties = Schema.ValidProperties,
                 PropertyMapping = Schema.PropertyMapping.ToDictionary(
                     pair => pair.Key,
@@ -2071,6 +2116,8 @@ namespace Kkts.Expressions
 
         private Type GetPropertyType(string clrPath)
         {
+            if (Schema.TryResolveQueryField(clrPath, out var field))
+                return field.ClrType;
             var current = Schema.EntityType;
             foreach (var segment in ExpressionSchema.NormalizePath(clrPath).Split('.'))
             {
@@ -2150,6 +2197,39 @@ namespace Kkts.Expressions
             QueryPolicy policy)
         {
             var allowedByPath = new Dictionary<string, IReadOnlyCollection<ComparisonOperator>>(StringComparer.OrdinalIgnoreCase);
+            if (schema.IsPublicSchema)
+            {
+                foreach (var rule in policy.AllowedOperators)
+                {
+                    if (!schema.TryResolveQueryField(rule.Key, out var field))
+                        throw new ArgumentException(
+                            $"Operator permissions refer to an unknown public query field '{rule.Key}'.",
+                            nameof(policy));
+                    allowedByPath.Add(field.Identity, Array.AsReadOnly(rule.Value.ToArray()));
+                }
+
+                foreach (var field in schema.Fields)
+                {
+                    var hasFieldOperators = field.AllowedOperators != null;
+                    var hasPolicyOperators = allowedByPath.TryGetValue(
+                        field.Name,
+                        out var policyOperators);
+                    if (!hasFieldOperators && !hasPolicyOperators)
+                        continue;
+
+                    var effectiveOperators = hasFieldOperators
+                        ? field.AllowedOperators
+                        : policyOperators;
+                    if (hasFieldOperators && hasPolicyOperators)
+                        effectiveOperators = Array.AsReadOnly(
+                            field.AllowedOperators.Intersect(policyOperators).ToArray());
+                    allowedByPath[field.Name] = effectiveOperators;
+                }
+
+                return new ReadOnlyDictionary<string, IReadOnlyCollection<ComparisonOperator>>(
+                    allowedByPath);
+            }
+
             foreach (var rule in policy.AllowedOperators)
             {
                 if (!schema.TryGetPolicyPathInfo(rule.Key, out var clrPath, out _, out _))
@@ -2173,6 +2253,41 @@ namespace Kkts.Expressions
             }
 
             return new ReadOnlyDictionary<string, IReadOnlyCollection<ComparisonOperator>>(allowedByPath);
+        }
+
+        private bool IsIncludedInAdditionalAllowlist(string sourcePath)
+        {
+            return _validProperties.Count == 0 ||
+                _validProperties.Contains(
+                    ExpressionSchema.NormalizePath(sourcePath),
+                    StringComparer.OrdinalIgnoreCase);
+        }
+
+        private static void ValidatePublicSchemaRestrictions(
+            ExpressionSchema schema,
+            QueryPolicy policy,
+            IReadOnlyList<string> validProperties)
+        {
+            if (!schema.IsPublicSchema)
+                return;
+
+            foreach (var name in validProperties)
+            {
+                if (!schema.TryResolveQueryField(name, out var field) ||
+                    !string.Equals(field.Name, name, StringComparison.OrdinalIgnoreCase))
+                    throw new ArgumentException(
+                        $"Additional allowed property '{name}' is not a registered public query field.",
+                        nameof(validProperties));
+            }
+
+            foreach (var name in policy.AllowedOperators.Keys)
+            {
+                if (!schema.TryResolveQueryField(name, out var field) ||
+                    !string.Equals(field.Name, name, StringComparison.OrdinalIgnoreCase))
+                    throw new ArgumentException(
+                        $"Operator permissions refer to an unknown public query field '{name}'.",
+                        nameof(policy));
+            }
         }
     }
 }

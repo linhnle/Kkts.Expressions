@@ -65,13 +65,13 @@ namespace Kkts.Expressions.Internal.Nodes
 				return await BuildConstantProperty(constant, property, build);
 			if (Left is Property leftProperty && Right is Constant rightConstant)
 			{
-				var left = (MemberExpression)await build(leftProperty);
+				var left = await build(leftProperty);
 				rightConstant.Type = left.Type;
 				return (left, await build(rightConstant), rightConstant.Type ?? left.Type);
 			}
 			if (Left is Property arrayProperty && Right is ArrayList array)
 			{
-				var left = (MemberExpression)await build(arrayProperty);
+				var left = await build(arrayProperty);
 				array.Type = left.Type;
 				return (left, await build(array), array.Type);
 			}
@@ -88,7 +88,7 @@ namespace Kkts.Expressions.Internal.Nodes
 		private static async Task<(Expression Left, Expression Right, Type InType)> BuildConstantProperty(Constant constant, Property property, Func<Node, Task<Expression>> build)
 		{
 			if (constant.Type != null) return (await build(constant), await build(property), typeof(string));
-			var right = (MemberExpression)await build(property);
+			var right = await build(property);
 			constant.Type = right.Type;
 			return (await build(constant), right, typeof(string));
 		}

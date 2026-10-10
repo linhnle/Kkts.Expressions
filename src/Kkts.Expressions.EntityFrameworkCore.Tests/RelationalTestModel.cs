@@ -34,6 +34,8 @@ public sealed class RelationalRecord
     public DateTime? OptionalCreatedAt { get; set; }
     public int ParentId { get; set; }
     public RelationalParent Parent { get; set; } = null!;
+    public int? OptionalParentId { get; set; }
+    public RelationalParent OptionalParent { get; set; }
 }
 
 public sealed class RelationalParent
@@ -74,6 +76,10 @@ public abstract class RelationalTestDbContext(DbContextOptions options) : DbCont
             entity.HasOne(record => record.Parent)
                 .WithMany()
                 .HasForeignKey(record => record.ParentId);
+            entity.HasOne(record => record.OptionalParent)
+                .WithMany()
+                .HasForeignKey(record => record.OptionalParentId)
+                .IsRequired(false);
         });
     }
 }
