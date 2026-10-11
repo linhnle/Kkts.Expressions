@@ -4,6 +4,7 @@ using System.Linq;
 using System.Linq.Expressions;
 using System.Threading;
 using System.Threading.Tasks;
+using Kkts.Expressions.Internal;
 
 namespace Kkts.Expressions
 {
@@ -55,12 +56,11 @@ namespace Kkts.Expressions
 			if (!allFilterGroups.Any()) return FilterExtensions.AlwaysTruePredicate(type);
 
 			var param = type.CreateParameterExpression();
-			var body = await FilterExtensions.BuildBodyAsync(allFilterGroups[0].Filters.ToArray(), param, arg, cancellationToken);
-			for (var i = 1; i < allFilterGroups.Length; i++)
-            {
-				body = Expression.OrElse(body, await FilterExtensions.BuildBodyAsync(allFilterGroups[i].Filters.ToArray(), param, arg, cancellationToken));
-
-            }
+			var body = await LegacyFilterComposition.Or(allFilterGroups.Select(group =>
+				LegacyFilterComposition.AsyncLeaf(token =>
+					FilterExtensions.BuildBodyAsync(group.Filters.ToArray(), param, arg, token))))
+				.BuildAsync(cancellationToken)
+				.ConfigureAwait(false);
 
 			return Expression.Lambda(body, param);
 		}
@@ -176,12 +176,11 @@ namespace Kkts.Expressions
 			try
 			{
 				var param = type.CreateParameterExpression();
-                var body = await FilterExtensions.BuildBodyAsync(allFilterGroups[0].Filters.ToArray(), param, arg, cancellationToken);
-                for (var i = 1; i < allFilterGroups.Length; i++)
-                {
-                    body = Expression.OrElse(body, await FilterExtensions.BuildBodyAsync(allFilterGroups[i].Filters.ToArray(), param, arg, cancellationToken));
-
-                }
+				var body = await LegacyFilterComposition.Or(allFilterGroups.Select(group =>
+					LegacyFilterComposition.AsyncLeaf(token =>
+						FilterExtensions.BuildBodyAsync(group.Filters.ToArray(), param, arg, token))))
+					.BuildAsync(cancellationToken)
+					.ConfigureAwait(false);
 
 				return new EvaluationResult
 				{

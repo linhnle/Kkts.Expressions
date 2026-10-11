@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
+using Kkts.Expressions.Internal;
 
 namespace Kkts.Expressions
 {
@@ -53,9 +54,9 @@ namespace Kkts.Expressions
 			if (!allFilterGroups.Any()) return FilterExtensions.AlwaysTruePredicate(type);
 
 			var param = type.CreateParameterExpression();
-			var body = allFilterGroups.Aggregate((Expression)null, (current, next) => current == null
-				? FilterExtensions.BuildBody(next.Filters.ToArray(), param, arg)
-				: Expression.OrElse(current, FilterExtensions.BuildBody(next.Filters.ToArray(), param, arg)));
+			var body = LegacyFilterComposition.Or(allFilterGroups.Select(group =>
+				LegacyFilterComposition.Leaf(() =>
+					FilterExtensions.BuildBody(group.Filters.ToArray(), param, arg)))).Build();
 
 			return Expression.Lambda(body, param);
 		}
@@ -171,9 +172,9 @@ namespace Kkts.Expressions
 			try
 			{
 				var param = type.CreateParameterExpression();
-				var body = allFilterGroups.Aggregate((Expression)null, (current, next) => current == null
-					? FilterExtensions.BuildBody(next.Filters.ToArray(), param, arg)
-					: Expression.OrElse(current, FilterExtensions.BuildBody(next.Filters.ToArray(), param, arg)));
+				var body = LegacyFilterComposition.Or(allFilterGroups.Select(group =>
+					LegacyFilterComposition.Leaf(() =>
+						FilterExtensions.BuildBody(group.Filters.ToArray(), param, arg)))).Build();
 				return new EvaluationResult
 				{
 					Succeeded = true,

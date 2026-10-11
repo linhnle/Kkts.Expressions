@@ -11,9 +11,10 @@ namespace Kkts.Expressions.Internal.Nodes
 
 		public override Expression Build(BuildArgument arg)
 		{
+			arg.ValidateQueryProperty(Name, StartIndex, Name?.Length ?? 0);
 			try
 			{
-				return Param.CreatePropertyExpression(arg.MapProperty(Name));
+				return arg.BuildPropertyExpression(Param, Name);
 			}
 			catch (Exception ex)
 			{

@@ -42,6 +42,8 @@ namespace Kkts.Expressions.Internal
 		{
 			return new List<Parser>(0);
 		}
+
+		internal virtual IList<Parser> GetNextParsersForObservation(char value) => GetNextParsers(value);
 		
 		public abstract bool Accept(char @char, int noOfWhiteSpaceIgnored, int index, ref bool keepTrack, ref bool isStartGroup);
 

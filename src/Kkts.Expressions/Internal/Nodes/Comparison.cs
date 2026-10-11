@@ -16,23 +16,39 @@ namespace Kkts.Expressions.Internal.Nodes
 
 		public override Expression Build(BuildArgument arg)
 		{
-			return BuildCore(node => Task.FromResult(node.Build(arg))).GetAwaiter().GetResult();
+			return BuildCore(node => Task.FromResult(node.Build(arg)), arg, asyncBuild: false)
+				.GetAwaiter().GetResult();
 		}
 
 		public override Task<Expression> BuildAsync(BuildArgument arg)
 		{
 			arg.CancellationToken.ThrowIfCancellationRequested();
-			return BuildCore(node => node.BuildAsync(arg));
+			return BuildCore(node => node.BuildAsync(arg), arg, asyncBuild: true);
 		}
 
-		private async Task<Expression> BuildCore(Func<Node, Task<Expression>> build)
+		private async Task<Expression> BuildCore(
+			Func<Node, Task<Expression>> build,
+			BuildArgument arg,
+			bool asyncBuild)
 		{
 			try
 			{
+				arg.ValidateComparison(Operator, Left, Right, StartIndex);
+				if (Interpreter.IsMembership(Operator) && Unwrap(Right) is Constant constant)
+				{
+					if (asyncBuild)
+						await arg.SnapshotMembershipVariableAsync(constant).ConfigureAwait(false);
+					else
+						arg.SnapshotMembershipVariable(constant);
+				}
 				var operands = await BuildOperands(build);
 				return BuildOperator(operands.Left, operands.Right, operands.InType);
 			}
 			catch (OperationCanceledException)
+			{
+				throw;
+			}
+			catch (QueryPolicyException)
 			{
 				throw;
 			}
@@ -49,13 +65,13 @@ namespace Kkts.Expressions.Internal.Nodes
 				return await BuildConstantProperty(constant, property, build);
 			if (Left is Property leftProperty && Right is Constant rightConstant)
 			{
-				var left = (MemberExpression)await build(leftProperty);
+				var left = await build(leftProperty);
 				rightConstant.Type = left.Type;
 				return (left, await build(rightConstant), rightConstant.Type ?? left.Type);
 			}
 			if (Left is Property arrayProperty && Right is ArrayList array)
 			{
-				var left = (MemberExpression)await build(arrayProperty);
+				var left = await build(arrayProperty);
 				array.Type = left.Type;
 				return (left, await build(array), array.Type);
 			}
@@ -72,7 +88,7 @@ namespace Kkts.Expressions.Internal.Nodes
 		private static async Task<(Expression Left, Expression Right, Type InType)> BuildConstantProperty(Constant constant, Property property, Func<Node, Task<Expression>> build)
 		{
 			if (constant.Type != null) return (await build(constant), await build(property), typeof(string));
-			var right = (MemberExpression)await build(property);
+			var right = await build(property);
 			constant.Type = right.Type;
 			return (await build(constant), right, typeof(string));
 		}
@@ -131,17 +147,15 @@ namespace Kkts.Expressions.Internal.Nodes
 					return Expression.Call(left, Interpreter.StringEndsWithMethod, right);
 				case Interpreter.ComparisonEqual:
 				case Interpreter.ComparisonEqual2:
-					return Expression.Equal(left, right ?? throw new FormatException(GetErrorMessage()));
 				case Interpreter.ComparisonGreaterThan:
-					return Expression.GreaterThan(left, right ?? throw new FormatException(GetErrorMessage()));
 				case Interpreter.ComparisonGreaterThanOrEqual:
-					return Expression.GreaterThanOrEqual(left, right ?? throw new FormatException(GetErrorMessage()));
 				case Interpreter.ComparisonLessThan:
-					return Expression.LessThan(left, right ?? throw new FormatException(GetErrorMessage()));
 				case Interpreter.ComparisonLessThanOrEqual:
-					return Expression.LessThanOrEqual(left, right ?? throw new FormatException(GetErrorMessage()));
 				case Interpreter.ComparisonNotEqual:
-					return Expression.NotEqual(left, right ?? throw new FormatException(GetErrorMessage()));
+					return ExpressionOperatorRules.ApplyComparison(
+						Operator,
+						left,
+						right ?? throw new FormatException(GetErrorMessage()));
 				case Interpreter.LogicalNot:
 					return left;
 				case Interpreter.ComparisonIn:

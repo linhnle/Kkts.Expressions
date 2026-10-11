@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
+using Kkts.Expressions.Internal;
 
 namespace Kkts.Expressions
 {
@@ -239,14 +240,16 @@ namespace Kkts.Expressions
 		internal static Expression BuildBody(Filter[] filters, ParameterExpression param, BuildArgument arg)
 		{
 			if (!filters.Any()) return AlwaysTruePredicate(param.Type);
-			var condition = filters.Aggregate((Expression)null, (current, next) => current == null ? BuildCondition(param, next, arg) : Expression.AndAlso(current, BuildCondition(param, next, arg)));
-			return condition;
+			return LegacyFilterComposition.And(filters.Select(filter =>
+				LegacyFilterComposition.Leaf(() => BuildCondition(param, filter, arg)))).Build();
 		}
 
 		internal static Expression BuildCondition(ParameterExpression param, Filter filter, BuildArgument arg)
 		{
-			var prop = param.CreatePropertyExpression(arg.MapProperty(filter.Property));
-			return Interpreter.BuildBody(filter.Operator.GetComparisonOperator(), prop, filter.Value, arg.VariableResolver);
+			var prop = arg.BuildPropertyExpression(param, filter.Property);
+			return arg.QueryContext == null
+				? Interpreter.BuildBody(filter.Operator.GetComparisonOperator(), prop, filter.Value, arg.VariableResolver)
+				: Interpreter.BuildBody(filter.Operator.GetComparisonOperator(), prop, filter.Value, arg);
 		}
 
 		#endregion private

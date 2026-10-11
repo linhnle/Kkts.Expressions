@@ -4,6 +4,7 @@ using System.Linq;
 using System.Linq.Expressions;
 using System.Threading;
 using System.Threading.Tasks;
+using Kkts.Expressions.Internal;
 
 namespace Kkts.Expressions
 {
@@ -218,19 +219,26 @@ namespace Kkts.Expressions
         internal static async Task<Expression> BuildBodyAsync(Filter[] filters, ParameterExpression param, BuildArgument arg, CancellationToken cancellationToken)
         {
             if (!filters.Any()) return AlwaysTruePredicate(param.Type);
-            var result = await BuildConditionAsync(param, filters[0], arg, cancellationToken);
-            for (var i = 1; i < filters.Length; ++i)
-            {
-                result = Expression.AndAlso(result, await BuildConditionAsync(param, filters[i], arg, cancellationToken));
-            }
-
-            return result;
+            return await LegacyFilterComposition.And(filters.Select(filter =>
+                LegacyFilterComposition.AsyncLeaf(token =>
+                    BuildConditionAsync(param, filter, arg, token))))
+                .BuildAsync(cancellationToken)
+                .ConfigureAwait(false);
         }
 
         internal static Task<Expression> BuildConditionAsync(ParameterExpression param, Filter filter, BuildArgument arg, CancellationToken cancellationToken)
         {
-            var prop = param.CreatePropertyExpression(arg.MapProperty(filter.Property));
-            return Interpreter.BuildBodyAsync(filter.Operator.GetComparisonOperator(), prop, filter.Value, arg.VariableResolver, cancellationToken);
+            var prop = arg.BuildPropertyExpression(param, filter.Property);
+            if (arg.QueryContext == null)
+                return Interpreter.BuildBodyAsync(
+                    filter.Operator.GetComparisonOperator(),
+                    prop,
+                    filter.Value,
+                    arg.VariableResolver,
+                    cancellationToken);
+
+            arg.CancellationToken = cancellationToken;
+            return Interpreter.BuildBodyAsync(filter.Operator.GetComparisonOperator(), prop, filter.Value, arg);
         }
 
         #endregion private

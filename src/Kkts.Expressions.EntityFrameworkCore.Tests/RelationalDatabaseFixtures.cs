@@ -89,7 +89,13 @@ public abstract class RelationalDatabaseFixture : IAsyncLifetime
             Status = status,
             CreatedAt = createdAt,
             OptionalCreatedAt = optionalCreatedAt,
-            ParentId = parentId
+            ParentId = parentId,
+            OptionalParentId = id switch
+            {
+                1 or 5 => 1,
+                3 => 2,
+                _ => null
+            }
         };
 }
 

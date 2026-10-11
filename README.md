@@ -17,8 +17,11 @@ The library targets `netstandard2.0` and is available on
   - [Contents](#contents)
   - [Installation](#installation)
   - [Quick start](#quick-start)
+    - [Query policy quick start](#query-policy-quick-start)
+    - [Typed public-field quick start](#typed-public-field-quick-start)
   - [Structured filters](#structured-filters)
     - [Filter groups](#filter-groups)
+  - [Nested JSON filter trees](#nested-json-filter-trees)
   - [Sorting](#sorting)
   - [Variables](#variables)
     - [Built-in variables](#built-in-variables)
@@ -31,10 +34,13 @@ The library targets `netstandard2.0` and is available on
     - [Retrieve a page](#retrieve-a-page)
   - [Supported operators](#supported-operators)
   - [Parsing and validation behavior](#parsing-and-validation-behavior)
+  - [Expression semantic analysis](#expression-semantic-analysis)
+  - [Expression autocomplete](#expression-autocomplete)
   - [Expression editor integration (v3.0 only)](#expression-editor-integration-v30-only)
     - [Building editor highlight runs](#building-editor-highlight-runs)
     - [Displaying syntax diagnostics while typing](#displaying-syntax-diagnostics-while-typing)
   - [TimeSpan durations](#timespan-durations)
+  - [DateTime and DateTimeOffset strings](#datetime-and-datetimeoffset-strings)
   - [Binary addition and subtraction in predicates (v3.0 only)](#binary-addition-and-subtraction-in-predicates-v30-only)
     - [Arithmetic and concatenation rules](#arithmetic-and-concatenation-rules)
     - [Limitations](#limitations)
@@ -71,6 +77,7 @@ The examples use this entity:
 public class Data
 {
     public int Id { get; set; }
+    public int TenantId { get; set; }
     public string Name { get; set; } = "";
     public bool IsEnabled { get; set; }
     public DateTime CreationDate { get; set; }
@@ -105,6 +112,65 @@ Expression<Func<Data, bool>> predicate =
 For user-supplied input, report validation diagnostics to the caller rather
 than using `Result` when parsing fails. See
 [Parsing and validation behavior](#parsing-and-validation-behavior).
+
+### Query policy quick start
+
+Opt in to a server-owned context for consistent editor analysis and runtime
+enforcement. The recommended preset is an explicit starting point; adjust its
+limits and field rules to fit the application:
+
+```csharp
+var schema = ExpressionSchema.FromType<Data>(
+    validProperties: new[] { "Id", "Name", "IsEnabled" });
+var queryContext = new ExpressionQueryContext(schema, QueryPolicy.Recommended);
+
+var editorAnalysis = queryContext.AnalyzeExpression(userText);
+var checkedPredicate = queryContext.ParsePredicate<Data>(userText);
+if (!checkedPredicate.Succeeded)
+{
+    throw checkedPredicate.Exception;
+}
+
+var results = context.Entities
+    .Where(item => item.TenantId == currentTenantId)
+    .Where(checkedPredicate.Result);
+```
+
+The tenant predicate is application-owned and must not be derived from user
+input. Query policies control permitted expression construction and
+complexity; they are not authorization, tenant isolation, or database cost
+controls. See the [query policy guide](docs/query-policies.md) for configuration,
+counting rules, structured APIs, diagnostics, and security boundaries.
+
+### Typed public-field quick start
+
+Register only the names an API should expose. Selectors are strongly typed,
+and computed expressions remain in the resulting expression tree:
+
+```csharp
+var publicSchema = new QuerySchema<Data>()
+    .Field("displayName", item => item.Name)
+    .Field("enabled", item => item.IsEnabled)
+    .Field("createdAt", item => item.CreationDate, canFilter: false)
+    .Build();
+var publicContext = new ExpressionQueryContext(
+    publicSchema,
+    new QueryPolicy());
+
+var predicate = publicContext.ParsePredicate<Data>(
+    "displayName = 'Test' and enabled = true");
+if (!predicate.Succeeded)
+{
+    throw predicate.Exception;
+}
+var results = context.Entities.Where(predicate.Result).ToList();
+```
+
+Public mode exposes exactly the registered names and keeps filter/sort
+permissions independent. See the
+[expression-field mapping guide](docs/expression-field-mapping.md) for
+computed selectors, metadata, policy integration, migration, and SQL
+translation limits.
 
 ## Structured filters
 
@@ -177,6 +243,47 @@ Expression<Func<Data, bool>> predicate = groups.BuildPredicate<Data>();
 ```
 
 Use `groups.TryBuildPredicate<Data>()` when you need validation details.
+
+## Nested JSON filter trees
+
+For arbitrarily nested AND/OR/NOT conditions with typed values and explicit
+variable references, use `FilterNode` and `FilterTreeJson`:
+
+```csharp
+var tree = FilterNode.And(new[]
+{
+    FilterNode.Or(new[]
+    {
+        FilterNode.Condition("Status", "=", FilterValue.String("Active")),
+        FilterNode.Condition("Priority", ">=", FilterValue.Number("3"))
+    }),
+    FilterNode.Not(FilterNode.Condition(
+        "Department",
+        "in",
+        FilterValue.Collection(new[]
+        {
+            FilterValue.String("Archived"),
+            FilterValue.String("External")
+        })))
+});
+
+var json = FilterTreeJson.Serialize(tree);
+var queryContext = new ExpressionQueryContext(
+    ExpressionSchema.FromType<Data>(),
+    QueryPolicy.Recommended);
+var decoded = FilterTreeJson.TryDeserialize(json, queryContext);
+if (!decoded.Succeeded) throw new QueryPolicyException(decoded.Diagnostics);
+var predicate = queryContext.BuildPredicate<Data>(decoded.Result);
+```
+
+The context-aware codec validates the tree against entity permissions and
+query policy before returning it. The no-context codec validates JSON shape
+only. See the [nested filter guide](docs/nested-filters.md) for JSON shapes,
+typed values, diagnostics, depth limits, serializer transport settings, and
+migration from `FilterGroup`, plus the supported
+[expression editor conversions](docs/nested-filters.md#expression-editor-exchange);
+see the [query policy guide](docs/query-policies.md)
+for policy accounting and server-side boundaries.
 
 ## Sorting
 
@@ -647,6 +754,127 @@ The library does not debounce or retain editor state. Consumers may debounce
 or schedule analysis for long inputs. If work is scheduled asynchronously, apply
 the result only if its input snapshot is still the current editor text, so an
 older result cannot overwrite newer highlighting or diagnostics.
+
+## Expression semantic analysis
+
+For editor feedback that depends on entity members, variable declarations, and
+operand types, use semantic analysis in addition to syntax highlighting. Supply
+metadata rather than runtime entity or variable values:
+
+```csharp
+var schema = ExpressionSchema.FromType<Data>(
+    validProperties: new[] { "Id", "Name", "IsEnabled" });
+
+var variables = new ExpressionVariableSchema(new[]
+{
+    ExpressionVariableDefinition.FromType("minimum", typeof(int))
+});
+
+var analysis = Interpreter.AnalyzeExpression<Data>(
+    "Id > 'abc' and UnknownField = $minimum",
+    schema,
+    variables);
+
+foreach (var diagnostic in analysis.SemanticDiagnostics)
+{
+    Console.WriteLine(
+        $"{diagnostic.Code} at {diagnostic.Start}+{diagnostic.Length}: " +
+        diagnostic.Message);
+}
+```
+
+This reports the incompatible operand and unknown property separately while
+the user is typing. Analysis never resolves variable values or invokes entity
+getters, and semantic validity does not guarantee EF Core SQL translation.
+For query permissions, aliases, nested paths, stable diagnostic codes,
+correction suggestions, and incomplete-input behavior, see the
+[semantic analysis guide](docs/semantic-analysis.md).
+
+Temporal editor validation recognizes compact literals such as
+`Created = '20261009'` and `CreatedOffset = '20261009T152646+0700'`
+as well as extended ISO forms. It uses an immutable schema conversion context
+and invariant machine formats, not ambient culture or the mutable runtime
+format list. `CreatedOffset = '20261009T152646'` still reports
+`context-dependent-conversion` because no offset was supplied. Semantic
+acceptance does not guarantee identical runtime values across machine timezones
+or EF Core SQL translation.
+
+## Expression autocomplete
+
+Request UI-independent suggestions from the same immutable public metadata used
+for analysis. Literal hints are advisory, not allowed-value constraints:
+
+```csharp
+var completionSchema = new QuerySchema<Data>()
+    .Field("Name", data => data.Name, allowedOperators: new[] { ComparisonOperator.Equal })
+    .Build();
+var hints = new ExpressionValueSuggestionSchema(completionSchema, new[]
+{
+    new KeyValuePair<string, IEnumerable<ExpressionValueSuggestion>>("Name", new[]
+    {
+        new ExpressionValueSuggestion(FilterValue.String("Active"))
+    })
+});
+var completion = Interpreter.CompleteExpression(
+    "Name = ", 7, completionSchema, valueSuggestions: hints);
+```
+
+Apply each item's exact UTF-16 `Start`/`Length` replacement using its
+`InsertionText`. Query-context completion also applies that context's policy and
+additional allowlist. Variables must be explicitly declared; completion never
+resolves runtime values or grants execution permission.
+
+See the [autocomplete guide](docs/autocomplete.md) for contracts, precise edits,
+limits, and performance evidence, and the runnable
+[CodeMirror sample](examples/Kkts.Examples/Kkts.Examples.Autocomplete/README.md)
+for snapshot-safe browser integration.
+
+## DateTime and DateTimeOffset strings
+
+`ToDateTime`, `ToDateTimeOffset`, their try counterparts, and temporal `Cast`
+operations accept the following machine-readable calendar forms. Predicate
+values use the same forms inside quoted literals.
+
+| Form | Example |
+|---|---|
+| Extended calendar date | `2026-10-09` |
+| Compact calendar date | `20261009` |
+| Extended full timestamp | `2026-10-09T15:26:46` |
+| Compact full timestamp | `20261009T152646` |
+| UTC timestamp | `2026-10-09T08:26:46.427Z` or `20261009T082646Z` |
+| Timestamp with numeric offset | `2026-10-09T15:26:46.1234567+07:00` or `20261009T152646.427+0700` |
+
+Full timestamps allow no fraction or 1-7 fractional-second digits. Use uppercase
+`T` and `Z`, four-digit years, zero-padded components, and numeric offsets within
++/-14 hours. Extended offsets use `+HH:mm` / `-HH:mm`; compact offsets use
+`+HHmm` / `-HHmm`. Date-only values represent midnight.
+
+Parsing preserves legacy precedence: current-culture .NET parsing first, then
+the mutable `StringExtensions.DateTimeFormats` list using the supplied provider
+(or invariant culture), then the invariant machine-format fallback. The provider
+does not override the first attempt. Existing accepted inputs retain their
+interpretation, including culture/calendar-specific interpretations; the new
+fallback uses the Gregorian calendar.
+
+`ToDateTime` converts timestamps with `Z` or a numeric offset to machine-local
+time with `DateTimeKind.Local`. Without a suffix, the kind is `Unspecified`.
+It does not preserve UTC kind. Choose `ToDateTimeOffset` to retain an explicit
+offset (`Z` becomes zero offset); without a suffix it uses the local timezone
+for the represented date.
+
+For JSON, pass the extracted string value, not the JSON quotes or document:
+
+```csharp
+var local = "20261009T082646Z".ToDateTime();
+var withOffset = "20261009T152646.427+0700".ToDateTimeOffset();
+```
+
+This is a bounded supported subset, not a strict all-ISO-8601 parser. Legacy .NET
+parsing may also accept other representations. No Unix epoch, ISO week/ordinal
+date, raw JSON, or legacy Microsoft JSON `/Date(milliseconds)/` parser is added.
+Invalid temporal text throws `FormatException`; temporal try methods return
+false with the respective minimum value. Blank strings cast to nullable temporal
+types remain null.
 
 ## TimeSpan durations
 

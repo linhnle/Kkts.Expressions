@@ -8,21 +8,26 @@ namespace Kkts.Expressions.Internal
 		private readonly string _source;
 		private readonly List<ExpressionToken> _tokens;
 		private readonly Action<string, string, int, int> _report;
+		private readonly int? _maximumTokens;
 		private int _index;
 		private bool _operand = true;
 		private bool _membership;
 		private char _listEnd;
 
-		internal ExpressionLexer(string source, List<ExpressionToken> tokens, Action<string, string, int, int> report)
+		internal ExpressionLexer(string source, List<ExpressionToken> tokens, Action<string, string, int, int> report,
+			int? maximumTokens = null)
 		{
 			_source = source;
 			_tokens = tokens;
 			_report = report;
+			_maximumTokens = maximumTokens;
 		}
+
+		internal bool IsTruncated { get; private set; }
 
 		internal void ReadAll()
 		{
-			while (_index < _source.Length)
+			while (_index < _source.Length && !IsTruncated)
 			{
 				if (char.IsWhiteSpace(_source[_index])) { ++_index; continue; }
 				var start = _index;
@@ -62,21 +67,21 @@ namespace Kkts.Expressions.Internal
 			return index;
 		}
 
-		private void Add(ExpressionTokenKind kind, int start, int end) =>
+		private void Add(ExpressionTokenKind kind, int start, int end)
+		{
+			if (_maximumTokens.HasValue && _tokens.Count >= _maximumTokens.Value)
+			{
+				IsTruncated = true;
+				_report("completion-work-limit-exceeded", "The expression exceeds the completion token budget.", start, end - start);
+				return;
+			}
 			_tokens.Add(new ExpressionToken(kind, start, end - start));
+		}
 
 		private void ReadString()
 		{
 			var start = _index;
-			var quote = _source[_index++];
-			var closed = false;
-			while (_index < _source.Length)
-			{
-				var value = _source[_index++];
-				// Only the active delimiter is escaped by the existing string parser.
-				if (value == ExpressionGrammar.Escape && _index < _source.Length && _source[_index] == quote) { ++_index; continue; }
-				if (value == quote) { closed = true; break; }
-			}
+			_index = ExpressionLiteralCodec.ScanQuotedToken(_source, start, out var closed);
 			Add(ExpressionTokenKind.Constant, start, _index);
 			if (!closed) _report("unterminated-string", "Expected a closing quote.", _source.Length, 0);
 			_operand = false;

@@ -11,6 +11,75 @@ namespace Kkts.Expressions.UnitTest.Units
 {
     public partial class InterpreterTest
     {
+        [Fact]
+        public async Task ParsePredicate_RuntimeRuleCharacterization_AllEntryPoints()
+        {
+            var resolver = new VariableResolver();
+            resolver.TryAdd("amount", (int?)4);
+            var entity = new TestEntity { Integer = 4, IntegerNullable = 4 };
+            foreach (var query in new[]
+            {
+                "Integer = Integer",
+                "(Integer + 1) = (2 + 3)",
+                "Integer in (1, 2, 4)"
+            })
+            {
+                var generic = Interpreter.ParsePredicate<TestEntity>(query, resolver);
+                var genericAsync = await Interpreter.ParsePredicateAsync<TestEntity>(query, resolver);
+                var runtime = Interpreter.ParsePredicate(query, typeof(TestEntity), resolver);
+                var runtimeAsync = await Interpreter.ParsePredicateAsync(query, typeof(TestEntity), resolver);
+
+                Assert.True(generic.Succeeded, generic.Exception?.ToString());
+                Assert.True(genericAsync.Succeeded, genericAsync.Exception?.ToString());
+                Assert.True(runtime.Succeeded, runtime.Exception?.ToString());
+                Assert.True(runtimeAsync.Succeeded, runtimeAsync.Exception?.ToString());
+                Assert.True(generic.Result.Compile()(entity));
+                Assert.True(genericAsync.Result.Compile()(entity));
+                Assert.True(((Expression<Func<TestEntity, bool>>)runtime.Result).Compile()(entity));
+                Assert.True(((Expression<Func<TestEntity, bool>>)runtimeAsync.Result).Compile()(entity));
+            }
+
+            const string nullableVariableQuery = "IntegerNullable = $amount";
+            var nullableVariableGeneric = Interpreter.ParsePredicate<TestEntity>(nullableVariableQuery, resolver);
+            var nullableVariableGenericAsync = await Interpreter.ParsePredicateAsync<TestEntity>(nullableVariableQuery, resolver);
+            var nullableVariableRuntime = Interpreter.ParsePredicate(nullableVariableQuery, typeof(TestEntity), resolver);
+            var nullableVariableRuntimeAsync = await Interpreter.ParsePredicateAsync(nullableVariableQuery, typeof(TestEntity), resolver);
+            foreach (var result in new EvaluationResultBase[]
+                     { nullableVariableGeneric, nullableVariableGenericAsync, nullableVariableRuntime, nullableVariableRuntimeAsync })
+            {
+                Assert.False(result.Succeeded);
+                Assert.IsType<FormatException>(result.Exception);
+            }
+
+            const string unsignedQuery = "PULong = 4294967297";
+            var unsignedEntity = new PlusEntity { PULong = 4294967297UL };
+            var unsignedGeneric = Interpreter.ParsePredicate<PlusEntity>(unsignedQuery);
+            var unsignedGenericAsync = await Interpreter.ParsePredicateAsync<PlusEntity>(unsignedQuery);
+            var unsignedRuntime = Interpreter.ParsePredicate(unsignedQuery, typeof(PlusEntity));
+            var unsignedRuntimeAsync = await Interpreter.ParsePredicateAsync(unsignedQuery, typeof(PlusEntity));
+            Assert.True(unsignedGeneric.Succeeded, unsignedGeneric.Exception?.ToString());
+            Assert.True(unsignedGenericAsync.Succeeded, unsignedGenericAsync.Exception?.ToString());
+            Assert.True(unsignedRuntime.Succeeded, unsignedRuntime.Exception?.ToString());
+            Assert.True(unsignedRuntimeAsync.Succeeded, unsignedRuntimeAsync.Exception?.ToString());
+            Assert.True(unsignedGeneric.Result.Compile()(unsignedEntity));
+            Assert.True(unsignedGenericAsync.Result.Compile()(unsignedEntity));
+            Assert.True(((Expression<Func<PlusEntity, bool>>)unsignedRuntime.Result).Compile()(unsignedEntity));
+            Assert.True(((Expression<Func<PlusEntity, bool>>)unsignedRuntimeAsync.Result).Compile()(unsignedEntity));
+
+            const string invalidQuery = "PDecimal + PDouble = 0";
+            var invalidGeneric = Interpreter.ParsePredicate<PlusEntity>(invalidQuery);
+            var invalidGenericAsync = await Interpreter.ParsePredicateAsync<PlusEntity>(invalidQuery);
+            var invalidRuntime = Interpreter.ParsePredicate(invalidQuery, typeof(PlusEntity));
+            var invalidRuntimeAsync = await Interpreter.ParsePredicateAsync(invalidQuery, typeof(PlusEntity));
+            foreach (var result in new EvaluationResultBase[]
+                     { invalidGeneric, invalidGenericAsync, invalidRuntime, invalidRuntimeAsync })
+            {
+                Assert.False(result.Succeeded);
+                Assert.NotNull(result.Exception);
+                Assert.Contains("+", result.InvalidOperators);
+            }
+        }
+
         [Theory]
         [InlineData("PInt+1 = 1+PInt")]
         [InlineData("(PInt + 1) = (2 + 3)")]

@@ -19,6 +19,14 @@ namespace Kkts.Expressions.Internal
 
 		public bool IsNestedProperty { get; set; }
 
+		internal bool HasCompleteIdentifier =>
+			Length > 0 && (!IsNestedProperty || Done || _nestedParser != null && _nestedParser.Length > 0);
+
+		internal override IList<Parser> GetNextParsersForObservation(char value) =>
+			value == '.'
+				? new List<Parser> { new ComparisonFunctionOperatorParser { Previous = this } }
+				: GetNextParsers(value);
+
 		public override bool Accept(char @char, int noOfWhiteSpaceIgnored, int index, ref bool keepTrack, ref bool isStartGroup)
 		{
 			if (Done) return false;

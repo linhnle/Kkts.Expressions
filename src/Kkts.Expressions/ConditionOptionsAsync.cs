@@ -29,6 +29,7 @@ namespace Kkts.Expressions
 
 			var predicates = new List<LambdaExpression>();
 			var exceptions = new List<Exception>();
+			var diagnostics = new List<ExpressionDiagnostic>();
 
 			if (Filters != null && Filters.Any())
 			{
@@ -45,8 +46,19 @@ namespace Kkts.Expressions
 				AddPredicate(await ExpressionParser.ParseAsync(Where, type, arg), predicates, exceptions);
 			}
 
+			if (FilterTree != null)
+			{
+				var tree = await FilterTree.TryBuildPredicateAsync(
+					type,
+					variableResolver,
+					validProperties,
+					propertyMapping,
+					cancellationToken);
+				AddPredicate(tree, predicates, exceptions, diagnostics);
+			}
+
 			var orderByClause = BuildOrderByClause(arg, exceptions);
-			return CreateCondition(arg, predicates, exceptions, orderByClause);
+			return CreateCondition(arg, predicates, exceptions, orderByClause, diagnostics);
 		}
 	}
 }

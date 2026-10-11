@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
+using System.Text.Json.Serialization;
 
 namespace Kkts.Expressions
 {
@@ -17,6 +18,9 @@ namespace Kkts.Expressions
 		public virtual IEnumerable<Filter> Filters { get; set; }
 
 		public virtual string Where { get; set; }
+
+		[JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+		public virtual FilterNode FilterTree { get; set; }
 
 		public virtual Condition<T> BuildCondition<T>(VariableResolver variableResolver = null, IEnumerable<string> validProperties = null, IDictionary<string, string> propertyMapping = null)
 		{
@@ -36,6 +40,7 @@ namespace Kkts.Expressions
 
 			var predicates = new List<LambdaExpression>();
 			var exceptions = new List<Exception>();
+			var diagnostics = new List<ExpressionDiagnostic>();
 
 			if (Filters != null && Filters.Any())
 			{
@@ -52,14 +57,32 @@ namespace Kkts.Expressions
 				AddPredicate(ExpressionParser.Parse(Where, type, arg), predicates, exceptions);
 			}
 
+			if (FilterTree != null)
+			{
+				AddPredicate(
+					FilterTree.TryBuildPredicate(type, variableResolver, validProperties, propertyMapping),
+					predicates,
+					exceptions,
+					diagnostics);
+			}
+
 			var orderByClause = BuildOrderByClause(arg, exceptions);
-			return CreateCondition(arg, predicates, exceptions, orderByClause);
+			return CreateCondition(arg, predicates, exceptions, orderByClause, diagnostics);
 		}
 
-		private static void AddPredicate(EvaluationResult evaluation, ICollection<LambdaExpression> predicates, ICollection<Exception> exceptions)
+		private static void AddPredicate(
+			EvaluationResult evaluation,
+			ICollection<LambdaExpression> predicates,
+			ICollection<Exception> exceptions,
+			ICollection<ExpressionDiagnostic> diagnostics = null)
 		{
 			if (evaluation.Succeeded) predicates.Add(evaluation.Result);
 			else if (evaluation.Exception != null) exceptions.Add(evaluation.Exception);
+			if (diagnostics != null && evaluation.Diagnostics.Count > 0)
+			{
+				foreach (var diagnostic in evaluation.Diagnostics)
+					diagnostics.Add(FilterTreeDiagnosticProjection.Project(diagnostic, "/FilterTree"));
+			}
 		}
 
 		private OrderByClause BuildOrderByClause(BuildArgument arg, ICollection<Exception> exceptions)
@@ -80,9 +103,15 @@ namespace Kkts.Expressions
 			return null;
 		}
 
-		private static Condition CreateCondition(BuildArgument arg, List<LambdaExpression> predicates, List<Exception> exceptions, OrderByClause orderByClause)
+		private static Condition CreateCondition(
+			BuildArgument arg,
+			List<LambdaExpression> predicates,
+			List<Exception> exceptions,
+			OrderByClause orderByClause,
+			ICollection<ExpressionDiagnostic> diagnostics = null)
 		{
-			var isInvalid = arg.InvalidProperties.Any() || arg.InvalidOperators.Any() || arg.InvalidVariables.Any() || exceptions.Any();
+			var isInvalid = arg.InvalidProperties.Any() || arg.InvalidOperators.Any() ||
+				arg.InvalidVariables.Any() || exceptions.Any() || (diagnostics?.Any() ?? false);
 			var result = new Condition { IsValid = !isInvalid };
 			if (isInvalid)
 			{
@@ -94,7 +123,8 @@ namespace Kkts.Expressions
 						InvalidValues = arg.InvalidValues,
 						InvalidOperators = arg.InvalidOperators,
 						InvalidVariables = arg.InvalidVariables,
-						InvalidOrderByDirections = arg.InvalidOrderByDirections
+						InvalidOrderByDirections = arg.InvalidOrderByDirections,
+						Diagnostics = diagnostics?.ToArray()
 					},
 					Exceptions = exceptions
 				};

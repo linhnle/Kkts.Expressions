@@ -6,16 +6,22 @@ namespace Kkts.Expressions.Internal
 {
 	internal sealed class ExpressionAnalyzer
 	{
+		private const int MaximumPolicyDiagnostics = 32;
 		private readonly string _source;
+		private readonly bool _policyAware;
 		private readonly List<ExpressionToken> _tokens = new List<ExpressionToken>();
 		private readonly List<ExpressionSyntaxDiagnostic> _diagnostics = new List<ExpressionSyntaxDiagnostic>();
 		private readonly HashSet<Tuple<string, int, int>> _reported = new HashSet<Tuple<string, int, int>>();
 		private readonly HashSet<Tuple<int, int>> _errorSpans = new HashSet<Tuple<int, int>>();
+		private bool _isTruncated;
 
-		internal ExpressionAnalyzer(string source)
+		internal ExpressionAnalyzer(string source, bool policyAware = false)
 		{
 			_source = source;
+			_policyAware = policyAware;
 		}
+
+		internal bool IsTruncated => _isTruncated;
 
 		internal ExpressionAnalysisResult Analyze()
 		{
@@ -28,8 +34,21 @@ namespace Kkts.Expressions.Internal
 
 		private void Report(string code, string message, int start, int length)
 		{
+			if (_isTruncated) return;
 			if (_reported.Add(Tuple.Create(code, start, length)))
 			{
+				if (_policyAware && _diagnostics.Count >= MaximumPolicyDiagnostics)
+				{
+					_diagnostics.RemoveAt(MaximumPolicyDiagnostics - 1);
+					_diagnostics.Add(new ExpressionSyntaxDiagnostic(
+						"query-policy-diagnostics-truncated",
+						"Additional diagnostics were omitted; fix the reported issues before retrying.",
+						start,
+						0));
+					_isTruncated = true;
+					return;
+				}
+
 				_diagnostics.Add(new ExpressionSyntaxDiagnostic(code, message, start, length));
 				_errorSpans.Add(Tuple.Create(start, length));
 			}
@@ -37,62 +56,16 @@ namespace Kkts.Expressions.Internal
 
 		private void Validate()
 		{
-			var state = new ExpressionSyntaxParser(syntaxOnly: true);
-			var cursor = 0;
-			var whitespace = 0;
-			var recovering = false;
-			var lastContent = _source.Length - 1;
-			while (lastContent >= 0 && char.IsWhiteSpace(_source[lastContent])) --lastContent;
-			for (var tokenIndex = 0; tokenIndex < _tokens.Count; ++tokenIndex)
+			var replay = ExpressionSyntaxReplay.Read(_source, _tokens, _source.Length, (tokenIndex, token) =>
 			{
-				var token = _tokens[tokenIndex];
-				var text = _source.Substring(token.Start, token.Length);
-				if (recovering)
-				{
-					if ((token.Kind == ExpressionTokenKind.Operator || token.Kind == ExpressionTokenKind.Property) &&
-						ExpressionGrammar.IsLogical(text))
-					{
-						if (token.Kind != ExpressionTokenKind.Operator)
-							_tokens[tokenIndex] = new ExpressionToken(ExpressionTokenKind.Operator, token.Start, token.Length);
-						state.Recover();
-						recovering = false;
-						cursor = token.Start + token.Length;
-						whitespace = 0;
-						continue;
-					}
-					if (token.Kind != ExpressionTokenKind.Punctuation || text != ")" || !state.HasOpenGroups)
-						continue;
-					state.Recover();
-					recovering = false;
-					cursor = token.Start;
-					whitespace = 0;
-				}
+				if (token.Kind != ExpressionTokenKind.Unknown &&
+					!_errorSpans.Contains(Tuple.Create(token.Start, token.Length)))
+					Report("unexpected-token", "Unexpected expression token.", token.Start, token.Length);
+			}, (tokenIndex, token) =>
+				_tokens[tokenIndex] = new ExpressionToken(ExpressionTokenKind.Operator, token.Start, token.Length));
 
-				var end = token.Start + token.Length;
-				while (cursor < end)
-				{
-					var value = _source[cursor];
-					if (!state.KeepsWhitespace && char.IsWhiteSpace(value))
-					{
-						++whitespace;
-						++cursor;
-						continue;
-					}
-					if (!state.TryRead(value, whitespace, cursor, cursor < lastContent))
-					{
-						if (token.Kind != ExpressionTokenKind.Unknown &&
-							!_errorSpans.Contains(Tuple.Create(token.Start, token.Length)))
-							Report("unexpected-token", "Unexpected expression token.", token.Start, token.Length);
-						recovering = true;
-						cursor = end;
-						break;
-					}
-					whitespace = 0;
-					++cursor;
-				}
-			}
-
-			if (recovering) return;
+			if (replay.IsRecovering) return;
+			var state = replay.Parser;
 			if (!state.TryComplete(out var chain))
 			{
 				if (!_diagnostics.Any(d => d.Start == _source.Length))

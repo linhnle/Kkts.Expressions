@@ -1,11 +1,14 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Linq.Expressions;
 
 namespace Kkts.Expressions
 {
     public class EvaluationResultBase
     {
+        private IReadOnlyList<ExpressionDiagnostic> _diagnostics = Array.AsReadOnly(new ExpressionDiagnostic[0]);
+
         public bool Succeeded { get; internal set; }
 
         public IEnumerable<string> InvalidProperties { get; internal set; }
@@ -19,6 +22,14 @@ namespace Kkts.Expressions
         public IEnumerable<string> InvalidValues { get; internal set; }
 
         public Exception Exception { get; internal set; }
+
+        /// <summary>Immutable policy or validation diagnostics associated with this result.</summary>
+        public IReadOnlyList<ExpressionDiagnostic> Diagnostics
+        {
+            get => _diagnostics;
+            internal set => _diagnostics = Array.AsReadOnly(
+                (value ?? Enumerable.Empty<ExpressionDiagnostic>()).ToArray());
+        }
     }
 
     public class EvaluationResult : EvaluationResultBase
@@ -36,7 +47,8 @@ namespace Kkts.Expressions
                 InvalidOperators = InvalidOperators,
                 InvalidVariables = InvalidVariables,
                 InvalidValues = InvalidValues,
-                InvalidOrderByDirections = InvalidOrderByDirections
+                InvalidOrderByDirections = InvalidOrderByDirections,
+                Diagnostics = Diagnostics
             };
         }
     }
