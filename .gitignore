@@ -19,3 +19,9 @@
 /src/Kkts.Expressions.EntityFrameworkCore.Tests/obj
 /examples/Kkts.Examples/Kkts.Examples.Autocomplete/bin
 /examples/Kkts.Examples/Kkts.Examples.Autocomplete/obj
+/src/Kkts.Expressions.OpenSearch/bin
+/src/Kkts.Expressions.OpenSearch/obj
+/src/Kkts.Expressions.OpenSearch.Client/bin
+/src/Kkts.Expressions.OpenSearch.Client/obj
+/src/Kkts.Expressions.OpenSearch.Tests/bin
+/src/Kkts.Expressions.OpenSearch.Tests/obj

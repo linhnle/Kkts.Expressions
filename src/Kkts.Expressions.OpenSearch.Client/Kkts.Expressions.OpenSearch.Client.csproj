@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Copyright>Copyright (C) 2016-2026 KKTS Ltd.</Copyright>
+    <Version>3.1.0</Version>
+    <Authors>Linh Le</Authors>
+    <Product>Dynamic Expression</Product>
+    <Company>KKTS Ltd.</Company>
+    <PackageProjectUrl>https://github.com/linhnle/Kkts.Expressions</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/linhnle/Kkts.Expressions.git</RepositoryUrl>
+    <RepositoryType>Git</RepositoryType>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <Description>OpenSearch.Client adapter for Kkts.Expressions.OpenSearch query translations.</Description>
+    <PackageTags>expression;linq;dynamic-filter;opensearch;opensearch-client;query-dsl</PackageTags>
+    <NeutralLanguage>en</NeutralLanguage>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="OpenSearch.Client" Version="2.2.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Kkts.Expressions.OpenSearch\Kkts.Expressions.OpenSearch.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+</Project>

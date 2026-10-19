@@ -44,6 +44,7 @@ The library targets `netstandard2.0` and is available on
   - [Binary addition and subtraction in predicates (v3.0 only)](#binary-addition-and-subtraction-in-predicates-v30-only)
     - [Arithmetic and concatenation rules](#arithmetic-and-concatenation-rules)
     - [Limitations](#limitations)
+  - [OpenSearch query translation](#opensearch-query-translation)
   - [Development notes](#development-notes)
     - [Running tests](#running-tests)
     - [Relational Entity Framework Core tests](#relational-entity-framework-core-tests)
@@ -321,6 +322,22 @@ if (!evaluation.Succeeded)
 }
 
 var ordered = evaluation.Result;
+```
+
+To inspect a parsed ordering, for example to translate it for another query
+engine, read its keys. Each key exposes the same selector that the clause's
+`Sort` methods apply, including property mappings and public expression
+fields:
+
+```csharp
+var clause = Interpreter.TryBuildOrderByClause<Data>("Name desc, Id").Result;
+
+foreach (OrderByKey key in clause.GetKeys<Data>())
+{
+    Console.WriteLine($"{key.KeySelector} {(key.Descending ? "desc" : "asc")}");
+}
+// p => p.Name desc
+// p => p.Id asc
 ```
 
 ## Variables
@@ -982,6 +999,42 @@ added.
 The library emits native expression trees. Relational query translation,
 especially mixed string concatenation, depends on the query provider.
 
+## OpenSearch query translation
+
+The separate `Kkts.Expressions.OpenSearch` package translates predicates,
+ordering clauses, and pagination into OpenSearch Query DSL JSON, and
+`Kkts.Expressions.OpenSearch.Client` applies the result to `OpenSearch.Client`
+2.x requests:
+
+```sh
+dotnet add package Kkts.Expressions.OpenSearch
+dotnet add package Kkts.Expressions.OpenSearch.Client
+```
+
+```csharp
+var predicate = Interpreter.ParsePredicate<Order>("Number = 'A-1' and Total >= 100").Result;
+var translator = new OpenSearchQueryTranslator<Order>();
+var result = translator.TranslatePredicate(predicate);
+if (!result.Succeeded) throw new OpenSearchTranslationException(result.Diagnostics);
+string json = result.Value.ToJsonString();
+```
+
+<!-- example: quick-start -->
+```json
+{"bool":{"filter":[{"term":{"number.keyword":"A-1"}},{"range":{"total":{"gte":100}}}]}}
+```
+
+Translation is offline and deterministic. It supports logical operators,
+comparisons, null checks, membership, `StartsWith`/`EndsWith`/`Contains`,
+nested documents, and safe flattened-collection shapes. Comparisons with
+mismatched numeric types are rewritten so results match in-memory evaluation.
+Constructs that cannot be expressed exactly fail with diagnostics; there is no
+fallback to scripts or approximations. Field names, string field kinds,
+case-insensitive fields, enum formats, `nested` paths, and object presence
+markers are configured with `OpenSearchMapping.For<T>()`. See the
+[OpenSearch guide](docs/opensearch.md) for mapping configuration, semantics,
+diagnostics, and limitations.
+
 ## Development notes
 
 ### Running tests
@@ -1052,6 +1105,30 @@ for the latest SQL Server and MySQL run results.
 
 The library continues to target `netstandard2.0`; the example projects retain
 their existing target frameworks.
+
+### OpenSearch integration tests
+
+`Kkts.Expressions.OpenSearch.Tests` holds two kinds of test: Docker-free unit
+tests for the translator and the `OpenSearch.Client` adapter, and integration
+tests tagged `Provider=OpenSearch`. The integration tests run translated
+queries against a real node and compare the hit ids and their order with
+LINQ-to-Objects over the same seed data. They use Testcontainers for .NET
+4.16.0 and OpenSearch 2.19.1, pinned to image digest
+`opensearchproject/opensearch@sha256:72fe2fc84be8295906b8efca020b46c58ed45c8da60cd9b8b49e1991e38e89a4`
+with the security plugin disabled. That version is the tested baseline, not a
+compatibility promise for every OpenSearch release.
+
+Docker must be running locally to run the integration tests:
+
+```sh
+dotnet test src/Kkts.Expressions.OpenSearch.Tests --filter "Provider=OpenSearch"
+```
+
+To run everything that does not need Docker, exclude the provider traits:
+
+```sh
+dotnet test src/Kkts.sln --filter "Provider!=OpenSearch&Provider!=SqlServer&Provider!=MySql"
+```
 
 ### Parser performance
 

@@ -14,6 +14,27 @@ namespace Kkts.Expressions
 			_parser = parser;
 		}
 
+		/// <summary>Returns the ordered sort keys for the specified element type.</summary>
+		public IReadOnlyList<OrderByKey> GetKeys<T>() => GetKeys(typeof(T));
+
+		/// <summary>Returns the ordered sort keys for the specified element type.</summary>
+		public IReadOnlyList<OrderByKey> GetKeys(Type elementType)
+		{
+			if (elementType == null) throw new ArgumentNullException(nameof(elementType));
+			var keys = new List<OrderByKey>(_parser.ThenBys.Count + 1)
+			{
+				CreateKey(elementType, _parser.PropertyName, _parser.PropertyField, _parser.Descending)
+			};
+			keys.AddRange(_parser.ThenBys.Select(item => CreateKey(elementType, item.Name, item.Field, item.Descending)));
+			return keys.AsReadOnly();
+		}
+
+		private static OrderByKey CreateKey(Type elementType, string propertyName, ResolvedQueryField field, bool descending)
+		{
+			var param = Expression.Parameter(elementType, "p");
+			return new OrderByKey(Expression.Lambda(CreateKeyExpression(param, propertyName, field), param), descending);
+		}
+
 		public IOrderedEnumerable<T> Sort<T>(IEnumerable<T> source)
 		{
 			var result = Sort(
